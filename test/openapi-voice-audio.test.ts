@@ -5,6 +5,18 @@ import { buildOpenApiSpec } from "@/lib/openapi-build";
 import { getCompleteOpenApiEntries } from "@/lib/api-surface";
 
 describe("agent audio OpenAPI view boundaries", () => {
+  test.each([["public", openApiSpec], ["complete", completeOpenApiSpec]])("%s keeps manual Start identity and both response contracts", (_name, spec) => {
+    const operation = spec.paths["/api/dial"].post;
+    expect(operation).toMatchObject({ operationId: "postDial", "x-callcaster-auth-class": "session", "x-callcaster-exposure": "sessionOnly" });
+    const json = operation.requestBody.content["application/json"].schema;
+    expect(json.oneOf).toHaveLength(2);
+    expect(json.oneOf[1].required).toEqual(expect.arrayContaining(["selected_device", "dial_intent_id", "audio_connection_id", "audio_generation"]));
+    expect(json.oneOf[0].properties).not.toHaveProperty("audio_connection_id");
+    expect(operation.requestBody.content["application/x-www-form-urlencoded"].schema).toEqual(json);
+    expect(operation.responses["200"].content["application/json"].schema.required).toEqual(["success", "callSid"]);
+    expect(operation.responses["200"].content).toHaveProperty("text/xml");
+    expect(operation.responses).toHaveProperty("409");
+  });
   test("keeps the signed provider endpoint outside the public user API", () => {
     expect(openApiSpec.paths).not.toHaveProperty("/api/voice-audio");
     expect(openApiSpec.paths).not.toHaveProperty("/api/voice-continuation");

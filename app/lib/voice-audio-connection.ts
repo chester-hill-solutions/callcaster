@@ -31,6 +31,10 @@ export function voiceAudioParticipantLabel(row: { id: string; generation: number
   return `audio:${row.id}:${row.generation}`;
 }
 
+export function voiceAudioCustomerLabel(reservationId: string) {
+  return `customer:${reservationId}`;
+}
+
 export function voiceAudioStartsMuted(row: { target_kind: string; source_agent_sid: string | null }) {
   return row.target_kind !== "idle" || row.source_agent_sid !== null;
 }

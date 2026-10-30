@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { workspace_voice_recording_operation as recordings } from "@/db/schema";
-import { VoiceRecordingBindingError, voiceRecordingReceiptSchema, type VoiceRecordingObservation, type VoiceRecordingReceipt } from "@/lib/voice-recording";
+import { VoiceRecordingBindingError, voiceRecordingReceiptSchema, voiceRecordingSource, type VoiceRecordingObservation, type VoiceRecordingReceipt } from "@/lib/voice-recording";
 import { withVoiceRecordingOperation, type VoiceRecordingOperation } from "./voice-recording-operation.server";
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
 
@@ -8,7 +8,7 @@ const observationSchema = voiceRecordingReceiptSchema.partial({ status: true });
 
 async function saveReceipt(tx: CreditTransaction, current: VoiceRecordingOperation, receipt: VoiceRecordingObservation) {
   if (!current.send_started_at || receipt.requestUrl !== current.callback_url || receipt.accountSid !== current.account_sid ||
-      receipt.callSid !== current.source_call_sid || receipt.source !== (current.kind === "dial" ? "DialVerb" : "StartCallRecordingAPI") ||
+      receipt.callSid !== current.source_call_sid || receipt.source !== voiceRecordingSource(current.kind) ||
       current.provider_sid && current.provider_sid !== receipt.recordingSid)
     throw new VoiceRecordingBindingError("Recording receipt does not match its instruction");
   // Late progress and duplicate completion cannot erase a terminal receipt.

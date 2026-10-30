@@ -9,6 +9,8 @@ import { bindVerifiedVoiceSetupRequest, voiceBridgeCallbackArgs } from "@/lib/vo
 import { claimVoiceBridgeRecipient } from "@/server/voice-bridge-reservation.server";
 import { voiceWebhookDeliveryUrl } from "@/lib/twilio-webhook-delivery";
 import { prepareVoiceDialRecording } from "@/server/voice-recording-operation.server";
+import { findVoicePhoneCustomerOwner } from "@/server/voice-phone-customer.server";
+import { voicePhoneCustomerInstruction } from "@/lib/voice-phone-customer.server";
 
 function unavailable() {
   return new Response(sayHangupTwiml("We're unable to take your call right now. Please try again later."),
@@ -20,15 +22,24 @@ export const action = defineAction({
     const formData = await request.clone().formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
     if (!params.CallSid) return twilioWebhookForbiddenHangup();
-    const forbidden = await requireTwilioSignature(request, { callSid: params.CallSid, params });
+    const query = new URL(request.url).searchParams;
+    const phoneCustomer = query.get("credit_leg") === "recipient"
+      ? await findVoicePhoneCustomerOwner(query.get("credit_reservation") ?? "") : null;
+    if (query.get("credit_leg") === "recipient" && !phoneCustomer?.audio_connection_id) return twilioWebhookForbiddenHangup();
+    const forbidden = await requireTwilioSignature(request, { callSid: params.CallSid, params,
+      ...(phoneCustomer ? { workspaceId: phoneCustomer.workspace, expectedAccountSid: phoneCustomer.account_sid } : {}),
+    });
     if (forbidden) return forbidden;
+    if (phoneCustomer) return { phoneCustomer, bridge: null, params };
     const bridge = await bindVerifiedVoiceSetupRequest(request, params);
-    return bridge instanceof Response ? bridge : { bridge, params };
+    return bridge instanceof Response ? bridge : { bridge, params, phoneCustomer: null };
   },
   sideEffects: ["db-read", "db-write", "twilio"],
   handler: async ({ request, auth }) => {
     try {
       const { bridge, params } = auth;
+      if (auth.phoneCustomer) return await voicePhoneCustomerInstruction(request, auth.phoneCustomer, params) ?? unavailable();
+      if (!bridge) return unavailable();
       if (!bridge.status_callback || !bridge.user_id) return unavailable();
       const recording = await prepareVoiceDialRecording(bridge, { sid: params.CallSid ?? "", accountSid: params.AccountSid ?? "",
         to: params.To ?? "", from: params.From ?? "", direction: params.Direction ?? "", parentCallSid: params.ParentCallSid || null }, env.BASE_URL());

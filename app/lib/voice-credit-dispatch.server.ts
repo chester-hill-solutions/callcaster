@@ -53,7 +53,8 @@ export async function dispatchReservedVoiceCall(
   }
   callback.searchParams.set(VOICE_RESERVATION_QUERY_PARAM, reserved.reservation.id);
   voice.searchParams.set(VOICE_RESERVATION_QUERY_PARAM, reserved.reservation.id);
-  const urls = { voiceUrl: voice.toString(), statusCallback: callback.toString() };
+  const urls = { voiceUrl: voice.toString(), statusCallback: callback.toString(),
+    ...(args.customerRecording ? { customerRecording: args.customerRecording } : {}) };
   let reservation = reserved.reservation;
   try {
     reservation = await startVoiceReservation(reservation, urls, args.audioSource?.proof);

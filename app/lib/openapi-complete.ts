@@ -5,6 +5,7 @@
 import { getCompleteOpenApiEntries } from "@/lib/api-surface";
 import { buildOpenApiSpec } from "@/lib/openapi-build";
 import { voiceAudioPathOverrides, voiceAudioProviderPathOverrides } from "@/lib/openapi-voice-audio";
+import { manualDialPathOverrides } from "@/lib/openapi-manual-dial";
 
 export const completeOpenApiSpec = buildOpenApiSpec({
   entries: getCompleteOpenApiEntries(),
@@ -13,7 +14,7 @@ export const completeOpenApiSpec = buildOpenApiSpec({
     "Full classified inventory: user-facing routes (also in /api/docs/openapi), provider webhooks (Twilio/Stripe), internal telephony workers, and documented security gaps.",
   tagStrategy: "auth",
   useIntegratorPathOverrides: true,
-  pathOverrides: { ...voiceAudioPathOverrides, ...voiceAudioProviderPathOverrides },
+  pathOverrides: { ...voiceAudioPathOverrides, ...voiceAudioProviderPathOverrides, ...manualDialPathOverrides },
   includeIntegratorSchemas: true,
   unsupportedDescription:
     "**Not supported for external use.** Webhook, internal, or security-gap route.",

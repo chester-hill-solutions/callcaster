@@ -7,12 +7,14 @@ import { ACTIVE_VOICE_RESERVATION_STATES, getOutboundHeldCredits, type CreditTra
 import { logger } from "@/lib/logger.server";
 import { persistReservedVoiceCall } from "./voice-reservation-callback.server";
 import { recordFundedPredictiveReceipt } from "./predictive-voice-receipt.server";
-import { admitVoiceAudioCustomerSource, voiceAudioCustomerReservationFields, voiceAudioCustomerSendGuard,
+import { admitVoiceAudioCustomerSource, hasUnresolvedVoiceAudioSource, voiceAudioCustomerReservationFields, voiceAudioCustomerSendGuard,
   type VerifiedVoiceAudioCustomerIntent, type VoiceAudioCustomerIntent } from "./voice-audio-customer-admission.server";
 import type { VoiceAudioCustomerSourceProof } from "./voice-audio-customer-source.server";
+import type { VoiceCustomerRecordingIntent } from "@/lib/voice-recording";
+import { voiceCustomerRecordingSendFields } from "./voice-customer-recording.server";
 
 export type VoiceReservation = typeof reservations.$inferSelect;
-export type VoiceDispatchUrls = { voiceUrl: string; statusCallback: string };
+export type VoiceDispatchUrls = { voiceUrl: string; statusCallback: string; customerRecording?: VoiceCustomerRecordingIntent };
 const LEASE_MS = 5 * 60_000;
 
 function owned(reservation: VoiceReservation) {
@@ -112,7 +114,11 @@ async function reservationSource(tx: CreditTransaction, args: VoiceReservationIn
     const replay = await findRepeatedOperation(tx, args, args.operationKey);
     if (replay) return replay;
   }
-  if (!args.audioSource) return { ok: true as const, fields: { conference_id: args.conferenceId } };
+  if (!args.audioSource) {
+    if (args.setupTo != null && args.userId && await hasUnresolvedVoiceAudioSource(tx, args.workspaceId, args.userId))
+      return { ok: false as const, reason: "audio_source_unavailable" as const };
+    return { ok: true as const, fields: { conference_id: args.conferenceId } };
+  }
   const audio = await admitVoiceAudioCustomerSource(tx, { ...args, audioSource: args.audioSource });
   return audio.ok ? { ok: true as const, fields: voiceAudioCustomerReservationFields(audio.connection, args.audioSource) } : audio;
 }
@@ -175,9 +181,11 @@ export async function startVoiceReservationInTransaction(
   executor: CreditTransaction, reservation: VoiceReservation, urls: VoiceDispatchUrls, audioProof?: VoiceAudioCustomerSourceProof,
 ) {
   const sourceGuard = await voiceAudioCustomerSendGuard(executor, reservation, audioProof);
+  const recordingFields = voiceCustomerRecordingSendFields(reservation, urls);
   const [row] = await executor.update(reservations).set({
     state: "creating", send_started_at: new Date(), updated_at: new Date(),
     voice_url: urls.voiceUrl, status_callback: urls.statusCallback,
+    ...recordingFields,
   }).where(and(owned(reservation), sourceGuard, eq(reservations.state, "reserved"),
     gt(reservations.lease_expires_at, new Date()))).returning();
   if (!row) throw new Error("Voice credit reservation is no longer owned");

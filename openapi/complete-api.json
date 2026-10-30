@@ -4889,8 +4889,8 @@
     "/api/dial": {
       "post": {
         "operationId": "postDial",
-        "summary": "POST /api/dial",
-        "description": "Campaign dial initiation; returns TwiML.",
+        "summary": "Start one funded manual customer call",
+        "description": "Session or bearer session only. user_id must be the actor. Queue/contact/campaign/outreach and the selected device are owned. Keep dial_intent_id for retries. Optional audio_connection_id and audio_generation reuse the actor's confirmed idle phone; both fields, a verified phone selected_device and dial_intent_id are required together. Explicit Start calls only the customer with one hold and returns its real SID as JSON. Accepted intent replay precedes mutable source checks. Connect remains connection-only. A new legacy phone setup is refused while this actor has an unresolved audio connection. Without an owned audio operation, legacy requests retain setup-plus-recipient behavior and TwiML success.",
         "tags": [
           "User API",
           "telephony"
@@ -4910,22 +4910,332 @@
         "requestBody": {
           "required": true,
           "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "to_number": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "caller_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "user_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "campaign_id": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "contact_id": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "queue_id": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "outreach_id": {
+                        "type": "string",
+                        "description": "Positive attempt ID or an empty value to create an attempt."
+                      },
+                      "selected_device": {
+                        "type": "string"
+                      },
+                      "dial_intent_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expected_queue_generation": {
+                        "type": "string",
+                        "format": "uuid"
+                      }
+                    },
+                    "required": [
+                      "to_number",
+                      "caller_id",
+                      "workspace_id",
+                      "user_id",
+                      "campaign_id",
+                      "contact_id",
+                      "queue_id"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "to_number",
+                      "caller_id",
+                      "workspace_id",
+                      "user_id",
+                      "campaign_id",
+                      "contact_id",
+                      "queue_id",
+                      "selected_device",
+                      "dial_intent_id",
+                      "audio_connection_id",
+                      "audio_generation"
+                    ],
+                    "properties": {
+                      "to_number": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "caller_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "user_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "campaign_id": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "contact_id": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "queue_id": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "outreach_id": {
+                        "type": "string",
+                        "description": "Positive attempt ID or an empty value to create an attempt."
+                      },
+                      "selected_device": {
+                        "type": "string",
+                        "pattern": "^\\+[1-9][0-9]{7,14}$"
+                      },
+                      "dial_intent_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expected_queue_generation": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "audio_connection_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "audio_generation": {
+                        "oneOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            },
             "application/x-www-form-urlencoded": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Form fields (JSON or multipart where noted in human docs)."
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "to_number": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "caller_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "user_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "campaign_id": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "contact_id": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "queue_id": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "outreach_id": {
+                        "type": "string",
+                        "description": "Positive attempt ID or an empty value to create an attempt."
+                      },
+                      "selected_device": {
+                        "type": "string"
+                      },
+                      "dial_intent_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expected_queue_generation": {
+                        "type": "string",
+                        "format": "uuid"
+                      }
+                    },
+                    "required": [
+                      "to_number",
+                      "caller_id",
+                      "workspace_id",
+                      "user_id",
+                      "campaign_id",
+                      "contact_id",
+                      "queue_id"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "to_number",
+                      "caller_id",
+                      "workspace_id",
+                      "user_id",
+                      "campaign_id",
+                      "contact_id",
+                      "queue_id",
+                      "selected_device",
+                      "dial_intent_id",
+                      "audio_connection_id",
+                      "audio_generation"
+                    ],
+                    "properties": {
+                      "to_number": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "caller_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "user_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "campaign_id": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "contact_id": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "queue_id": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "outreach_id": {
+                        "type": "string",
+                        "description": "Positive attempt ID or an empty value to create an attempt."
+                      },
+                      "selected_device": {
+                        "type": "string",
+                        "pattern": "^\\+[1-9][0-9]{7,14}$"
+                      },
+                      "dial_intent_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expected_queue_generation": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "audio_connection_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "audio_generation": {
+                        "oneOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "TwiML XML response",
+            "description": "Accepted call or accepted intent replay. Confirmed-phone requests return JSON; legacy requests return TwiML.",
             "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "callSid"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "callSid": {
+                      "type": "string",
+                      "pattern": "^CA[0-9a-fA-F]{32}$"
+                    }
+                  }
+                }
+              },
               "text/xml": {
                 "schema": {
                   "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid dial context",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -4935,7 +5245,75 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Insufficient available credits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Selected actor or device is not permitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workspace or dial context not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Pending call, stale queue/source, or provider verification required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the client may retry."
+              }
+            }
+          },
+          "502": {
+            "description": "Provider rejected the call",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }

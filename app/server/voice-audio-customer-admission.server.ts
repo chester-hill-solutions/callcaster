@@ -1,15 +1,26 @@
-import { and, eq, inArray, ne, or, isNull } from "drizzle-orm";
-import { workspace_voice_reservation as reservations } from "@/db/schema";
+import { and, eq, inArray, ne, or, isNull, isNotNull } from "drizzle-orm";
+import { workspace_voice_audio_connection as connections, workspace_voice_reservation as reservations } from "@/db/schema";
 import { lockVerifiedVoiceAudioCustomerSource, type VoiceAudioCustomerSourceProof } from "./voice-audio-customer-source.server";
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
 import type { VoiceAudioConnection } from "./voice-audio-connection.server";
 import type { VoiceReservation } from "./voice-credit-reservation.server";
-import { VoiceAudioBindingError } from "@/lib/voice-audio-connection";
+import { RECOVERABLE_VOICE_AUDIO_STATES, VoiceAudioBindingError } from "@/lib/voice-audio-connection";
 
 export type VoiceAudioCustomerIntent = {
   connectionId: string; generation: number; destination: string; mode: "manual" | "predictive";
 };
 export type VerifiedVoiceAudioCustomerIntent = VoiceAudioCustomerIntent & { proof: VoiceAudioCustomerSourceProof };
+
+/** Called after intent replay, under the workspace funding lock. */
+export async function hasUnresolvedVoiceAudioSource(tx: CreditTransaction, workspaceId: string, userId: string) {
+  const [source] = await tx.select({ id: connections.id }).from(connections).where(and(
+    eq(connections.workspace, workspaceId), eq(connections.user_id, userId),
+    or(inArray(connections.state, [...RECOVERABLE_VOICE_AUDIO_STATES]),
+      and(isNotNull(connections.provider_sid), isNull(connections.terminal_at)),
+      and(isNotNull(connections.conference_stop_requested_at), isNull(connections.conference_stopped_at))),
+  )).limit(1);
+  return Boolean(source);
+}
 
 export function voiceAudioCustomerReservationFields(connection: VoiceAudioConnection, intent: VoiceAudioCustomerIntent) {
   return { conference_id: connection.conference_id, conference_sid: connection.conference_sid,

@@ -8,7 +8,7 @@ import { observeVoiceAudioStatus } from "@/server/voice-audio-lifecycle.server";
 import type { VoiceAudioConnection } from "@/server/voice-audio-connection.server";
 import { logger } from "@/lib/logger.server";
 import { VoiceAudioBindingError } from "@/lib/voice-audio-connection";
-import { handleBoundVoiceAudioParticipant, handleBoundVoiceAudioBridgeParticipant } from "@/lib/voice-audio-participant.server";
+import { handleBoundVoiceAudioParticipant, handleBoundVoiceAudioBridgeParticipant, handleBoundVoiceAudioCustomerParticipant } from "@/lib/voice-audio-participant.server";
 import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 
 type VerifiedContext = { owner: VoiceAudioConnection; params: Record<string, string>; event: "voice" | "status" | "conference" };
@@ -23,7 +23,9 @@ async function handleConference(owner: VoiceAudioConnection, params: Record<stri
   if (params.StatusCallbackEvent !== "participant-join" && params.StatusCallbackEvent !== "participant-leave") return new Response(null, { status: 204 });
   const event = parseTwilioVoiceCallback(params);
   if (event.kind !== "participant") return twilioWebhookForbiddenHangup();
-  if (!await handleBoundVoiceAudioParticipant(owner.workspace, requestUrl, event)) await handleBoundVoiceAudioBridgeParticipant(owner, requestUrl, event);
+  if (!await handleBoundVoiceAudioParticipant(owner.workspace, requestUrl, event) &&
+    !await handleBoundVoiceAudioCustomerParticipant(owner, requestUrl, event))
+    await handleBoundVoiceAudioBridgeParticipant(owner, requestUrl, event);
   return new Response(null, { status: 204 });
 }
 

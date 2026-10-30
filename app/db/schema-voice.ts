@@ -27,6 +27,8 @@ export const workspace_voice_reservation = pgTable("workspace_voice_reservation"
   audio_agent_sid: text(),
   audio_conference_callback: text(),
   audio_mode: text().$type<"manual" | "predictive">(),
+  customer_recording_id: uuid(),
+  customer_recording_callback: text(),
   predictive_operation_id: uuid(),
   setup_voice_url: text(),
   setup_status_callback: text(),

@@ -5,6 +5,13 @@ export class VoiceRecordingBindingError extends Error {
   constructor(message: string) { super(message); this.name = "VoiceRecordingBindingError"; }
 }
 
+export type VoiceCustomerRecordingIntent = { id: string; callbackUrl: string };
+
+export function voiceRecordingSource(kind: "dial" | "parent" | "customer") {
+  if (kind === "dial") return "DialVerb";
+  return kind === "customer" ? "OutboundAPI" : "StartCallRecordingAPI";
+}
+
 export function voiceRecordingCallbackUrl(baseUrl: string, operationId: string) {
   const url = new URL("/api/voice-recording", baseUrl);
   url.searchParams.set("recording", operationId);
@@ -13,7 +20,7 @@ export function voiceRecordingCallbackUrl(baseUrl: string, operationId: string) 
 
 export const voiceRecordingReceiptSchema = z.strictObject({
   requestUrl: z.url(), accountSid: z.string().regex(/^AC[0-9a-f]{32}$/i), callSid: z.string().regex(/^CA[0-9a-f]{32}$/i),
-  recordingSid: z.string().regex(/^RE[0-9a-f]{32}$/i), source: z.enum(["DialVerb", "StartCallRecordingAPI"]),
+  recordingSid: z.string().regex(/^RE[0-9a-f]{32}$/i), source: z.enum(["DialVerb", "StartCallRecordingAPI", "OutboundAPI"]),
   status: z.enum(["in-progress", "completed", "absent"]), startedAt: z.date().optional(),
   durationSeconds: z.int().nonnegative().max(2147483647).optional(), channels: z.union([z.literal(1), z.literal(2)]).optional(),
 });

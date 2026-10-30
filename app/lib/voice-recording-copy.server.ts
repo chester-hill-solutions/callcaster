@@ -29,7 +29,8 @@ export async function runVoiceRecordingCopy(workspaceId: string, operationId: st
     const result = await persistCallRecordingToStorage({ workspaceId: current.workspace, callSid: current.logical_call_sid,
       accountSid: current.account_sid, recordingSid: current.provider_sid, existingAudioUrl: current.audio_url, storageMode: "recording" });
     const copied = await finishVoiceRecordingCopy(current, result.audioUrl);
-    if (copied && current.kind === "dial") await enqueueCallRecordingTranscription(current.workspace, current.logical_call_sid, result.audioUrl);
+    if (copied && (current.kind === "dial" || current.kind === "customer"))
+      await enqueueCallRecordingTranscription(current.workspace, current.logical_call_sid, result.audioUrl);
     return { copied };
   } catch (error) {
     await deferVoiceRecordingCopy(current);

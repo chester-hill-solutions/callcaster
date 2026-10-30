@@ -137,6 +137,19 @@ access are checked again; the saved operation identifies its original device,
 caller ID, recipient and context. An empty optional `outreach_id` retains the
 legacy meaning of creating a new attempt.
 
+To reuse a confirmed idle phone, send `audio_connection_id`, `audio_generation`,
+the same verified `selected_device`, and a stable `dial_intent_id`. The connection
+must already be active for this agent and workspace. Start checks the live phone
+and room again, reserves one customer hold, and calls only the selected customer.
+It does not ring the agent again. Accepted retries return the same customer SID
+before mutable device checks. This form returns JSON
+`{ "success": true, "callSid": "CA..." }`; legacy requests retain TwiML success.
+Phone Connect itself never starts a customer. This path remains in development
+with the phone transport controls and physical acceptance.
+A new legacy phone setup returns `409` while the actor has an unresolved audio
+connection. Omitting both source fields cannot ring another agent. Existing
+accepted intent retries still return their saved result.
+
 Insufficient available funds return `402`. Pending or stale operations return
 JSON with an `error` and status `409`. An uncertain provider create also returns
 `reason: "voice_dispatch_pending"`; its hold remains for recovery. A definite
@@ -218,7 +231,7 @@ does not reset the campaign queue.
 Documented in [api-internal-unsupported.md](./api-internal-unsupported.md):
 
 - `POST /api/disconnect` — Twilio Device disconnect
-- `POST /api/dial/:number` — TwiML sub-route without signature
+- `POST /api/dial/:number` — signed TwiML sub-route for the saved call account
 - Legacy `POST /api/outreach_attempts/:id`
 
 ## See also

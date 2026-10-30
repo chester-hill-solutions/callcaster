@@ -79,8 +79,8 @@ describe("original-account recording observation recovery (#2879)", () => {
       if (journal) { const { pool, directPool } = await import("@/server/db"); await Promise.all([pool.end(), directPool.end()]); }
     }
   });
-  async function fixture(kind: "dial" | "parent" | "customer" = "dial", known = false) {
-    const id = randomUUID(), sourceSid = ca(), parentSid = kind === "customer" ? ca() : null, recordingSid = re();
+  async function fixture(kind: "dial" | "parent" | "customer" = "dial", known = false, child = false) {
+    const id = randomUUID(), sourceSid = ca(), parentSid = child ? ca() : null, recordingSid = re();
     const callbackUrl = `https://recording-recovery.example.test/api/voice-recording?recording=${id}`;
     await sql`insert into public.workspace_voice_recording_operation
       (id, workspace, reservation_id, user_id, kind, intent_id, logical_call_sid, source_call_sid,
@@ -88,7 +88,7 @@ describe("original-account recording observation recovery (#2879)", () => {
        provider_sid, provider_status, send_started_at, lease_token, lease_expires_at)
       values (${id}::uuid, ${workspaceId}::uuid, ${randomUUID()}::uuid, ${randomUUID()}, ${kind}, ${randomUUID()}::uuid,
        ${parentSid ?? sourceSid}, ${sourceSid}, ${kind === "customer" ? recipient : phone}, ${callerId},
-       ${kind === "customer" ? "outbound-dial" : "outbound-api"}, ${parentSid}, ${accountSid}, ${callbackUrl},
+       ${child ? "outbound-dial" : "outbound-api"}, ${parentSid}, ${accountSid}, ${callbackUrl},
        ${known ? "accepted" : "creating"}, ${known ? recordingSid : null}, ${known ? "in-progress" : null},
        now() - interval '30 minutes', ${randomUUID()}::uuid, now() - interval '1 minute')`;
     const row = await journal.findVoiceRecordingOperation(id); if (!row) throw new Error("Owned recovery row required");
@@ -99,7 +99,8 @@ describe("original-account recording observation recovery (#2879)", () => {
     const ended = new Date(Date.now() - 20 * 60_000).toUTCString().replace("GMT", "+0000");
     const physical = { sid: sourceSid, account_sid: accountSid, to: row.source_to, from: callerId, direction: row.source_direction,
       parent_call_sid: parentSid, status: "completed", date_created: started, date_updated: ended, end_time: ended };
-    const recording = { sid: recordingSid, account_sid: accountSid, call_sid: sourceSid, source: kind === "dial" ? "DialVerb" : "StartCallRecordingAPI",
+    const recording = { sid: recordingSid, account_sid: accountSid, call_sid: sourceSid,
+      source: kind === "dial" ? "DialVerb" : kind === "customer" && !child ? "OutboundAPI" : "StartCallRecordingAPI",
       status: "completed", duration: "71", start_time: started, channels: 1 };
     const event = { request: { method: "POST", url: callbackUrl, parameters: { account_sid: accountSid, call_sid: sourceSid,
       recording_sid: recordingSid, recording_source: recording.source, recording_status: "completed", recording_duration: "71",
@@ -115,7 +116,7 @@ describe("original-account recording observation recovery (#2879)", () => {
   }
   async function jobs() { return sql`select params from public.job where workspace_id = ${workspaceId}::uuid`; }
 
-  test.each(["dial", "parent"] as const)("recovers a lost root %s callback from its exact nonce and real SDK response", async (kind) => {
+  test.each(["dial", "parent", "customer"] as const)("recovers a lost root %s callback from its exact nonce and real SDK response", async (kind) => {
     const f = await fixture(kind);
     expect(await recovery.runVoiceRecordingRecovery()).toEqual({ lifecycle: { examined: 1, closed: 1, pending: 0 }, copies: { examined: 1, enqueued: 1, pending: 0 } });
     expect(await read(f.row)).toMatchObject({ provider_sid: f.recordingSid, provider_status: "completed", state: "accepted",
@@ -125,7 +126,7 @@ describe("original-account recording observation recovery (#2879)", () => {
     expect(provider.requests.map((row) => row.uri)).toEqual([f.callUrl, f.eventsUrl, f.recordingUrl]);
   });
   test("child capture stays pending until its parent-reported recording contract is proved", async () => {
-    const f = await fixture("customer", true);
+    const f = await fixture("customer", true, true);
     if (!f.row.source_parent_sid) throw new Error("Owned physical child fixture required");
     f.recording.call_sid = f.row.source_parent_sid; f.event.request.parameters.call_sid = f.row.source_parent_sid;
     expect(await run()).toEqual({ examined: 0, closed: 0, pending: 0 });

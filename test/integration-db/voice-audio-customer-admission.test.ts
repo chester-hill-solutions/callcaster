@@ -1,24 +1,8 @@
 import { accountSid, actor, callerId, customer, otherPhone, phone, sid, sql, state, useOwnedAudioFixture, web, workspaceId } from "../helpers/voice-audio-fixture";
-import { confirmed, verified } from "../helpers/voice-audio-customer-fixture";
+import { verified, customerAttempt as attempt, fundCustomerAttempt as funded, customerUrls } from "../helpers/voice-audio-customer-fixture";
 import { randomUUID } from "node:crypto";
 import { describe, expect, test, vi } from "vitest";
-import { recordVoiceReservationProvider, replayVoiceOperation, reserveVoiceCredits, startVoiceReservation,
-  type VoiceReservationInput } from "@/server/voice-credit-reservation.server";
-
-async function attempt(mode: "manual" | "predictive" = "manual") {
-  const f = await confirmed(), proof = await verified(f);
-  const args: VoiceReservationInput = { workspaceId, userId: actor, accountSid, kind: "staffed", to: customer, from: callerId,
-    campaignId: 123, operationKey: `audio-customer:${randomUUID()}`, audioSource: {
-      connectionId: f.row.id, generation: f.row.generation, destination: phone, mode, proof,
-    } };
-  return { ...f, args };
-}
-
-async function funded(args: VoiceReservationInput) {
-  const result = await reserveVoiceCredits(args);
-  if (!result.ok) throw new Error(`Customer admission refused: ${result.reason}`);
-  return result.reservation;
-}
+import { recordVoiceReservationProvider, replayVoiceOperation, reserveVoiceCredits, startVoiceReservation } from "@/server/voice-credit-reservation.server";
 
 describe("customer funding through one confirmed phone", () => {
   useOwnedAudioFixture();
@@ -45,7 +29,7 @@ describe("customer funding through one confirmed phone", () => {
 
   test("accepted intent replay precedes a canceled source and an expired physical observation", async () => {
     const f = await attempt(), reservation = await funded(f.args), customerSid = sid();
-    const started = await startVoiceReservation(reservation, { voiceUrl: "https://audio-connection.example.test/customer", statusCallback: "https://audio-connection.example.test/status" }, f.args.audioSource?.proof);
+    const started = await startVoiceReservation(reservation, customerUrls(), f.args.audioSource?.proof);
     await recordVoiceReservationProvider(started, customerSid);
     await sql`update public.workspace_voice_audio_connection set cancel_requested_at = now() where id = ${f.row.id}::uuid`;
     vi.spyOn(Date, "now").mockReturnValue((f.args.audioSource?.proof.observedAt ?? 0) + 6000);
@@ -60,9 +44,7 @@ describe("customer funding through one confirmed phone", () => {
 
   test.each(["connection", "generation", "destination", "mode", "room", "customer", "actor"])("accepted replay rejects changed %s", async change => {
     const f = await attempt(), reservation = await funded(f.args), customerSid = sid();
-    await recordVoiceReservationProvider(await startVoiceReservation(reservation, {
-      voiceUrl: "https://audio-connection.example.test/customer", statusCallback: "https://audio-connection.example.test/status",
-    }, f.args.audioSource?.proof), customerSid);
+    await recordVoiceReservationProvider(await startVoiceReservation(reservation, customerUrls(), f.args.audioSource?.proof), customerSid);
     if (!f.args.audioSource) throw new Error("Audio source fixture required");
     const audio = { ...f.args.audioSource };
     const args = { ...f.args, audioSource: audio };
@@ -104,9 +86,7 @@ describe("customer funding through one confirmed phone", () => {
 
   test("one settled customer frees its hold and the next customer keeps the same real phone", async () => {
     const f = await attempt(), reservation = await funded(f.args), customerSid = sid();
-    await recordVoiceReservationProvider(await startVoiceReservation(reservation, {
-      voiceUrl: "https://audio-connection.example.test/customer", statusCallback: "https://audio-connection.example.test/status",
-    }, f.args.audioSource?.proof), customerSid);
+    await recordVoiceReservationProvider(await startVoiceReservation(reservation, customerUrls(), f.args.audioSource?.proof), customerSid);
     await sql`update public.call set status = 'completed', duration = '42' where sid = ${customerSid}`;
     const { findCallBySid } = await import("@/lib/telephony-db.server");
     const { billTerminalCallStatus } = await import("@/lib/twilio-call-status.server");

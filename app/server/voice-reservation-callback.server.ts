@@ -7,6 +7,9 @@ import { normalizeProviderStatus } from "@/lib/call-status";
 import { recordFundedPredictiveReceipt } from "./predictive-voice-receipt.server";
 import { matchesStoredVoiceCallbackUrl } from "@/lib/twilio/callback-url";
 import { voiceCallLegIdentity } from "@/lib/voice-bridge-identity";
+import { persistVoiceCustomerRecording } from "./voice-customer-recording.server";
+
+export class VoiceReservationBindingError extends Error {}
 
 async function survivingCallContext(tx: CreditTransaction, reservation: VoiceReservation) {
   // Customer data can be removed after the provider accepts a call. Keep its
@@ -45,6 +48,7 @@ export async function persistReservedVoiceCall(
   if (!saved || (saved.account_sid && saved.account_sid !== reservation.account_sid)) {
     throw new Error("Voice call belongs to a different dispatch");
   }
+  if (purpose === "recipient") await persistVoiceCustomerRecording(tx, reservation, callSid);
   return saved;
 }
 
@@ -56,20 +60,26 @@ type VoiceReservationCallbackInput = {
   from: string;
   direction: string;
   requestUrl: string;
-  entryPoint: "voice" | "status";
+  entryPoint: "voice" | "status" | "recording";
+  recordingOperationId?: string;
   machinePhase?: string | null;
   machineOperationId?: string | null;
   parentCallSid?: string | null;
 };
 
 async function expectedCallbackUrl(tx: CreditTransaction, reservation: VoiceReservation, args: VoiceReservationCallbackInput) {
+  if (args.entryPoint === "recording") {
+    if (!reservation.audio_connection_id || reservation.customer_recording_id !== args.recordingOperationId)
+      throw new VoiceReservationBindingError("Customer recording callback has no saved launch");
+    return reservation.customer_recording_callback;
+  }
   if (args.entryPoint !== "voice" || !args.machinePhase)
     return args.entryPoint === "voice" ? reservation.voice_url : reservation.status_callback;
   const [operation] = await tx.select().from(predictive_machine_operation).where(and(
     eq(predictive_machine_operation.workspace, reservation.workspace), eq(predictive_machine_operation.id, args.machineOperationId ?? ""),
     eq(predictive_machine_operation.call_sid, args.callSid), eq(predictive_machine_operation.conference_id, reservation.conference_id ?? ""),
   )).limit(1);
-  if (!operation || !["wait", "complete"].includes(args.machinePhase)) throw new Error("Invalid funded machine phase");
+  if (!operation || !["wait", "complete"].includes(args.machinePhase)) throw new VoiceReservationBindingError("Invalid funded machine phase");
   const phaseUrl = new URL(operation.ack_url);
   phaseUrl.searchParams.set("machine", args.machinePhase);
   return phaseUrl.href;
@@ -85,7 +95,7 @@ function matchesRecipientDispatch(reservation: VoiceReservation, args: VoiceRese
 /** Call only after validating the provider signature, including the URL query. */
 export async function bindVoiceReservationCallback(args: VoiceReservationCallbackInput) {
   if (!/^[0-9a-f-]{36}$/i.test(args.reservationId) || !/^CA[0-9a-f]{32}$/i.test(args.callSid)) {
-    throw new Error("Invalid voice reservation callback identity");
+    throw new VoiceReservationBindingError("Invalid voice reservation callback identity");
   }
   return db.transaction(async (tx) => {
     const [reservation] = await tx.select().from(reservations)
@@ -93,10 +103,10 @@ export async function bindVoiceReservationCallback(args: VoiceReservationCallbac
     if (!reservation || !reservation.send_started_at || reservation.state === "released" || reservation.recipient_refused_at ||
         !matchesRecipientDispatch(reservation, args) ||
         (reservation.setup_to !== null && !reservation.recipient_instruction_issued_at)) {
-      throw new Error("Voice reservation callback does not match its dispatch");
+      throw new VoiceReservationBindingError("Voice reservation callback does not match its dispatch");
     }
     if (!matchesStoredVoiceCallbackUrl(args.requestUrl, await expectedCallbackUrl(tx, reservation, args)))
-      throw new Error("Voice callback URL does not match its dispatch");
+      throw new VoiceReservationBindingError("Voice callback URL does not match its dispatch");
     await recordFundedPredictiveReceipt(tx, reservation, args.callSid);
     const saved = await persistReservedVoiceCall(tx, reservation, args.callSid);
     await tx.update(reservations).set({
