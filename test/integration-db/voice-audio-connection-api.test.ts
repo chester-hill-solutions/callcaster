@@ -123,6 +123,46 @@ describe("owned agent audio connection journal (#2879)", () => {
     expect(responses.some((r) => r.status === 200)).toBe(true); expect(web.create).toHaveBeenCalledTimes(1);
     expect((await state()).operations).toBe(1);
   });
+  test("POST, GET and DELETE retain the saved audio owner and request identity", async () => {
+    const intent = randomUUID(), response = await apiPost({ workspaceId, phoneNumber: phone, connection_intent_id: intent });
+    const body = await response.json(), row = await journal.findVoiceAudioConnection(body.connection_id);
+    if (!row) throw new Error("Saved API connection required");
+    const identity = { connection_id: row.id, workspace_id: workspaceId, user_id: actor, connection_intent_id: intent,
+      destination: phone, requested_call_sid: null, campaign_id: null, generation: 1, transport: "phone", callSid: row.provider_sid };
+    expect(body).toMatchObject(identity);
+    await expect((await apiControl(row)).json()).resolves.toMatchObject(identity);
+    await expect((await apiControl(row, "DELETE")).json()).resolves.toMatchObject({ ...identity, cancel_requested: true });
+    expect(web.create).toHaveBeenCalledTimes(1);
+  });
+  test("reusing a pending phone exposes its original intent rather than the new request UUID", async () => {
+    const intent = randomUUID(), first = await (await apiPost({ workspaceId, phoneNumber: phone, connection_intent_id: intent })).json();
+    const reused = await apiPost({ workspaceId, phoneNumber: phone, connection_intent_id: randomUUID() });
+    expect(reused.status).toBe(200);
+    await expect(reused.json()).resolves.toMatchObject({ connection_id: first.connection_id, connection_intent_id: intent,
+      workspace_id: workspaceId, user_id: actor, destination: phone, generation: 1, connection_state: "joining" });
+    expect(web.create).toHaveBeenCalledTimes(1); expect((await state()).operations).toBe(1);
+  });
+  test("reusing an active phone retains its original identity without another provider create", async () => {
+    const row = await issued();
+    expect(await observeVoiceAudioConferenceEvent(joined(row))).toMatchObject({ state: "active" });
+    const response = await apiPost({ workspaceId, phoneNumber: phone, connection_intent_id: randomUUID() });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ success: true, connection_id: row.id, connection_intent_id: row.intent_id,
+      workspace_id: workspaceId, user_id: actor, destination: phone, callSid: row.provider_sid, generation: 1, connection_state: "active", cancel_requested: false });
+    expect(web.create).not.toHaveBeenCalled(); expect((await state()).operations).toBe(1);
+  });
+  test("an account change after preparation exposes the owned unsent attempt for cancellation", async () => {
+    const intent = randomUUID(), row = await prepare(input({ intentId: intent }));
+    web.accountSid = `AC${"5".repeat(32)}`;
+    const response = await apiPost({ workspaceId, phoneNumber: phone, connection_intent_id: intent });
+    expect(response.status).toBe(409);
+    expect(response.headers.get("Set-Cookie")).toBe("audio-session=refreshed");
+    await expect(response.json()).resolves.toMatchObject({ reason: "account_changed", connection_id: row.id,
+      workspace_id: workspaceId, user_id: actor, connection_intent_id: intent, destination: phone, connection_state: "prepared", callSid: null });
+    const canceled = await apiControl(row, "DELETE"); expect(canceled.status).toBe(200);
+    await expect(canceled.json()).resolves.toMatchObject({ connection_id: row.id, connection_state: "canceled", cancel_requested: true });
+    expect(web.create).not.toHaveBeenCalled(); expect(web.update).not.toHaveBeenCalled();
+  });
   test("API auth, tenant membership and device checks stop before provider create", async () => {
     web.authenticated = false; expect((await apiPost()).status).toBe(401);
     web.authenticated = true; web.userId = otherActor; expect((await apiPost()).status).toBe(404);
@@ -167,8 +207,13 @@ describe("owned agent audio connection journal (#2879)", () => {
     web.create.mockRejectedValueOnce(Object.assign(new Error("owned-provider-secret-marker"), { status: 400 }));
     const body = { workspaceId, phoneNumber: phone, connection_intent_id: randomUUID() };
     const response = await apiPost(body); expect(response.status).toBe(502);
-    await expect(response.json()).resolves.toEqual({ error: "Unable to connect the agent device" });
-    expect((await apiPost(body)).status).toBe(409); expect(web.create).toHaveBeenCalledTimes(1);
+    const failure = await response.json();
+    expect(failure).toMatchObject({ error: "Unable to connect the agent device", workspace_id: workspaceId, user_id: actor,
+      connection_intent_id: body.connection_intent_id, destination: phone, connection_state: "failed", callSid: null });
+    expect(JSON.stringify(failure)).not.toContain("owned-provider-secret-marker");
+    const replay = await apiPost(body); expect(replay.status).toBe(409);
+    await expect(replay.json()).resolves.toMatchObject({ connection_id: failure.connection_id, connection_state: "failed", reason: "stale_audio" });
+    expect(web.create).toHaveBeenCalledTimes(1);
   });
   test("GET and DELETE are owned by the session and cannot end another user's audio", async () => {
     const response = await apiPost(), body = await response.json(), row = await journal.findVoiceAudioConnection(body.connection_id);

@@ -114,17 +114,28 @@ and its campaign. Phone mode uses `phoneNumber` and optional `device: "phone"`.
 Computer mode uses `device: "computer"` and omits `phoneNumber`. The server
 resolves the user's client identity; callers cannot choose another agent.
 
-The response retains `success` and `callSid`, and adds `connection_id`,
-`connection_state`, `generation` and `transport`. Poll with
+The response retains `success` and `callSid`, and includes `connection_id`,
+`connection_state`, `generation`, `transport`, `source_agent_sid` and
+`cancel_requested`. It also includes the saved `workspace_id`, `user_id`,
+`connection_intent_id`, `destination`, `requested_call_sid` and `campaign_id`.
+These identify the saved operation, rather than echo the latest request. A
+matching pending or active connection can be reused; it retains its original
+connection ID, intent UUID and generation. Poll with
 `GET /api/connect-phone-device?workspaceId=…&connection_id=…`. Only **active**
-means the new transport is committed. Accepted, answered and **ready** mean
+with `cancel_requested: false` means the new transport is committed. Accepted,
+answered and **ready** mean
 that work remains. Keep the existing audio until active. A failed phone change
 keeps that audio and the original customer call. Manual calls issued before
 the parent-continuation capability return `409` for a live change.
 
 Retries keep the same intent. A pending or uncertain create returns `409`;
 recovery checks the original provider account and saved callback URLs before
-another action. A current funded call does not need more available credits
+another action. If preparation saved an owned attempt, `409` and `502` replies
+include its last known snapshot. Keep that identity for read/cancel, and read
+its current state before taking action. A non-success response never confirms
+active audio. Errors before preparation have no connection snapshot. Provider
+credentials and provider error details are never included. A current funded
+call does not need more available credits
 to change its audio. Idle connection still requires available credits.
 
 Manual calls permit one unresolved customer promotion. A new intent cannot
