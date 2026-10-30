@@ -7,6 +7,9 @@ import { ACTIVE_VOICE_RESERVATION_STATES, getOutboundHeldCredits, type CreditTra
 import { logger } from "@/lib/logger.server";
 import { persistReservedVoiceCall } from "./voice-reservation-callback.server";
 import { recordFundedPredictiveReceipt } from "./predictive-voice-receipt.server";
+import { admitVoiceAudioCustomerSource, voiceAudioCustomerReservationFields, voiceAudioCustomerSendGuard,
+  type VerifiedVoiceAudioCustomerIntent, type VoiceAudioCustomerIntent } from "./voice-audio-customer-admission.server";
+import type { VoiceAudioCustomerSourceProof } from "./voice-audio-customer-source.server";
 
 export type VoiceReservation = typeof reservations.$inferSelect;
 export type VoiceDispatchUrls = { voiceUrl: string; statusCallback: string };
@@ -37,6 +40,7 @@ export type VoiceReservationInput = {
   setupClientIdentity?: string | null;
   conferenceId?: string | null;
   predictiveOperationId?: string | null;
+  audioSource?: VerifiedVoiceAudioCustomerIntent;
   /** Runs database work only, after funding succeeds and inside its transaction. */
   prepareOutreach?: (tx: CreditTransaction) => Promise<number>;
 };
@@ -56,13 +60,20 @@ async function resolveQueueOperation(tx: CreditTransaction, args: VoiceReservati
   }
   return {
     ok: true as const, queueGeneration: queue.dispatch_generation,
-    operationKey: args.setupTo ? args.operationKey : args.operationKey ? `${args.operationKey}:${queue.dispatch_generation}` : undefined,
+    operationKey: args.setupTo || args.audioSource ? args.operationKey : args.operationKey ? `${args.operationKey}:${queue.dispatch_generation}` : undefined,
     queued: queue.dequeued_at === null && (queue.queue_state === null || ["queued", "assigned"].includes(queue.queue_state)),
   };
 }
 
 type VoiceIntentInput = Pick<VoiceReservationInput,
-  "workspaceId" | "to" | "from" | "campaignId" | "contactId" | "queueId" | "userId" | "setupTo" | "setupClientIdentity" | "outreachAttemptId" | "operationKey" | "conferenceId" | "predictiveOperationId">;
+  "workspaceId" | "to" | "from" | "campaignId" | "contactId" | "queueId" | "userId" | "setupTo" | "setupClientIdentity" | "outreachAttemptId" | "operationKey" | "conferenceId" | "predictiveOperationId"> & { audioSource?: VoiceAudioCustomerIntent };
+
+function sameAudioSource(existing: VoiceReservation, args: VoiceIntentInput) {
+  if (!args.audioSource) return existing.audio_connection_id === null && existing.conference_id === (args.conferenceId ?? null);
+  return existing.audio_connection_id === args.audioSource.connectionId && existing.audio_generation === args.audioSource.generation &&
+    existing.audio_destination === args.audioSource.destination && existing.audio_mode === args.audioSource.mode &&
+    (args.conferenceId == null || existing.conference_id === args.conferenceId);
+}
 
 function sameVoiceContext(existing: VoiceReservation, args: VoiceIntentInput) {
   return existing.campaign_id === (args.campaignId ?? null) && existing.contact_id === (args.contactId ?? null) &&
@@ -80,7 +91,7 @@ async function findRepeatedOperation(tx: CreditTransaction, args: VoiceIntentInp
   if (!existing) return null;
   const sameRequest = (args.accountSid === undefined || existing.account_sid === args.accountSid) &&
     existing.recipient === args.to && existing.caller_id === args.from && sameVoiceContext(existing, args) &&
-    existing.conference_id === (args.conferenceId ?? null) && existing.predictive_operation_id === (args.predictiveOperationId ?? null);
+    sameAudioSource(existing, args) && existing.predictive_operation_id === (args.predictiveOperationId ?? null);
   const acceptedSid = existing.setup_sid ?? existing.provider_sid;
   if (!acceptedSid || !sameRequest) return { ok: false as const, reason: "dispatch_in_progress" as const };
   if (existing.provider_sid) await persistReservedVoiceCall(tx, existing, existing.provider_sid);
@@ -96,15 +107,23 @@ export async function replayVoiceOperation(args: VoiceIntentInput) {
   });
 }
 
+async function reservationSource(tx: CreditTransaction, args: VoiceReservationInput) {
+  if (args.setupTo != null || args.audioSource) {
+    const replay = await findRepeatedOperation(tx, args, args.operationKey);
+    if (replay) return replay;
+  }
+  if (!args.audioSource) return { ok: true as const, fields: { conference_id: args.conferenceId } };
+  const audio = await admitVoiceAudioCustomerSource(tx, { ...args, audioSource: args.audioSource });
+  return audio.ok ? { ok: true as const, fields: voiceAudioCustomerReservationFields(audio.connection, args.audioSource) } : audio;
+}
+
 /** Reuse an owned transaction for queue selection, funding and send journals. */
 export async function reserveVoiceCreditsInTransaction(tx: CreditTransaction, args: VoiceReservationInput) {
   const [balance] = await tx.select({ credits: workspace.credits }).from(workspace)
     .where(eq(workspace.id, args.workspaceId)).for("no key update");
   if (!balance) return { ok: false as const, reason: "workspace_not_found" as const };
-  if (args.setupTo != null) {
-    const replay = await findRepeatedOperation(tx, args, args.operationKey);
-    if (replay) return replay;
-  }
+  const source = await reservationSource(tx, args);
+  if (!source.ok) return source;
   const queue = await resolveQueueOperation(tx, args);
   if (!queue.ok) return queue;
   const replay = await findRepeatedOperation(tx, args, queue.operationKey);
@@ -129,7 +148,8 @@ export async function reserveVoiceCreditsInTransaction(tx: CreditTransaction, ar
     requested_outreach_attempt_id: args.outreachAttemptId,
     operation_key: queue.operationKey, user_id: args.userId, setup_to: args.setupTo,
     setup_client_identity: args.setupClientIdentity,
-    conference_id: args.conferenceId, predictive_operation_id: args.predictiveOperationId,
+    ...source.fields,
+    predictive_operation_id: args.predictiveOperationId,
     lease_token: randomUUID(), lease_expires_at: new Date(Date.now() + LEASE_MS),
     // Admission may wait for a workspace lock. Record the real insertion
     // time, not the transaction start, for explicit-redial duplicate checks.
@@ -147,17 +167,18 @@ export async function reserveVoiceCredits(args: VoiceReservationInput) {
 }
 
 /** The committed checkpoint permits one provider POST for this owner. */
-export async function startVoiceReservation(reservation: VoiceReservation, urls: VoiceDispatchUrls) {
-  return startVoiceReservationInTransaction(db, reservation, urls);
+export async function startVoiceReservation(reservation: VoiceReservation, urls: VoiceDispatchUrls, audioProof?: VoiceAudioCustomerSourceProof) {
+  return db.transaction(tx => startVoiceReservationInTransaction(tx, reservation, urls, audioProof));
 }
 
 export async function startVoiceReservationInTransaction(
-  executor: Pick<CreditTransaction, "update">, reservation: VoiceReservation, urls: VoiceDispatchUrls,
+  executor: CreditTransaction, reservation: VoiceReservation, urls: VoiceDispatchUrls, audioProof?: VoiceAudioCustomerSourceProof,
 ) {
+  const sourceGuard = await voiceAudioCustomerSendGuard(executor, reservation, audioProof);
   const [row] = await executor.update(reservations).set({
     state: "creating", send_started_at: new Date(), updated_at: new Date(),
     voice_url: urls.voiceUrl, status_callback: urls.statusCallback,
-  }).where(and(owned(reservation), eq(reservations.state, "reserved"),
+  }).where(and(owned(reservation), sourceGuard, eq(reservations.state, "reserved"),
     gt(reservations.lease_expires_at, new Date()))).returning();
   if (!row) throw new Error("Voice credit reservation is no longer owned");
   return row;

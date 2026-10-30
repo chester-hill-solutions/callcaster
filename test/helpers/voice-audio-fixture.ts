@@ -14,7 +14,7 @@ export type ApiPhysical = { sid: string; accountSid: string; to: string; from: s
 
 const web = vi.hoisted(() => ({ userId: "", accountSid: "", authenticated: true, create: vi.fn(), fetch: vi.fn(), update: vi.fn(), records: new Map<string, ApiPhysical>() }));
 
-const rooms = vi.hoisted(() => ({ fetch: vi.fn(), update: vi.fn(), list: vi.fn(), records: new Map<string, { sid: string; accountSid: string; friendlyName: string; status: string }>() }));
+const rooms = vi.hoisted(() => ({ fetch: vi.fn(), update: vi.fn(), list: vi.fn(), participant: vi.fn(), records: new Map<string, { sid: string; accountSid: string; friendlyName: string; status: string }>() }));
 
 vi.mock("@/lib/api-auth.server", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/api-auth.server")>(),
@@ -30,7 +30,8 @@ vi.mock("@/lib/database/workspace.server", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/database/workspace.server")>(),
   createWorkspaceTwilioInstance: async () => ({ accountSid: web.accountSid,
     calls: Object.assign((id: string) => ({ fetch: () => web.fetch(id), update: (args: { status: string }) => web.update(id, args) }), { create: web.create }),
-    conferences: Object.assign((id: string) => ({ fetch: () => rooms.fetch(id), update: (args: { status: string }) => rooms.update(id, args) }), { list: rooms.list }),
+    conferences: Object.assign((id: string) => ({ fetch: () => rooms.fetch(id), update: (args: { status: string }) => rooms.update(id, args),
+      participants: (callSid: string) => ({ fetch: () => rooms.participant(id, callSid) }) }), { list: rooms.list }),
   }),
 }));
 
@@ -275,6 +276,7 @@ export function useOwnedAudioFixture() {
     rooms.fetch.mockReset().mockImplementation(async (id: string) => { const room = rooms.records.get(id); if (!room) throw new Error("Owned audio conference required"); return room; });
     rooms.update.mockReset().mockImplementation(async (id: string, args: { status: string }) => { const room = rooms.records.get(id); if (!room) throw new Error("Owned audio conference required"); room.status = args.status; return room; });
     rooms.list.mockReset().mockImplementation(async () => [...rooms.records.values()].filter((r) => r.status === "in-progress"));
+    rooms.participant.mockReset().mockRejectedValue(new Error("Owned audio participant required"));
     web.create.mockReset().mockImplementation(async (args: { to: string; from: string; url: string; statusCallback: string }) => {
       const physical: ApiPhysical = { sid: sid(), accountSid, to: args.to, from: args.from, direction: "outbound-api", parentCallSid: null,
         status: "ringing", duration: null, dateCreated: new Date(), dateUpdated: new Date(), endTime: null, voiceUrl: args.url, statusCallback: args.statusCallback };
