@@ -124,6 +124,18 @@ dial.conference(
 
 **Note:** Conference recording captures the main audio mix. Coach/whisper audio is NOT included. See `twilio-conference-calls`.
 
+Preserve the application's existing channel and consent policy during an audio
+handoff. A Dial recording can end when its child leaves the Dial, before the
+parent Call ends. Own the replacement capture before that transition. Retain
+each RecordingSid under a distinct storage key and logical-call link; an older
+call-level audio URL does not prove a later recording part was copied.
+
+Use explicit RecordingSids when a call has multiple or concurrent recordings;
+`Twilio.CURRENT` is ambiguous in that case. Check the pinned helper before
+selecting a create API: its Call Recordings helper supports `create`, while its
+Conference Recordings helper does not. Use a documented supported primitive.
+See [Recordings resource](https://www.twilio.com/docs/voice/api/recording).
+
 ### ConversationRelay Recording
 
 **Critical:** `record:true` on the REST API call is **silently ignored** with ConversationRelay. No error. No recording.
@@ -258,10 +270,10 @@ client.recordings(recording_sid).delete()
 
 ## CANNOT
 
-- **`recordingTrack` has no observable effect via TwiML** — The `<Start><Recording>` TwiML parameter `recordingTrack` does not isolate tracks. Use the Recordings REST API with `recordingTrack` for actual track isolation.
+- **Do not use the REST `recordingTrack` name as a TwiML attribute.** `<Start><Recording>` uses `track` (`inbound`, `outbound`, `both`) and `channels` (`mono`, `dual`). See the [Recording noun](https://www.twilio.com/docs/voice/twiml/recording).
 - **Cannot start API recordings on ConversationRelay calls** — REST API `record:true` is silently ignored ("not eligible for recording"). Must use `<Start><Recording>` before `<Connect>` in TwiML.
 - **Cannot pause/resume recordings via TwiML** — Only available via the REST API (`update` with `status="paused"` or `status="in-progress"`).
-- **Cannot get dual-channel conference recordings** — Conference recording is always mono (mixed).
+- **Conference download format depends on account settings.** Conference media downloads default to mono. Dual-channel conference recordings require the account feature and `RequestedChannels=2`; unavailable dual media returns 400 and can fall back to `RequestedChannels=1`. See [Recording media formats](https://www.twilio.com/docs/voice/api/recording#retrieve-a-recordings-media-file).
 - **Cannot get dual-channel from Calls API without explicit param** — `Record=true` defaults to mono. Must specify `recordingChannels: 'dual'`.
 - **Cannot transcribe PCI-mode recordings** — Recordings created while PCI mode was enabled cannot be transcribed, even after PCI is disabled.
 - **Cannot use `<Record>` verb for call recording** — `<Record>` captures the caller only (voicemail-style). Use `<Dial record>` or `<Start><Recording>` for call recording.
