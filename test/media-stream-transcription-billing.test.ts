@@ -192,6 +192,36 @@ describe("live transcription billing follows the STT lifecycle", () => {
     expect(transcriptionDebits()).toHaveLength(1);
   });
 
+  test("delayed coaching cleanup cannot add time to the stopped STT stream", async () => {
+    vi.useFakeTimers();
+    workspaceConfigMocks.loadWorkspaceMediaStreamConfig.mockResolvedValue(capabilities({ runCoaching: true }));
+    let finish = () => {};
+    coachingEngineMocks.finalizeCoachingSession.mockReturnValueOnce(new Promise<void>(resolve => { finish = resolve; }));
+    const { handleTwilioStreamMessage } = await import("../services/media-stream/twilio-handler");
+    const ws = createMockWebSocket();
+    await handleTwilioStreamMessage(ws, START_MESSAGE);
+    vi.advanceTimersByTime(2 * 60_000);
+    const stopping = handleTwilioStreamMessage(ws, { event: "stop" });
+    await handleTwilioStreamMessage(ws, { event: "stop" });
+    vi.advanceTimersByTime(10 * 60_000);
+    finish(); await stopping;
+    // Only the two open minutes count: ceil(2 * 0.43) = one credit.
+    expect(transcriptionDebits()).toEqual([expect.objectContaining({ amount: -1 })]);
+  });
+
+  test("failed coaching cleanup still settles one completed STT duration", async () => {
+    vi.useFakeTimers();
+    workspaceConfigMocks.loadWorkspaceMediaStreamConfig.mockResolvedValue(capabilities({ runCoaching: true }));
+    coachingEngineMocks.finalizeCoachingSession.mockRejectedValueOnce(new Error("Owned coaching cleanup failure"));
+    const { handleTwilioStreamMessage } = await import("../services/media-stream/twilio-handler");
+    const ws = createMockWebSocket();
+    await handleTwilioStreamMessage(ws, START_MESSAGE);
+    vi.advanceTimersByTime(2 * 60_000);
+    await expect(handleTwilioStreamMessage(ws, { event: "stop" })).rejects.toThrow("Owned coaching cleanup failure");
+    await handleTwilioStreamMessage(ws, { event: "stop" });
+    expect(transcriptionDebits()).toEqual([expect.objectContaining({ amount: -1 })]);
+  });
+
   test("an STT stream that never opened is not billed", async () => {
     sttMocks.openElevenLabsRealtimeStream.mockResolvedValue(null);
 

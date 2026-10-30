@@ -160,6 +160,13 @@ Recording nonce preparation needs only the reservation lock. Prove
 cross-service races at the real ledger boundary and wait for `pg_blocking_pids`
 before releasing the barrier; a timing-only overlap can miss a deadlock.
 
+Twilio inbound and outbound media share one timestamp clock. Test simultaneous
+tracks against fixed G.711 vectors and one mono duration; byte concatenation
+doubles elapsed audio. Keep startup and jitter buffers bounded, own every timer
+through stop/close, and flush before closing STT. Delay upstream open and coaching
+cleanup separately: early media must survive, a late open must stay retired, and
+cleanup time must not extend the completed transcription debit.
+
 Bun checks must run where Bun can write its temporary files. A permission
 failure is not lockfile drift: retain the dependency files and rerun the full
 gate with the required permissions. The vendor guard leaves rebuilt output for
