@@ -65,6 +65,42 @@ The command prints JSON with independent `required` names, `optional` names, and
 Provider choice is checked against the environment. The default is dotenv for
 local and Railway for deployed environments. GitHub is reserved for CI.
 
+## Local checks during development
+
+Use a focused test or watch command after each edit. Use the fast gate before
+the full gate to find type, lint and guard failures early.
+
+| Need | Command |
+|---|---|
+| One Node test file | `npm run test:node:vitest -- test/example.test.ts` |
+| One UI test file | `npm run test:ui -- test/ui/example.test.tsx` |
+| Watch Node tests | `npm run test:watch:node -- test/example.test.ts` |
+| Watch UI tests | `npm run test:watch:ui -- test/ui/example.test.tsx` |
+| Bun runtime tests | `npm run test:node:runtime` |
+| Type, lint and structural checks | `npm run ci:local:fast` |
+| Full check before a push or PR | `npm run ci:local` |
+
+`test:node` runs both the Node and Bun suites. Use `test:node:vitest` to pass
+a file filter to Vitest. Watch mode reruns tests when their imported files change.
+For a long edit session, run `npm run typecheck` once, then
+`npm run typecheck:watch` in another terminal. Run `npm run typecheck` again
+after route changes to update generated route types.
+
+TypeScript saves its build cache in `node_modules/.cache/typecheck.tsbuildinfo`.
+Each run checks changed inputs. Delete that file to force a fresh check.
+
+Both gates use `scripts/lib/local-gate-plan.mjs`. They run preparation in
+sequence, then run up to two independent guard checks at once. Tests, builds
+and code generation run in sequence after all fast checks pass. Each check
+prints its time. Full logs are in the printed `node_modules/.cache/local-gates/`
+directory. A failure stops queued checks and prints the end of its log.
+
+Use `npm run ci:local -- --jobs=1` for a serial run on a busy machine.
+`--jobs=3` and `--jobs=4` increase guard concurrency. These options do not change
+test worker counts. `VITEST_MAX_WORKERS=2 npm run ci:local` limits test workers.
+Run one full gate per host at a time. The fast gate omits tests and builds;
+the full gate is required before each push or PR.
+
 ## Environment Setup
 
 ### Prerequisites
