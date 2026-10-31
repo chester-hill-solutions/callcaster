@@ -11,8 +11,12 @@ export async function restoreArchivedWorkspace(workspaceId: string, actorId: str
     if (!row) return { ok: false as const, error: "Workspace not found.", status: 404 };
     if (!row.archivedAt) return { ok: true as const, restored: false };
 
+    const tdb = createTenantDb(workspaceId, tx);
+    // Workspaces archived before key revocation was added can still hold old keys.
+    // Delete them before access returns; restore must never reactivate a credential.
+    await tdb.workspace_api_key.delete({});
     await tx.update(workspace).set({ archived_at: null }).where(eq(workspace.id, workspaceId));
-    await createTenantDb(workspaceId, tx).workspace_audit_event.insert({
+    await tdb.workspace_audit_event.insert({
       actor_type: "support", actor_id: actorId, action: "workspace.restore",
       target_type: "workspace", target_id: workspaceId, outcome: "success",
       metadata: { archivedAt: row.archivedAt.toISOString(), releasedNumbersRestored: false },

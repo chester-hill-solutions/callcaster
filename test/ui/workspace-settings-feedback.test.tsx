@@ -38,6 +38,16 @@ function showSettings(action: (form: FormData) => unknown) {
 }
 
 describe("workspace settings action feedback (#2306)", () => {
+  test("archive consent explains that restore requires new keys", async () => {
+    const submitted = vi.fn();
+    showSettings(submitted);
+    const consent = await screen.findByRole("checkbox", { name: /All API keys will be revoked. New keys will be needed after restore/ });
+    expect(consent).toBeRequired();
+    expect(consent).not.toBeChecked();
+    expect(screen.getByText(/Restore requires new API keys/)).toBeInTheDocument();
+    expect(submitted).not.toHaveBeenCalled();
+  });
+
   test("cancel-invite failure appears once, leaves Email valid, and does not replay", async () => {
     const user = userEvent.setup();
     const error = vi.spyOn(toast, "error");

@@ -224,9 +224,15 @@ export const platformOpenApiComponents = {
     },
     DeleteWorkspaceResponse: {
       type: "object" as const,
-      required: ["success"] as const,
+      required: ["success", "revoked_api_keys"] as const,
       properties: {
         success: { type: "boolean" as const, enum: [true] as const },
+        revoked_api_keys: {
+          type: "integer" as const,
+          minimum: 0,
+          maximum: Number.MAX_SAFE_INTEGER,
+          description: "Number of workspace API keys permanently revoked by this archive.",
+        },
       },
     },
     WorkspaceMemberRole: {

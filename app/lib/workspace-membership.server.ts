@@ -3,8 +3,9 @@
  * Canonical membership is `workspace_member` + `role_id`; legacy `workspace_users`
  * remains for rollback evidence until Phase D.
  */
-import { eq } from "drizzle-orm";
-import { workspace_member } from "@/db/schema";
+import { and, eq, exists, isNull } from "drizzle-orm";
+import { workspace, workspace_member } from "@/db/schema";
+import { adminDb } from "@/server/admin-db";
 import {
   isProductRoleId,
   type ProductRoleId,
@@ -102,7 +103,12 @@ export async function getUserRole({
   const tdb = tdbIn ?? createTenantDb(workspaceId);
   try {
     const membership = await tdb.workspace_member.findFirst({
-      where: eq(workspace_member.user_id, user.id),
+      where: and(
+        eq(workspace_member.user_id, user.id),
+        exists(adminDb.select({ id: workspace.id }).from(workspace).where(and(
+          eq(workspace.id, workspaceId), isNull(workspace.archived_at),
+        ))),
+      ),
       columns: { role_id: true },
     });
     if (!membership) {

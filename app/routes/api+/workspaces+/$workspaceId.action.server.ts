@@ -1,11 +1,10 @@
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
-import { getSession } from "@/lib/auth.server";
 import {
   dataPlaneCapabilityAuth,
   dataPlaneSessionMinRoleAuth,
 } from "@/lib/capability-guard.server";
 import { MemberRole } from "@/lib/member-role";
-import { updateWorkspaceBodySchema } from "@/lib/schemas/api/platform-auth";
+import { updateWorkspaceBodySchema, workspaceArchiveResponseSchema } from "@/lib/schemas/api/platform-auth";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import {
   deleteWorkspaceApi,
@@ -38,7 +37,6 @@ export const action = defineAction({
   auth: dataPlaneSessionMinRoleAuth(MemberRole.Caller),
   sideEffects: ["db-write"],
   handler: async ({ request, auth }) => {
-    const { headers } = await getSession(request);
     if (request.method === "PATCH") {
       const parsed = await parseJsonBodyOrResponse(request, updateWorkspaceBodySchema);
       if (parsed instanceof Response) return parsed;
@@ -64,14 +62,13 @@ export const action = defineAction({
       const result = await deleteWorkspaceApi(
         auth.userId,
         auth.workspaceId,
-        headers,
       );
 
       if (!result.ok) {
         return jsonError(result.error, result.status);
       }
 
-      return jsonResponse({ success: true }, 200);
+      return jsonResponse(workspaceArchiveResponseSchema.parse({ success: true, revoked_api_keys: result.revokedApiKeys }), 200);
     }
 
     return jsonError("Method not allowed", 405);

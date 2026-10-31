@@ -203,7 +203,7 @@ describe.skipIf(!databaseUrl)("admin workspace restore with real sessions and Po
     provider.active = true;
     await recordWorkspaceAuditEvent({ workspaceId: workspace, actorType: "session", actorId: actor("owner").id, action: "owned.history", outcome: "success" });
     expect(await listUserWorkspaces(actor("owner").id)).toMatchObject({ workspaces: [expect.objectContaining({ workspace: expect.objectContaining({ id: workspace }) })] });
-    expect(await deleteWorkspaceApi(actor("owner").id, workspace, new Headers())).toMatchObject({ ok: true });
+    expect(await deleteWorkspaceApi(actor("owner").id, workspace)).toMatchObject({ ok: true });
     expect(await listUserWorkspaces(actor("owner").id)).toMatchObject({ workspaces: [] });
     expect((await state()).archived_at).not.toBeNull();
     expect(provider.active).toBe(false);

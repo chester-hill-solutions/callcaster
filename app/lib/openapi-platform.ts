@@ -243,22 +243,23 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
     },
     delete: {
       operationId: "deleteWorkspace",
-      summary: "Delete a workspace",
+      summary: "Archive a workspace",
       tags: ["Platform API", "Workspace"],
       security: sessionCookieSecurity,
-      description: "Permanently delete a workspace. Owner session only.",
+      description: "Archive the workspace after releasing its phone numbers. Owner session only. Existing workspace API keys are permanently revoked. Archived workspaces refuse session and API-key access; restoring the workspace requires new keys.",
       responses: {
         "200": {
-          description: "Workspace deleted",
+          description: "Workspace archived and API keys revoked",
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/DeleteWorkspaceResponse" },
             },
           },
         },
-        "400": errorResponse("Deletion blocked"),
+        "400": errorResponse("Archive blocked"),
         "401": errorResponse("Unauthorized"),
         "403": errorResponse("Owner role required"),
+        "404": errorResponse("Workspace not found or unavailable"),
       },
     },
   },

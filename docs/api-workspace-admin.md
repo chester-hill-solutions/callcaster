@@ -10,9 +10,24 @@ Spec: [`/api/docs/openapi`](/api/docs/openapi) · Auth: [auth matrix](./api-auth
 | --- | --- | --- |
 | GET | `/api/workspaces/:workspaceId` | Read workspace metadata (session or workspace API key) |
 | PATCH | `/api/workspaces/:workspaceId` | Rename workspace (admin+ session) |
-| DELETE | `/api/workspaces/:workspaceId` | Delete workspace (owner session) |
+| DELETE | `/api/workspaces/:workspaceId` | Archive workspace (owner session) |
 
 Legacy `POST /api/workspace` is removed (SEC-01). Use the scoped routes above.
+
+### Archive and credentials
+
+`DELETE /api/workspaces/:workspaceId` archives the workspace after its phone
+numbers have been released. The workspace and its history remain stored. The
+response is `{ "success": true, "revoked_api_keys": 2 }`, where the count is the
+number of existing API keys permanently revoked by that operation. Zero is valid.
+A failed number release leaves the workspace active and its API keys available
+for the owner to retry.
+
+Archived workspaces refuse both workspace API-key and member session access.
+Session requests receive the same 404 as an unavailable workspace; revoked keys
+receive 401. Restoring a workspace through the admin console restores its members'
+access, but never restores old credentials. Create new API keys after restore.
+This also applies to workspaces archived before this policy was introduced.
 
 ### Ownership transfer
 

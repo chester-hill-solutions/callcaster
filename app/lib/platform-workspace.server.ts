@@ -5,7 +5,7 @@ import {
   getWorkspaceInfo,
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
-import { handleDeleteWorkspace } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
+import { archiveWorkspace } from "@/lib/workspace-archive.server";
 import type { Database } from "@/lib/db-types";
 import { MemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
@@ -125,7 +125,6 @@ export async function updateWorkspaceName(
 export async function deleteWorkspaceApi(
   userId: string,
   workspaceId: string,
-  headers: Headers,
 ) {
   const role = await getUserRole({
     user: { id: userId },
@@ -136,13 +135,9 @@ export async function deleteWorkspaceApi(
     return { ok: false as const, error: "Only workspace owners can delete", status: 403 };
   }
 
-  const result = await handleDeleteWorkspace({
-    workspaceId,
-    headers,
-  });
-
-  if (result && typeof result === "object" && "error" in result && result.error) {
-    return { ok: false as const, error: String(result.error), status: 400 };
+  const result = await archiveWorkspace(workspaceId);
+  if (!result.ok) {
+    return { ok: false as const, error: result.error, status: 400 };
   }
 
   await safeRecordWorkspaceAuditEvent({
@@ -153,9 +148,10 @@ export async function deleteWorkspaceApi(
     targetType: "workspace",
     targetId: workspaceId,
     outcome: "success",
+    metadata: { revokedApiKeys: result.revokedApiKeys },
   });
 
-  return { ok: true as const };
+  return { ok: true as const, revokedApiKeys: result.revokedApiKeys };
 }
 
 export async function transferWorkspaceOwnershipApi(

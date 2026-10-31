@@ -25,7 +25,7 @@ async function restoreWorkspace(formData: FormData, actorId: string) {
   }
   const result = await restoreArchivedWorkspace(workspaceId.data, actorId);
   if (!result.ok) return routeData({ error: result.error }, { status: result.status });
-  return routeData({ success: result.restored ? "Workspace restored. Released numbers were not rented again." : "Workspace is already restored; no changes made." });
+  return routeData({ success: result.restored ? "Workspace restored. Create new API keys. Released numbers were not rented again." : "Workspace is already restored; no changes made." });
 }
 
 export const action = defineAction({
