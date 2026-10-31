@@ -1,5 +1,39 @@
 [
   {
+    "issueNumber": 3085,
+    "verdict": "verify-close",
+    "summary": "Import reuse is merged into dev through PR #3087 at 6f940f35. Verify the deployed flow and release before closing; no new import fix is needed.",
+    "currentBehavior": "New imports reuse one normalized workspace contact, preserve its saved data and add audience membership. Ambiguous legacy contacts receive a clear row result without another contact or membership.",
+    "rootCause": "The old import lookup checked only the target audience, so another audience could create a second workspace contact and make manual SMS ambiguous.",
+    "resolution": "Verify a synthetic repeated-phone import through deployed dev without sending SMS, then follow release acceptance. Existing duplicate repair remains in #2546; do not claim that the whole parent is fixed.",
+    "lookIn": [
+      "app/server/audience-import-effects.server.ts",
+      "app/lib/database/contact.server.ts",
+      "app/lib/audience-import-download.server.ts",
+      "test/integration-db/audience-import-recovery.test.ts",
+      "test/integration-db/audience-import-report.test.ts"
+    ],
+    "existingTests": [
+      "50 real-database cases pass without skips. The original implementation fails four contact-reuse cases while 33 controls pass. The original renderer fails the new reuse/ambiguity download assertion while three controls pass.",
+      "35 focused Node cases pass. Changed runtime files and the report test have no lint warnings; the recovery test retains its one existing warning.",
+      "Full npm run ci:local passes on clean 030d8bd45cec1ab46243489322ce0306f4181d9a in 698.38 seconds: 6,153 Node tests with three existing skips, 34 Bun tests and 1,568 UI tests. All guards, typecheck, lint, build, bundle and codegen checks pass. Start/end commit and source hashes match."
+    ],
+    "missingTests": [
+      "Deployed dev acceptance of repeated-phone imports and default-branch promotion remain. No live SMS or phone traffic was sent."
+    ],
+    "acceptanceCriteria": [
+      "One workspace contact can belong to two audiences.",
+      "Concurrent imports, replay and recovery cannot duplicate contacts, memberships or receipts.",
+      "Reuse preserves saved profile, opt-out, line type, household and history.",
+      "Ambiguous legacy phones add no contact or membership and produce a clear report.",
+      "Workspace isolation and unmapped-phone behavior stay intact."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Native Bug, Priority High. PR #3087 merged into dev at 6f940f35 with a tree identical to tested e93fb40a. Applicable GitHub checks and both dev app/worker deployment statuses pass. Actual Project Status is on-dev, verified in the authenticated board; the issue stays open. Parent #2546 remains In progress."
+  },
+  {
     "issueNumber": 100,
     "verdict": "verify-close",
     "summary": "Browser verification confirms that both workspace member icons use black in system-dark mode. The candidate fix uses the themed button foreground, including before the theme is resolved.",

@@ -117,6 +117,43 @@ suite("normalized SMS recipient selection against Postgres (#2089)", () => {
     });
   });
 
+  test("campaign opt-outs include formatted copies, but exclude other phones and workspaces (#3088)", async () => {
+    await withContacts(async tx => {
+      await tx.execute(sql`insert into contact (id,workspace,phone,opt_out) values
+        (9,${workspaceId},${to},false),
+        (10,${workspaceId},'(555) 123-4567',true),
+        (11,${workspaceId},'+15557654321',false),
+        (12,${otherWorkspaceId},'+15557654321',true),
+        (13,${workspaceId},'+15550001111',true),
+        (14,${workspaceId},'+44 (20) 7946 0958',true)`);
+      const { findSmsOptOutPhoneKeys } = await import("@/lib/database/contact.server");
+      const blocked = await findSmsOptOutPhoneKeys(workspaceId, ["555.123.4567", "+15557654321", "+442079460958"]);
+      expect([...blocked].sort()).toEqual(["15551234567", "442079460958"]);
+    });
+  });
+
+  test("all-opted-in copies and an unknown phone remain eligible (#3088)", async () => {
+    await withContacts(async tx => {
+      await tx.execute(sql`insert into contact (id,workspace,phone,opt_out) values
+        (9,${workspaceId},${to},false),
+        (10,${workspaceId},'(555) 123-4567',false),
+        (11,${otherWorkspaceId},${to},true)`);
+      const { findSmsOptOutPhoneKeys } = await import("@/lib/database/contact.server");
+      expect(await findSmsOptOutPhoneKeys(workspaceId, [to, "+15559876543"])).toEqual(new Set());
+    });
+  });
+
+  test("a large selected audience stays below the Postgres parameter limit (#3088)", async () => {
+    await withContacts(async tx => {
+      const phones = Array.from({ length: 65_536 }, (_, index) => `+1555${1_000_000 + index}`);
+      const last = phones.at(-1);
+      if (!last) throw new Error("Large audience fixture is empty");
+      await tx.execute(sql`insert into contact (id,workspace,phone,opt_out) values (9,${workspaceId},${last},true)`);
+      const { findSmsOptOutPhoneKeys } = await import("@/lib/database/contact.server");
+      expect(await findSmsOptOutPhoneKeys(workspaceId, phones)).toEqual(new Set(["15551065535"]));
+    });
+  });
+
   test("matches international digits without selecting a different country", async () => {
     await withContacts(async (tx) => {
       await tx.execute(sql`insert into contact (id, workspace, phone, opt_out, line_type) values

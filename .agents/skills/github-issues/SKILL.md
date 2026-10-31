@@ -39,6 +39,10 @@ Use `setIssueFieldValue` with `issueId` and an `issueFields` list containing
 Verify the resulting `issueFieldValues`. These organization fields do not need
 Project scope and must not be replaced with labels or Project item fields.
 
+Pass the complete input through one `$input: SetIssueFieldValueInput!` variable.
+This avoids guessing nested list input type names. Write multiline GraphQL and
+check its balanced braces before sending it; verify the saved fields separately.
+
 | Type | Use for |
 | --- | --- |
 | `Bug` | An unexpected problem or behavior |

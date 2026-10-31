@@ -1072,10 +1072,10 @@
   {
     "issueNumber": 2546,
     "verdict": "needs-decision",
-    "summary": "High-priority user requirement. Child #3085 implements contact reuse across audience imports. Legacy duplicate repair and the remaining SMS requirements stay open.",
-    "currentBehavior": "The local #3085 candidate reuses exactly one workspace phone match, preserves its saved data and adds an audience membership. Ambiguous legacy matches add no contact or membership. The candidate is not merged or deployed.",
+    "summary": "High-priority user requirement. Import reuse under #3085 is merged into dev. Active child #3088 enforces saved opt-outs across duplicate workspace phones. Legacy repair and the remaining SMS requirements stay open.",
+    "currentBehavior": "Dev includes contact reuse and clear import outcomes from PR #3087. Draft PR #3090 implements the #3088 saved-consent rule before campaign dispatch; it awaits exact-head GitHub CI and merge approval.",
     "rootCause": "Contact identity is deduplicated inside one audience, while SMS recipient identity is workspace-wide.",
-    "resolution": "Finish the tested #3085 import-reuse fix first. Keep legacy repair separate until identity, profile, consent, history and queue conflict rules are recorded. Verify remaining campaign and manual-SMS requirements against current code before filing more work.",
+    "resolution": "Finish #3088 and verify deployed #3085 behavior. Keep legacy repair separate until profile, consent, history and queue conflict rules are recorded. Preserve existing campaign duplicate-send checks and prove any further gap before adding another fix.",
     "lookIn": [
       "app/lib/audience-import-map.server.ts",
       "app/server/audience-import-effects.server.ts",
@@ -1088,10 +1088,11 @@
     ],
     "size": "L",
     "risk": "high",
-    "trackerRecommendation": "Native Bug, Priority High, Effort Medium. Parent and native child #3085 have Project Status In progress, verified in the authenticated board on 2026-10-31. The bounded import-reuse fix is in sole open draft PR #3087. The parent stays open for existing duplicate repair and its remaining SMS requirements.",
+    "trackerRecommendation": "Native Bug, Priority High, Effort Medium. Project Status In progress, verified in the authenticated board. Native children #3085 and #3088 cover the merged import fix and draft PR #3090 for campaign consent. Keep the parent open for its remaining requirements.",
     "existingTests": [
       "The #3085 focused real-database run passes 50 cases, including cross-audience reuse, concurrent imports, formatted phones, opt-out preservation, workspace isolation, replay/recovery, manual-SMS identity and download messages. The original implementation fails four regression cases.",
-      "Full npm run ci:local passes on clean 030d8bd45cec1ab46243489322ce0306f4181d9a in 698.38 seconds: 6,153 Node tests with three existing skips, 34 Bun tests and 1,568 UI tests. All guards, typecheck, lint, build, bundle and codegen checks pass. Start/end commit and source hashes match."
+      "Full npm run ci:local passes on clean 030d8bd45cec1ab46243489322ce0306f4181d9a in 698.38 seconds: 6,153 Node tests with three existing skips, 34 Bun tests and 1,568 UI tests. All guards, typecheck, lint, build, bundle and codegen checks pass. Start/end commit and source hashes match.",
+      "The #3088 old coordinator fails both HTTP and worker consent regressions while 17 controls pass. Draft PR #3090 passes 37 local checks, 136 affected Node cases and 36 real-database cases after rebasing onto merged CI PR #3089. Full local CI passed before that tooling-only rebase; application and affected test sources are unchanged."
     ]
   },
   {

@@ -106,6 +106,7 @@ vi.mock("@/server/tenant-db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/server/tenant-db")>()),
   withAppCurrentUser: vi.fn(async (_userId: string, run: (tx: unknown) => Promise<unknown>) => run(undefined)),
   createTenantDb: vi.fn(() => ({
+    contact: { findMany: async () => [] },
     // Fixture: this workspace owns the sending number.
     workspace_number: { findFirst: async () => ({ id: 1, suspended_at: null }) },
     message: { update: async () => [{ outreach_attempt_id: 1 }] },
