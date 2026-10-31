@@ -3,6 +3,7 @@ import type { Call } from "@twilio/voice-sdk";
 import { useTwilioConnection } from "@/hooks/call/useTwilioConnection";
 import { useCallHandling } from "@/hooks/call/useCallHandling";
 import { useOwnedSdkCallCleanup } from "@/hooks/call/useOwnedSdkCallCleanup";
+import { useSoftphoneSessionEnd } from "@/hooks/call/useSoftphoneSessionEnd";
 import { declineIncomingCall } from "@/components/calls/IncomingCallPanel";
 import { normalizePhoneNumber } from "@/lib/phone";
 import { sendCallDigits } from "@/lib/twilio/twilio-call-adapter.client";
@@ -104,33 +105,13 @@ export function useSoftphoneController({
     callHandling.clearIncomingCall();
   }, [callHandling]);
 
-  const handleEndSession = useCallback(async () => {
+  const blockOutbound = useCallback(() => {
     outboundEpochRef.current += 1;
     outboundPreparationRef.current = true;
-    try {
-      for (const held of callHandling.heldCalls) {
-        await callHandling.hangUp(held);
-      }
-      await callHandling.hangUp();
-    } catch {
-      connection.device?.disconnectAll();
-    }
-    endSession();
-    onNavigateBack();
-    // Deps list the specific callHandling fields actually read (activeCall,
-    // heldCalls, hangUp); callHandling itself is a fresh object every render
-    // (useCallHandling isn't memoized), so depending on the whole object would
-    // recreate this callback on every render of a live call-session hook for
-    // no behavioral benefit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    callHandling.activeCall,
-    callHandling.heldCalls,
-    callHandling.hangUp,
-    connection.device,
-    endSession,
-    onNavigateBack,
-  ]);
+    return () => { outboundPreparationRef.current = false; };
+  }, []);
+  const handleEndSession = useSoftphoneSessionEnd({ workspaceId, clientIdentity, device: connection.device,
+    callHandling, isPreparingOutbound, blockOutbound, endSession, onNavigateBack, onError });
 
   useOwnedSdkCallCleanup(callHandling.activeCall, workspaceId);
 

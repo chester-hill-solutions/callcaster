@@ -311,4 +311,19 @@ describe("SDK customer command lifetime", () => {
     expect(first.mock.disconnect).toHaveBeenCalledOnce();
     expect(toast.error).not.toHaveBeenCalled();
   });
+
+  test("a retired pending-dial cancellation cannot cancel a new workspace's connection", async () => {
+    const s = mountSession(), retained = s.result.current.cancelPendingDial;
+    s.rerender({ workspaceId: "10000000-0000-4000-8000-000000000002" });
+    const next = createMockTwilioCall({ parameters: { CallSid: secondSid, To: "+16135550124" } });
+    let connected!: (value: typeof next) => void;
+    mockTwilioDevice.connect.mockReturnValueOnce(new Promise(resolve => { connected = resolve; }));
+    let pending: ReturnType<typeof s.result.current.makeCall>;
+    act(() => { pending = s.result.current.makeCall({ To: "+16135550124" }); });
+    act(() => retained());
+    await act(async () => { connected(next); await pending; });
+    expect(s.result.current.activeCall).toBe(next);
+    expect(next.disconnect).not.toHaveBeenCalled();
+    expect(hangupCall).not.toHaveBeenCalled();
+  });
 });

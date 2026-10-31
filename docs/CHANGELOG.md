@@ -24,6 +24,9 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 - Fixed: Importing a phone into another audience reuses its workspace contact and preserves its saved details and opt-out state. The row report identifies reused contacts and ambiguous duplicate records ([PR #3087](https://github.com/chester-hill-solutions/callcaster/pull/3087), [#3085](https://github.com/chester-hill-solutions/callcaster/issues/3085)).
 
+- Fixed: Handset End Session retains its workspace, identity, device and captured calls through replies. Old commands cannot close a newer session; pending dials still cancel, and an incoming SDK call survives before the screen receives it ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
+
+
 - Fixed: Predictive customer joins update only the queue generation and reservation that funded the call. Answer and queue writes commit together, so a failed callback can retry; a terminal Call cannot be revived by an older lookup ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
 
 
