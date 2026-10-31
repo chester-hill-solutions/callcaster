@@ -138,6 +138,8 @@ linters separately, with the same executed cases and enforced rules.
 The compose bootstrap grants privileges to the `callcaster` role. Create that
 role in an owned native Postgres fixture before applying its reset SQL, even
 when the fixture's initial superuser has a different name.
+When a configuration catalog gains a key, regenerate its reports before the
+full gate. The Node suite checks catalog and generated-summary consistency.
 
 The compose migration fixture grants its public schema to the `callcaster`
 role. Create disposable Postgres with that role, or create it inside the owned
