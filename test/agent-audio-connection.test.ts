@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { AgentAudioConnection } from "@/lib/agent-audio-connection.client";
-import { agentAudioStorageKey, type AgentAudioStorage } from "@/lib/agent-audio-storage.client";
+import { AgentAudioConnection } from "@/lib/agent-audio-connection";
+import { agentAudioStorageKey, type AgentAudioStorage } from "@/lib/agent-audio-storage";
 import type { VoiceAudioConnectRequest } from "@/lib/voice-audio-client";
 
 const owner = { workspaceId: "10000000-0000-4000-8000-000000000001", userId: "agent-audio" };

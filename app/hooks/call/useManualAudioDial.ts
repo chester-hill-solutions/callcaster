@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { ManualAudioDial } from "@/lib/manual-audio-dial.client";
+import { ManualAudioDial } from "@/lib/manual-audio-dial";
 
 export function useManualAudioDial(workspaceId: string, userId: string, campaignId: number) {
   const resource = useMemo(() => new ManualAudioDial({ workspaceId, userId, campaignId }, {

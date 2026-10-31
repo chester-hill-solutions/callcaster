@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { AgentAudioConnection } from "@/lib/agent-audio-connection.client";
-import type { AgentAudioStorage } from "@/lib/agent-audio-storage.client";
+import { AgentAudioConnection } from "@/lib/agent-audio-connection";
+import type { AgentAudioStorage } from "@/lib/agent-audio-storage";
 import { isVoiceAudioEffective } from "@/lib/voice-audio-client";
 
 // Resolve storage at use time: rendering and server rendering perform no I/O.

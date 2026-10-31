@@ -245,6 +245,13 @@ readiness. A fixed number of Promise.resolve turns does not prove that an
 import or a microphone request has completed. Keep cancellation tests separate
 so late setup must still be rejected after the owner is suspended or removed.
 
+Keep pure resources used during render in ordinary `.ts` modules. React Router
+replaces `.client` module exports with `undefined` during server rendering,
+including classes constructed by `useMemo`. Defer browser storage, media and
+network access until mount or explicit actions. Test the real hooks through the
+installed Router client-boundary transform and a server renderer; JSDOM tests
+and a successful production build do not prove that the route can render.
+
 Discover uncertain module paths with `rg --files` before reading them. An ADR's
 planned layout can differ from the active source. A referenced skill can also
 exist only as a user file in the shared checkout; read it there without copying

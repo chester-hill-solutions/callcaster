@@ -3,7 +3,7 @@ import { connectVoiceAudio, isVoiceAudioEffective, matchesVoiceAudioConnection, 
 import { cancelVoiceAudioIntent, readVoiceAudioIntent } from "@/lib/voice-audio-intent-client";
 import type { VoiceAudioIntentSnapshot, VoiceAudioSnapshot } from "@/lib/schemas/api/voice-audio";
 import { agentAudioRequestDevice, readAgentAudioJournal, writeAgentAudioJournal,
-  type AgentAudioJournal, type AgentAudioStorage } from "@/lib/agent-audio-storage.client";
+  type AgentAudioJournal, type AgentAudioStorage } from "@/lib/agent-audio-storage";
 
 type AudioSlot = { request: VoiceAudioConnectRequest; connection: VoiceAudioSnapshot | null; cancelRequested: boolean; returningBrowser: boolean };
 export type AgentAudioState = {

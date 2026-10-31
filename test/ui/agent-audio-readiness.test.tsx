@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { Device } from "@twilio/voice-sdk";
-import { AgentAudioConnection } from "@/lib/agent-audio-connection.client";
+import { AgentAudioConnection } from "@/lib/agent-audio-connection";
 import { useCallAudioControls } from "@/hooks/call/useCallAudioControls";
 import { useAgentBrowserReadiness } from "@/hooks/call/useAgentAudioConnection";
 
