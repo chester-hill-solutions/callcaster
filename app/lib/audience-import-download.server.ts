@@ -3,6 +3,13 @@ import { getAudienceImportReport } from "@/lib/audience-import-report.server";
 
 type Report = NonNullable<Awaited<ReturnType<typeof getAudienceImportReport>>>;
 
+const importReasons: Record<string, string> = {
+  "invalid-phone": "Invalid phone number",
+  "duplicate-phone": "Duplicate phone number",
+  "reused-workspace-contact": "Existing workspace contact added to audience",
+  "ambiguous-workspace-phone": "Multiple workspace contacts use this phone number; resolve the duplicate contacts before importing",
+};
+
 /** The general CSV helper allows numeric phone prefixes; reports allow none. */
 export function escapeImportReportCell(value: string): string {
   return /^[=+\-@]/.test(value.trimStart()) || /^[\t\r\n]/.test(value)
@@ -15,8 +22,7 @@ function reportLines(report: Report, row: Report["rows"][number]): string[] {
   const coordinates = [row.record_number, row.source.startLine, row.source.endLine,
     row.source.byteStart, row.source.byteEnd, row.outcome];
   const receipt = [row.contact_id ?? "", row.household_id ?? "", report.uploadStatus, report.run.next_index, report.run.source_rows];
-  const reason = row.reason === "invalid-phone" ? "Invalid phone number"
-    : row.reason === "duplicate-phone" ? "Duplicate phone number" : "Imported";
+  const reason = row.reason ? importReasons[row.reason] ?? "Imported" : "Imported";
   const lines = [csvRow([...coordinates, escapeImportReportCell(row.reason ? phoneField : ""), "", reason, ...receipt])];
   for (const warning of row.warnings) {
     lines.push(csvRow([...coordinates, escapeImportReportCell(warning.header),

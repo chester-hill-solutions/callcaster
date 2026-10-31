@@ -265,6 +265,56 @@ suite("audience import durable source recovery (#2479)", () => {
     const id=Number(other.id); const u=await newUpload(id); const j=await newJob(u,id);
     expect((await processor.processAudienceUpload(args(content,fields,u,j,id))).runId).not.toBe(original.runId); expect((await evidence(id)).contacts).toHaveLength(2);
   });
+  test("a second audience reuses the workspace contact and leaves manual SMS unambiguous (#3085)", async () => {
+    await processor.processAudienceUpload(args());
+    const first = await evidence(); const contactId = first.contacts[0].id;
+    const [other] = await native`insert into audience (workspace,name) values (${workspace}::uuid,'Second audience') returning id`;
+    const id = Number(other.id), u = await newUpload(id), j = await newJob(u,id);
+    expect(await processor.processAudienceUpload(args(csv(),mapping,u,j,id))).toMatchObject({ imported: 1 });
+    expect(await native`select id from contact where workspace=${workspace}::uuid`).toEqual([{ id: contactId }]);
+    expect(await native`select audience_id,contact_id from contact_audience where contact_id=${contactId} order by audience_id`)
+      .toEqual([{ audience_id: String(audience), contact_id: contactId }, { audience_id: String(id), contact_id: contactId }]);
+    const proof = await evidence(id);
+    expect(proof.receipts[0]).toMatchObject({ outcome: "imported", reason: "reused-workspace-contact", contact_id: contactId });
+    const { verifySmsRecipient } = await import("@/lib/chat-sms-guards.server");
+    expect(await verifySmsRecipient(workspace,"+14165551000",undefined,{ checkLineType: false }))
+      .toMatchObject({ ok: true, contact: { id: Number(contactId) } });
+  });
+  test("formatted-phone reuse preserves the existing profile and opt-out (#3085)", async () => {
+    await processor.processAudienceUpload(args());
+    const first = await evidence(); const contactId = first.contacts[0].id;
+    await native`update contact set firstname='Saved profile',opt_out=true,line_type='mobile' where id=${contactId}`;
+    const [other] = await native`insert into audience (workspace,name) values (${workspace}::uuid,'Second audience') returning id`;
+    const id = Number(other.id), u = await newUpload(id), j = await newJob(u,id);
+    const content = "Name,Phone,Address,Postal,Consent\nReplacement,(416) 555-1000,999 Other St,M5V 2A2,no";
+    await processor.processAudienceUpload(args(content,mapping,u,j,id));
+    expect(await native`select id,firstname,opt_out,line_type,household_id from contact where workspace=${workspace}::uuid`)
+      .toEqual([{ id: contactId, firstname: "Saved profile", opt_out: true, line_type: "mobile", household_id: first.contacts[0].household_id }]);
+  });
+  test("concurrent imports into different audiences create one workspace contact (#3085)", async () => {
+    const [other] = await native`insert into audience (workspace,name) values (${workspace}::uuid,'Concurrent audience') returning id`;
+    const id = Number(other.id), u = await newUpload(id), j = await newJob(u,id);
+    await Promise.all([processor.processAudienceUpload(args()),processor.processAudienceUpload(args(csv(),mapping,u,j,id))]);
+    expect(await native`select count(*)::int as value from contact where workspace=${workspace}::uuid`).toEqual([{ value: 1 }]);
+    expect(await native`select count(*)::int as value from contact_audience where audience_id in (${audience},${id})`).toEqual([{ value: 2 }]);
+  });
+  test("legacy ambiguous contacts do not acquire a third contact or new membership (#3085)", async () => {
+    const [legacyAudience] = await native`insert into audience (workspace,name) values (${workspace}::uuid,'Legacy audience') returning id`;
+    const contacts = await native`insert into contact (workspace,phone) values (${workspace}::uuid,'+14165551000'),(${workspace}::uuid,'(416) 555-1000') returning id`;
+    for (const contact of contacts) await native`insert into contact_audience (audience_id,contact_id) values (${legacyAudience.id},${contact.id})`;
+    expect(await processor.processAudienceUpload(args())).toMatchObject({ imported: 0, skippedInvalid: 1 });
+    expect(await native`select count(*)::int as value from contact where workspace=${workspace}::uuid`).toEqual([{ value: 2 }]);
+    expect(await native`select contact_id from contact_audience where audience_id=${audience}`).toHaveLength(0);
+    expect((await evidence()).receipts[0]).toMatchObject({ outcome: "invalid", reason: "ambiguous-workspace-phone", contact_id: null });
+  });
+  test("the same phone in another workspace remains a separate contact (#3085)", async () => {
+    await processor.processAudienceUpload(args());
+    const [other] = await native`insert into audience (workspace,name) values (${foreign}::uuid,'Other workspace') returning id`;
+    const id = Number(other.id), u = await newUpload(id,foreign), j = await newJob(u,id,foreign);
+    await processor.processAudienceUpload(args(csv(),mapping,u,j,id,foreign));
+    expect(await native`select workspace,count(*)::int as value from contact where workspace in (${workspace}::uuid,${foreign}::uuid) group by workspace order by workspace`)
+      .toEqual([workspace,foreign].sort().map(id => ({ workspace: id, value: 1 })));
+  });
   test("foreign upload or audience IDs cannot bind a run or change foreign rows",async()=>{
     const [a]=await native`insert into audience (workspace,name) values (${foreign}::uuid,'Foreign preserved') returning id`; const id=Number(a.id);
     const u=await newUpload(id,foreign); const j=await newJob(u,id);

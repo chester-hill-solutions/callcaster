@@ -33,16 +33,18 @@ suite("audience report authenticated durable download (#2480)", () => {
     await native`insert into workspace_member (id,workspace_id,user_id,role_id) values (${`report-${actor}`},${workspace}::uuid,${actor},'member')`;
     const [audience] = await native`insert into audience (workspace,name,status) values (${workspace}::uuid,'Partial report','error') returning id`;
     const [run] = await native`insert into audience_import_run (workspace,audience_id,identity,file_sha256,mapping,created_by,source_rows,next_index,imported,invalid,duplicates)
-      values (${workspace}::uuid,${audience.id},'owned-report','file',${native.json({fields:[["=Phone","phone"]],split:null,voterSource:null,version:1})},${actor}::uuid,250,201,199,1,1) returning id`;
+      values (${workspace}::uuid,${audience.id},'owned-report','file',${native.json({fields:[["=Phone","phone"]],split:null,voterSource:null,version:1})},${actor}::uuid,250,201,198,2,1) returning id`;
     runId = run.id;
     const [upload] = await native`insert into audience_upload (workspace,audience_id,created_by,status,processed_contacts,total_contacts,import_run_id)
       values (${workspace}::uuid,${audience.id},${actor}::uuid,'error',200,249,${runId}::uuid) returning id`;
     uploadId = Number(upload.id);
     for (let i = 0; i < 201; i++) {
-      const outcome = i === 1 ? "invalid" : i === 2 ? "duplicate" : "imported";
+      const outcome = i === 1 || i === 5 ? "invalid" : i === 2 ? "duplicate" : "imported";
+      const reason = i === 1 ? "invalid-phone" : i === 2 ? "duplicate-phone"
+        : i === 4 ? "reused-workspace-contact" : i === 5 ? "ambiguous-workspace-phone" : null;
       await native`insert into audience_import_row (run_id,workspace,record_number,source,outcome,reason,contact_id,warnings)
         values (${runId}::uuid,${workspace}::uuid,${i+2},${native.json({recordNumber:i+2,startLine:i*2+2,endLine:i*2+3,byteStart:i*40+20,byteEnd:i*40+58})},
-        ${outcome},${i===1 ? "invalid-phone" : i===2 ? "duplicate-phone" : null},${outcome==="imported" ? i+1000 : null},
+        ${outcome},${reason},${outcome==="imported" ? i+1000 : null},
         ${native.json(i===3 ? [{code:"unknown-opt-out",header:"@Consent",value:"+1+1"}] : [])})`;
     }
     const [job] = await native`insert into job (type,status,workspace_id,params) values ('audience_upload','completed',${workspace}::uuid,${native.json({uploadId})}) returning id`;
@@ -92,9 +94,18 @@ suite("audience report authenticated durable download (#2480)", () => {
     expect((await request(foreign)).headers.get("Location")).toBe("/workspaces");
     expect((await request(workspace,"1x")).status).toBe(400);
   });
+  test("reuse and ambiguous workspace phones have clear download results (#3085)", async () => {
+    const rows = parse(await (await request()).text(), { columns: true });
+    expect(rows.find((row: { Record: string }) => row.Record === "6")).toMatchObject({
+      Outcome: "imported", Reason: "Existing workspace contact added to audience", "Contact ID": "1004",
+    });
+    expect(rows.find((row: { Record: string }) => row.Record === "7")).toMatchObject({
+      Outcome: "invalid", Reason: "Multiple workspace contacts use this phone number; resolve the duplicate contacts before importing", "Contact ID": "",
+    });
+  });
   test("the download captures a committed prefix while another batch lands", async () => {
     const response = await request();
-    await native`update audience_import_run set next_index=202,imported=200 where id=${runId}::uuid`;
+    await native`update audience_import_run set next_index=202,imported=199 where id=${runId}::uuid`;
     await native`insert into audience_import_row (run_id,workspace,record_number,source,outcome,contact_id)
       values (${runId}::uuid,${workspace}::uuid,203,${native.json({recordNumber:203,startLine:405,endLine:405,byteStart:9000,byteEnd:9020})},'imported',1201)`;
     const captured = parse(await response.text(),{columns:true});

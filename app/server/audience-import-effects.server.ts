@@ -1,35 +1,29 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { contact as contactTable, contact_audience as members, households as householdsTable } from "@/db/schema";
+import { contact_audience as members, households as householdsTable } from "@/db/schema";
 import type { Database } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
 import { householdKeyFor } from "@/lib/household-key";
-import { parsePhoneNumber } from "@/lib/phone";
+import { getConversationPhoneKey } from "@/lib/chat-conversation-sort";
+import { findSmsRecipientContactsForPhones } from "@/lib/database/contact.server";
 import { mapAudienceImportRow, type PreparedAudienceImport } from "@/lib/audience-import-map.server";
 import type { audience_import_row, audience_import_run } from "@/db/schema";
+import type { Contact } from "@/lib/types";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type Run = typeof audience_import_run.$inferSelect;
+type MappedRow = PreparedAudienceImport["contacts"][number] & ReturnType<typeof mapAudienceImportRow>;
 
 export async function commitAudienceImportRows(tx: Transaction, run: Run, rows: PreparedAudienceImport["contacts"]) {
   const tdb = createTenantDb(run.workspace, tx);
   const mapped = rows.map(row => ({ ...row, ...mapAudienceImportRow(row.data, run.mapping, run.created_by, run.imported_at) }));
   const phones = mapped.flatMap(row => row.contact.phone ? [row.contact.phone] : []);
-  const existing = phones.length ? await tx.select({ phone: contactTable.phone }).from(members)
-    .innerJoin(contactTable, eq(contactTable.id, members.contact_id))
-    .where(and(eq(members.audience_id, run.audience_id), eq(contactTable.workspace, run.workspace))) : [];
-  const seen = new Set(existing.flatMap(row => { const phone = parsePhoneNumber(row.phone); return phone ? [phone] : []; }));
-  const outcomes: Array<typeof audience_import_row.$inferInsert> = [];
-  const accepted: typeof mapped = [];
-  let invalid = 0; let duplicates = 0;
-  for (const row of mapped) {
-    const duplicate = !row.invalid && row.contact.phone && seen.has(row.contact.phone);
-    const outcome = row.invalid ? "invalid" : duplicate ? "duplicate" : "imported";
-    outcomes.push({ run_id: run.id, workspace: run.workspace, record_number: row.source.recordNumber, source: row.source,
-      outcome, reason: row.invalid ? "invalid-phone" : duplicate ? "duplicate-phone" : null, warnings: row.warnings });
-    if (row.invalid) invalid += 1;
-    else if (duplicate) duplicates += 1;
-    else { accepted.push(row); if (row.contact.phone) seen.add(row.contact.phone); }
-  }
+  // Different audiences hold different row locks. This transaction lock makes
+  // their workspace lookup and insertion one ordered import operation (#3085).
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`audience-import-contacts:${run.workspace}`}, 0))`);
+  const existing = await findSmsRecipientContactsForPhones(run.workspace, phones, tdb);
+  const currentMembers = existing.length ? await tx.select({ contact_id: members.contact_id }).from(members)
+    .where(and(eq(members.audience_id, run.audience_id), inArray(members.contact_id, existing.map(contact => contact.id)))) : [];
+  const { outcomes, accepted, imported, invalid, duplicates } = planRows(run, mapped, existing, new Set(currentMembers.map(row => row.contact_id)));
   const householdEntries = new Map<string, { household_key: string; address: string; postal: string; city: string | null; province: string | null }>();
   const keys = accepted.map(row => {
     const { address, postal, city, province } = row.contact;
@@ -54,15 +48,51 @@ export async function commitAudienceImportRows(tx: Transaction, run: Run, rows: 
 
     const returned = new Set(contacts.map(row => Number(row.id)));
     if (returned.size !== accepted.length || contactIds.some(id => !returned.has(id))) throw new Error("Incomplete contact insert");
-    await tx.insert(members).values(accepted.map((_, index) => ({ contact_id: contactIds[index], audience_id: run.audience_id })));
     accepted.forEach((row, index) => {
       const receipt = outcomes.find(outcome => outcome.record_number === row.source.recordNumber);
       if (!receipt) throw new Error("Source receipt not found");
       receipt.contact_id = contactIds[index]; receipt.household_id = row.contact.household_id ?? null;
     });
   }
+  const links = outcomes.filter(row => row.outcome === "imported").map(row => {
+    if (!row.contact_id) throw new Error("Imported row has no contact identity");
+    return { contact_id: row.contact_id, audience_id: run.audience_id };
+  });
+  if (links.length) await tx.insert(members).values(links).onConflictDoNothing();
   if (outcomes.length) await tdb.audience_import_row.insertMany(outcomes);
-  return { imported: accepted.length, invalid, duplicates };
+  return { imported, invalid, duplicates };
+}
+
+function classifyRow(row: MappedRow, matches: Contact[], alreadyMember: boolean) {
+  if (row.invalid) return { outcome: "invalid" as const, reason: "invalid-phone", contact: null };
+  if (alreadyMember) return { outcome: "duplicate" as const, reason: "duplicate-phone", contact: null };
+  if (matches.length > 1) return { outcome: "invalid" as const, reason: "ambiguous-workspace-phone", contact: null };
+  const contact = matches[0] ?? null;
+  return { outcome: "imported" as const, reason: contact ? "reused-workspace-contact" : null, contact };
+}
+
+function planRows(run: Run, rows: MappedRow[], existing: Contact[], memberIds: Set<number>) {
+  const byPhone = new Map<string, Contact[]>(), seen = new Set<string>();
+  for (const contact of existing) {
+    const key = getConversationPhoneKey(contact.phone);
+    if (!key) continue;
+    byPhone.set(key, [...(byPhone.get(key) ?? []), contact]);
+    if (memberIds.has(contact.id)) seen.add(key);
+  }
+  const outcomes: Array<typeof audience_import_row.$inferInsert> = [], accepted: MappedRow[] = [];
+  const counts = { imported: 0, invalid: 0, duplicate: 0 };
+  for (const row of rows) {
+    const key = getConversationPhoneKey(row.contact.phone ?? null);
+    const decision = classifyRow(row, key ? byPhone.get(key) ?? [] : [], key !== null && seen.has(key));
+    counts[decision.outcome]++;
+    outcomes.push({ run_id: run.id, workspace: run.workspace, record_number: row.source.recordNumber, source: row.source,
+      outcome: decision.outcome, reason: decision.reason, warnings: row.warnings,
+      contact_id: decision.contact?.id, household_id: decision.contact?.household_id });
+    if (decision.outcome !== "imported") continue;
+    if (!decision.contact) accepted.push(row);
+    if (key) seen.add(key);
+  }
+  return { outcomes, accepted, imported: counts.imported, invalid: counts.invalid, duplicates: counts.duplicate };
 }
 
 function sqlContactIds(count: number) {
