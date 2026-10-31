@@ -1,0 +1,127 @@
+name: Issue triage
+
+# Every new issue gets one automated pass:
+#
+#   1. `.opencode/agents/issue-triage` reads the issue, lists what a fixer
+#      still needs, finds the code the report concerns, and picks a Priority.
+#   2. `scripts/issue-triage-apply.mjs` posts one comment and writes the
+#      organization Issue field `Priority` (Urgent / High / Medium / Low).
+#
+# The agent never writes to GitHub. It only produces `.issue-triage/triage.json`,
+# so every published sentence comes from the deterministic renderer and every
+# code link is checked against the checkout first.
+#
+# A low-confidence priority is stored as a pending suggestion on the field
+# (`suggest: true`), not applied silently.
+#
+# Configuration:
+#   secret OPENCODE_API_KEY      — model access (required; the job skips without it)
+#   secret TRIAGE_TOKEN          — optional override for issues:write and org Issue fields
+#   var    ISSUE_TRIAGE_MODEL    — provider/model, default opencode/claude-haiku-5-5
+#   var    ISSUE_TRIAGE_OPENCODE_VERSION — optional CLI pin for the installer
+#
+# Opt an issue out with the `skip-triage` label before it opens, or by running
+# the workflow manually for one issue.
+
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Issue number to triage
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: issue-triage-${{ github.event.issue.number || inputs.issue_number }}
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.issue.user.type != 'Bot' &&
+      !contains(github.event.issue.labels.*.name, 'skip-triage'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+    steps:
+      - name: Check the model key
+        id: preflight
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        run: |
+          if [ -z "$OPENCODE_API_KEY" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::OPENCODE_API_KEY is not set; skipping issue triage"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.preflight.outputs.ready == 'true'
+        with:
+          persist-credentials: false
+
+      - name: Install OpenCode
+        if: steps.preflight.outputs.ready == 'true'
+        env:
+          OPENCODE_VERSION: ${{ vars.ISSUE_TRIAGE_OPENCODE_VERSION }}
+        run: |
+          if [ -n "$OPENCODE_VERSION" ]; then
+            curl -fsSL https://opencode.ai/install | bash -s -- --version "$OPENCODE_VERSION"
+          else
+            curl -fsSL https://opencode.ai/install | bash
+          fi
+          export PATH="$HOME/.opencode/bin:$PATH"
+          bin_dir=$(dirname "$(command -v opencode)")
+          echo "$bin_dir" >> "$GITHUB_PATH"
+          opencode --version
+
+      - name: Collect the issue
+        if: steps.preflight.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.TRIAGE_TOKEN || github.token }}
+        run: |
+          mkdir -p .issue-triage
+          gh issue view "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --json number,title,body,author,labels,url,createdAt,comments \
+            > .issue-triage/issue.json
+
+      - name: Run the triage agent
+        if: steps.preflight.outputs.ready == 'true'
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          MODEL: ${{ vars.ISSUE_TRIAGE_MODEL || 'opencode/claude-haiku-5-5' }}
+        run: |
+          opencode run --standalone --auto \
+            --agent issue-triage \
+            --model "$MODEL" \
+            "Triage issue #$ISSUE_NUMBER from .issue-triage/issue.json. Follow your instructions exactly and write .issue-triage/triage.json."
+
+      - name: Show the triage result
+        if: steps.preflight.outputs.ready == 'true'
+        run: |
+          if [ -f .issue-triage/triage.json ]; then
+            cat .issue-triage/triage.json
+          else
+            echo "::error::the agent did not write .issue-triage/triage.json"
+            exit 1
+          fi
+
+      - name: Publish the triage
+        if: steps.preflight.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.TRIAGE_TOKEN || github.token }}
+        run: |
+          node scripts/issue-triage-apply.mjs \
+            --issue "$ISSUE_NUMBER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --triage .issue-triage/triage.json \
+            --ref "$GITHUB_SHA"

@@ -25,6 +25,7 @@ pnpm-debug.log*
 /public/exports/
 .local/
 .repl/
+.issue-triage/
 
 # Campaign data exports (PII: contact names, phone numbers, SMS message bodies).
 # Anchored to the repo root so the tracked e2e fixtures under
