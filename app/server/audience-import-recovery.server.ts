@@ -1,3 +1,4 @@
+import { lockWorkspaceContactIdentity } from "./contact-identity-lock.server";
 import { and, count, eq, sql } from "drizzle-orm";
 import { audience, audience_upload, audience_import_run, audience_import_row, contact_audience } from "@/db/schema";
 import { db, type Database } from "@/server/db";
@@ -37,6 +38,7 @@ async function lockAudience(tx: Transaction, ctx: AudienceImportContext) {
 async function fenced<T>(ctx: AudienceImportContext, fn: (tx: Transaction) => Promise<T>): Promise<T> {
   return db.transaction(async tx => {
     await lockClaim(tx, ctx);
+    await lockWorkspaceContactIdentity(tx, ctx.workspaceId);
     const result = await fn(tx);
     // clock_timestamp(), not transaction now(): expiry during a batch must roll
     // back every effect even though a stale-claim sweep waits on this row lock.

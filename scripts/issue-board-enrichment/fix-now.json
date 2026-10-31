@@ -1,37 +1,33 @@
 [
   {
-    "issueNumber": 3088,
+    "issueNumber": 3091,
     "verdict": "fix-now",
-    "summary": "High-priority consent requirement from #2546. A saved opt-out on any workspace copy must block campaign SMS to that normalized phone.",
-    "currentBehavior": "Draft PR #3090 loads bounded canonical phone matches before row work and uses the existing opt-out queue outcome. A failed read sends nothing and leaves queued work for retry. Dev still has the old queued-contact-only check until an approved merge.",
-    "rootCause": "Bulk campaign dispatch checks only member.contact.opt_out; its message duplicate lookup and in-process phone claim do not read other saved contact opt-outs.",
-    "resolution": "Require exact-head GitHub CI on draft PR #3090, then obtain approval before making it ready or merging. Verify deployed dev behavior and release acceptance. Preserve eligible sends, existing one-send controls, tenant isolation, queue attempts, credits and sender policies. Do not merge or rewrite contact profiles.",
+    "summary": "High-priority reviewed repair from #2546 for legacy copies of the same person. Shared-phone different people stay separate.",
+    "currentBehavior": "The local candidate provides review, retained-profile choice, explicit confirmation and an atomic merge. No PR or deployed repair exists yet.",
+    "rootCause": "Legacy duplicate-person rows leave the strict manual-SMS identity guard ambiguous. Direct deletion would cascade through history and queue links.",
+    "resolution": "Finish structural review, focused checks and the fast local gate. Publish only when the single PR slot is free. Require full exact-head CI before the standing-authorized dev merge, then verify deployment and the native board.",
     "lookIn": [
-      "app/lib/campaign-sms-dispatch.server.ts",
-      "app/lib/database/contact.server.ts",
-      "test/campaign-sms-dispatch-contract.test.ts",
-      "test/integration-db/sms-recipient-identity.test.ts"
+      "app/server/contact-merge.server.ts",
+      "app/server/contact-merge-relations.server.ts",
+      "app/components/contact/ContactMergePanel.tsx",
+      "test/integration-db/contact-merge.test.ts"
     ],
     "existingTests": [
-      "The new requirement fails on both real adapters with the old coordinator; 17 controls pass.",
-      "Rebased 982371e6 passes all 37 local checks, 136 affected Node cases and 36 real-Postgres cases with no test skips. Checks cover both adapters, no intent/provider/outreach work on opt-out or read failure, eligible and all-opted-in duplicate controls, formatted and international phones, another workspace, and 65,536 selected phones.",
-      "Before the CI tooling rebase, full local CI passed on clean 3f532afa in 698.01 seconds: 6,159 Node cases with three existing skips, 34 Bun cases and 1,568 UI cases; all guards, typecheck, lint, build, bundle and codegen checks passed. The rebase changes only approved CI tooling paths; application and affected test sources are unchanged."
+      "28 real database repair and authenticated-route cases pass. They cover history, queues, rollback, opt-outs, identity conflicts, roles, stale reviews, concurrent imports, repeat confirmations and the manual SMS route with its provider send stubbed.",
+      "99 affected database cases passed before the final route additions; 36 affected UI cases pass. The original apply regressions fail while 11 controls pass. The import/repair lock-order regression failed before the shared lock fix."
     ],
     "missingTests": [
-      "Full GitHub CI at the final draft head, then deployed dev and release acceptance."
+      "Final focused UI/Node/DB checks, fast local gate, full exact-head GitHub CI and deployed acceptance."
     ],
     "acceptanceCriteria": [
-      "An opted-out same-workspace phone copy blocks the queued copy, including records outside the selected audience.",
-      "Both adapters enforce the rule before message intents, provider calls and outreach attempts.",
-      "Other phones and other workspaces cannot block a permitted recipient.",
-      "All-opted-in duplicates retain the existing one-send behavior.",
-      "A failed read consumes no contact attempts and removes no queued work.",
-      "Bound database parameters and reuse canonical normalized phone identity."
+      "Do not merge distinct external or voter identities or bypass ambiguous-recipient protection.",
+      "Retain the chosen profile, source snapshots, history and completed queue state. Any saved opt-out remains effective.",
+      "Keep import receipts immutable and serialize imports with repair. Reject active work and stale reviews; roll back failures; repeat requests apply once."
     ],
     "blockedBy": [],
-    "size": "S",
+    "size": "L",
     "risk": "high",
-    "trackerRecommendation": "Native Bug, Priority High, Effort Medium, assigned @wra-sol, native parent #2546. Actual Project Status In progress, verified in the authenticated board. Draft PR #3090 is the only open PR and has the native Development link to #3088. CI PR #3089 is merged into dev. PRs #3081 and #3086 remain parked with branches preserved."
+    "trackerRecommendation": "Native Bug, Priority High, Effort High, assigned @wra-sol, native parent #2546. Actual Project Status In progress was verified in the authenticated board. Branch bug/3091-review-duplicate-contacts is local; PR #3092 currently occupies the one open PR slot."
   },
   {
     "issueNumber": 2638,

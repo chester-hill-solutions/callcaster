@@ -451,7 +451,7 @@ export function useChatsPage() {
 
   /**
    * @effect When the message-send fetcher settles with an error, reconcile the optimistic UI: mark the pending optimistic message as failed and restore its text into the composer.
-   * @effect-deps messageFetcher.state, messageFetcher.data, composerKey, contact_number, phoneNumber (send lifecycle and current recipient)
+   * @effect-deps messageFetcher.state, messageFetcher.data, composerKey, contact_number, phoneNumber, navigate, workspace.id (send lifecycle and scoped contact recovery)
    * @effect-side-effects toast, optimistic message status, draft state; no DOM access or fetch
    * @effect-why-not-loader This reconciles optimistic client state against a fetcher action's result; it's inherently a "react after the fetcher settles" side effect, not something a loader or derived value can express.
    */
@@ -473,7 +473,7 @@ export function useChatsPage() {
     }
 
     const data = (hasFreshResult ? messageFetcher.data : undefined) as
-      | { error?: string; billing?: { nextSendBlocked?: boolean } }
+      | { error?: string; recipientVerificationError?: boolean; billing?: { nextSendBlocked?: boolean } }
       | undefined;
     if (!data || !data.error) {
       if (data?.billing?.nextSendBlocked) {
@@ -485,7 +485,13 @@ export function useChatsPage() {
       return;
     }
 
-    toast.error(data.error);
+    if (data.recipientVerificationError && pending.composerKey === composerKey) toast.error(data.error, {
+      action: {
+        label: "Review contacts",
+        onClick: () => { void navigate(`/workspaces/${workspace.id}/contacts?q=${encodeURIComponent(pending.to)}`); },
+      },
+    });
+    else toast.error(data.error);
     if (
       pending.composerKey === composerKey &&
       pending.to === (contact_number || phoneNumber)
@@ -506,6 +512,8 @@ export function useChatsPage() {
     composerKey,
     contact_number,
     phoneNumber,
+    navigate,
+    workspace.id,
   ]);
 
   const markConversationReadForContact = useCallback(

@@ -2,6 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { contact_audience as members, households as householdsTable } from "@/db/schema";
 import type { Database } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
+import { lockWorkspaceContactIdentity } from "./contact-identity-lock.server";
 import { householdKeyFor } from "@/lib/household-key";
 import { getConversationPhoneKey } from "@/lib/chat-conversation-sort";
 import { findSmsRecipientContactsForPhones } from "@/lib/database/contact.server";
@@ -19,7 +20,7 @@ export async function commitAudienceImportRows(tx: Transaction, run: Run, rows: 
   const phones = mapped.flatMap(row => row.contact.phone ? [row.contact.phone] : []);
   // Different audiences hold different row locks. This transaction lock makes
   // their workspace lookup and insertion one ordered import operation (#3085).
-  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`audience-import-contacts:${run.workspace}`}, 0))`);
+  await lockWorkspaceContactIdentity(tx, run.workspace);
   const existing = await findSmsRecipientContactsForPhones(run.workspace, phones, tdb);
   const currentMembers = existing.length ? await tx.select({ contact_id: members.contact_id }).from(members)
     .where(and(eq(members.audience_id, run.audience_id), inArray(members.contact_id, existing.map(contact => contact.id)))) : [];

@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from "react";
 import { useActionData, useLoaderData, useSubmit, useNavigation, useNavigate } from "react-router";
 
+import { ContactMergePanel } from "@/components/contact/ContactMergePanel";
+import { hasMinRole, MemberRole } from "@/lib/member-role";
 import ContactDetails from "@/components/contact/ContactDetails";
 import type { ContactDetailsHandle } from "@/components/contact/ContactDetails";
 import { Button } from "@/components/ui/button";
@@ -18,7 +20,7 @@ export { action } from "./$contactId.action.server";
 export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 
 export default function ContactScreen() {
-  const { contact, workspace_id, selected_id, userRole, audiences } =
+  const { contact, workspace_id, selected_id, userRole, audiences, mergeCandidates = [], mergeResult } =
     useLoaderData<ContactIdLoaderData>();
   const actionData = useActionData<ActionResponse>();
   const navigate = useNavigate();
@@ -42,11 +44,11 @@ export default function ContactScreen() {
 
 
   return <ContactEditor key={`${workspace_id}:${selected_id}:${contactEditorSnapshot(contact ?? undefined)}`}
-    contact={contact} selected_id={selected_id} userRole={userRole} audiences={audiences}
+    workspace_id={workspace_id} mergeResult={mergeResult} mergeCandidates={mergeCandidates} contact={contact} selected_id={selected_id} userRole={userRole} audiences={audiences}
     startEditable={selected_id === "new" || Boolean(actionData?.success && actionData.contact?.workspace === workspace_id && String(actionData.contact.id) === selected_id)} />;
 }
 
-function ContactEditor({ contact, selected_id, userRole, audiences, startEditable }: Pick<ContactIdLoaderData, "contact" | "selected_id" | "userRole" | "audiences"> & { startEditable: boolean }) {
+function ContactEditor({ contact, selected_id, userRole, audiences, startEditable, workspace_id, mergeCandidates = [], mergeResult }: Pick<ContactIdLoaderData, "contact" | "selected_id" | "userRole" | "audiences" | "workspace_id" | "mergeCandidates" | "mergeResult"> & { startEditable: boolean }) {
   const submit = useSubmit();
   const navigation = useNavigation();
   const detailsRef = useRef<ContactDetailsHandle>(null);
@@ -86,6 +88,8 @@ function ContactEditor({ contact, selected_id, userRole, audiences, startEditabl
         </>
       }
     >
+      {contact && hasMinRole(userRole, MemberRole.Member) && <ContactMergePanel
+        workspaceId={workspace_id} contactId={contact.id} initialResult={mergeResult} candidates={mergeCandidates} disabled={hasChanges || isSaving} />}
       <ContactDetails
         ref={detailsRef}
         disabled={isSaving}

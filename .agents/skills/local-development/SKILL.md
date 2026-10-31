@@ -631,6 +631,12 @@ section can be discarded before a defensive provider read sees it. Include a
 non-default explicit value, missing/invalid values and negated prose. Never let
 a workflow description or an implicit default become an operator attestation.
 
+For every new SQL migration, register its real execution in both
+`scripts/db/bootstrap-fresh-db.mjs` and
+`scripts/e2e/bootstrap-compose-db.mjs` in the same change. Run the bootstrap
+coverage guard and apply the fresh path to an empty owned database. An upgrade
+on an existing fixture does not prove that fresh installs include the table.
+
 ## RPC migration changes
 
 Trace the latest function definition and both bootstrap lists before editing an
@@ -873,7 +879,7 @@ its authoritative result before restarting it.
 When Docker is unavailable, an installed native PostgreSQL can run an owned
 loopback fixture. Record its actual version. On macOS, use an explicit valid
 locale and UTF-8 encoding; long artifact paths can exceed the Unix socket
-limit, so use TCP only. Verify the server PID, data directory, port and database
+103-byte limit. Set a short task-owned socket directory with `pg_ctl -o "-k /private/tmp/<owned-dir>"`; keep clients on explicit loopback TCP. Verify the server PID, data directory, port and database
 before cleanup. An empty fixture can use `scripts/db/bootstrap-fresh-db.mjs`:
 it applies the SQL before recording and checking both ledgers. Keep this local
 proof separate from deployed verification; never write ledger rows merely to
