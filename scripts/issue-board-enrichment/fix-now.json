@@ -3,9 +3,9 @@
     "issueNumber": 3091,
     "verdict": "fix-now",
     "summary": "High-priority reviewed repair from #2546 for legacy copies of the same person. Shared-phone different people stay separate.",
-    "currentBehavior": "The local candidate provides review, retained-profile choice, explicit confirmation and an atomic merge. No PR or deployed repair exists yet.",
+    "currentBehavior": "Draft PR #3093 provides review, retained-profile choice, explicit confirmation and an atomic merge. Local checks pass; full GitHub CI and dev merge remain.",
     "rootCause": "Legacy duplicate-person rows leave the strict manual-SMS identity guard ambiguous. Direct deletion would cascade through history and queue links.",
-    "resolution": "Finish structural review, focused checks and the fast local gate. Publish only when the single PR slot is free. Require full exact-head CI before the standing-authorized dev merge, then verify deployment and the native board.",
+    "resolution": "Structural review, focused checks and all 37 fast local checks pass. Require full exact-head CI on draft PR #3093 before the standing-authorized dev merge, then verify deployment and the native board.",
     "lookIn": [
       "app/server/contact-merge.server.ts",
       "app/server/contact-merge-relations.server.ts",
@@ -17,7 +17,7 @@
       "116 affected database/schema cases and 37 affected UI cases pass. The original apply regressions fail while 11 controls pass. The import/repair lock-order regression failed before the shared lock fix."
     ],
     "missingTests": [
-      "Final focused UI/Node/DB checks, fast local gate, full exact-head GitHub CI and deployed acceptance."
+      "Full exact-head GitHub CI and deployed acceptance."
     ],
     "acceptanceCriteria": [
       "Do not merge distinct external or voter identities or bypass ambiguous-recipient protection.",
@@ -27,7 +27,7 @@
     "blockedBy": [],
     "size": "L",
     "risk": "high",
-    "trackerRecommendation": "Native Bug, Priority High, Effort High, assigned @wra-sol, native parent #2546. Actual Project Status In progress was verified in the authenticated board. Branch bug/3091-review-duplicate-contacts is local; PR #3092 is parked unmerged with its branch preserved. This is the active working feature."
+    "trackerRecommendation": "Native Bug, Priority High, Effort High, assigned @wra-sol, native parent #2546. Actual Project Status In progress was verified in the authenticated board. Draft PR #3093 is the only open PR and has the native Development link to #3091. PR #3092 is parked unmerged with its branch preserved."
   },
   {
     "issueNumber": 2638,

@@ -8,7 +8,7 @@ Current dev includes the merged SMS export and credential-log fixes plus auth is
 
 The approved merge batch #3070 and CI changes #3082–#3084 are merged into dev. PR #3087 is now also merged at 6f940f35; its tree matches tested e93fb40a and both dev app/worker deployments pass. PRs #3081 and #3086 remain parked with both original branches saved. PR #3092 is parked unmerged and its branch is preserved. The active repair is #3091; publication and full remote validation follow its local checks.
 
-Priority correction, 2026-10-31: take existing urgent and high-priority app requirements first. #3085 and #3088 are on-dev. Parent #2546 and reviewed-repair child #3091 are In progress in the authenticated board. PR #3090 is merged with green CI and successful dev app/worker deployments. The #3091 repair is local and has no PR yet. Keep #2679 person identity and the #2089 ambiguous-recipient guard. Other sections retain their prior snapshot evidence.
+Priority correction, 2026-10-31: take existing urgent and high-priority app requirements first. #3085 and #3088 are on-dev. Parent #2546 and reviewed-repair child #3091 are In progress in the authenticated board. PR #3090 is merged with green CI and successful dev app/worker deployments. Draft PR #3093 is the only open PR for the #3091 repair; full GitHub CI is running. Keep #2679 person identity and the #2089 ambiguous-recipient guard. Other sections retain their prior snapshot evidence.
 
 ## How to use this board
 
@@ -44,14 +44,14 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 ### [#3091](https://github.com/chester-hill-solutions/callcaster/issues/3091) Provide a reviewed repair for duplicate workspace contacts
 - **IN PROGRESS** · Verdict: **Fix now** · Type: Bug · Priority: High · Effort: High · Environment: unset · Size: L · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
 - High-priority reviewed repair from #2546 for legacy copies of the same person. Shared-phone different people stay separate.
-- Current behavior: The local candidate provides review, retained-profile choice, explicit confirmation and an atomic merge. No PR or deployed repair exists yet.
+- Current behavior: Draft PR #3093 provides review, retained-profile choice, explicit confirmation and an atomic merge. Local checks pass; full GitHub CI and dev merge remain.
 - Root cause: Legacy duplicate-person rows leave the strict manual-SMS identity guard ambiguous. Direct deletion would cascade through history and queue links.
-- Resolution: Finish structural review, focused checks and the fast local gate. Publish only when the single PR slot is free. Require full exact-head CI before the standing-authorized dev merge, then verify deployment and the native board.
+- Resolution: Structural review, focused checks and all 37 fast local checks pass. Require full exact-head CI on draft PR #3093 before the standing-authorized dev merge, then verify deployment and the native board.
 - Look in: `app/server/contact-merge.server.ts`, `app/server/contact-merge-relations.server.ts`, `app/components/contact/ContactMergePanel.tsx`, `test/integration-db/contact-merge.test.ts`
 - Existing tests: 30 real database repair and authenticated-route cases pass. They cover history, queues, rollback, opt-outs, identity conflicts, roles, stale reviews, concurrent imports, repeat confirmations and the manual SMS route with its provider send stubbed.; 116 affected database/schema cases and 37 affected UI cases pass. The original apply regressions fail while 11 controls pass. The import/repair lock-order regression failed before the shared lock fix.
-- Missing tests: Final focused UI/Node/DB checks, fast local gate, full exact-head GitHub CI and deployed acceptance.
+- Missing tests: Full exact-head GitHub CI and deployed acceptance.
 - Done when: Do not merge distinct external or voter identities or bypass ambiguous-recipient protection.; Retain the chosen profile, source snapshots, history and completed queue state. Any saved opt-out remains effective.; Keep import receipts immutable and serialize imports with repair. Reject active work and stale reviews; roll back failures; repeat requests apply once.
-- Tracker: Native Bug, Priority High, Effort High, assigned @wra-sol, native parent #2546. Actual Project Status In progress was verified in the authenticated board. Branch bug/3091-review-duplicate-contacts is local; PR #3092 is parked unmerged with its branch preserved. This is the active working feature.
+- Tracker: Native Bug, Priority High, Effort High, assigned @wra-sol, native parent #2546. Actual Project Status In progress was verified in the authenticated board. Draft PR #3093 is the only open PR and has the native Development link to #3091. PR #3092 is parked unmerged with its branch preserved.
 
 
 ### [#3073](https://github.com/chester-hill-solutions/callcaster/issues/3073) Align the patched Twilio redirect dependency
