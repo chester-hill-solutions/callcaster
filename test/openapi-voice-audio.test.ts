@@ -47,13 +47,32 @@ describe("agent audio OpenAPI view boundaries", () => {
   });
   test.each([["public", openApiSpec], ["complete", completeOpenApiSpec]])("%s describes the owned session query and failure states", (_name, spec) => {
     const path = spec.paths["/api/connect-phone-device"];
-    for (const method of ["get", "delete"]) expect(path[method].parameters).toEqual([
+    const capturedControlParameters = [
       { name: "workspaceId", in: "query", required: true, schema: { type: "string", format: "uuid" } },
       expect.objectContaining({ name: "connection_id", in: "query", required: false, schema: { type: "string", format: "uuid" } }),
       expect.objectContaining({ name: "control_intent_id", in: "query", required: false, schema: expect.objectContaining({ type: "string", format: "uuid" }) }),
       expect.objectContaining({ name: "connection_intent_id", in: "query", required: false, schema: expect.objectContaining({ type: "string", format: "uuid" }) }),
       expect.objectContaining({ name: "X-Callcaster-Audio-Actor", in: "header", required: false }),
+    ];
+    expect(path.delete.parameters).toEqual(capturedControlParameters);
+    expect(path.get.parameters).toEqual([...capturedControlParameters,
+      expect.objectContaining({ name: "current", in: "query", required: false, schema: { type: "string", enum: ["1"] } }),
     ]);
+    expect(path.delete.responses["200"].content["application/json"].schema.oneOf).toHaveLength(2);
+    const readResponses = path.get.responses["200"].content["application/json"].schema.oneOf;
+    expect(readResponses).toHaveLength(3);
+    const current = readResponses[2];
+    expect(current.required).toEqual(["workspace_id", "user_id", "active", "pending", "recovery_required", "customer_pending"]);
+    expect(current.properties.recovery_required.type).toBe("boolean");
+    expect(current.properties.customer_pending.type).toBe("boolean");
+    for (const role of ["active", "pending"]) {
+      expect(current.properties[role].nullable).toBe(true);
+      expect(current.properties[role].required).toEqual(["workspace_id", "user_id", "connection_intent_id", "intent_state", "request", "connection"]);
+      expect(current.properties[role].properties.request.required).toEqual(["transport", "destination", "callSid", "expectedAgentSid", "campaignId"]);
+      expect(current.properties[role].properties.connection.required).toEqual(expect.arrayContaining([
+        "workspace_id", "user_id", "connection_id", "connection_intent_id", "control_intent_id", "source_agent_sid", "requested_call_sid", "campaign_id",
+      ]));
+    }
     expect(path.post).toMatchObject({ "x-callcaster-auth-class": "session", "x-callcaster-exposure": "sessionOnly" });
     expect(path.post.responses["402"].content["application/json"].schema.required).toEqual(["error", "creditsError"]);
     expect(path.post.responses["200"].content["application/json"].schema.properties.connection_state.enum).toContain("ready");
