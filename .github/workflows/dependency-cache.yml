@@ -1,0 +1,34 @@
+name: Seed dependency cache
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - package.json
+      - package-lock.json
+      - .npmrc
+      - vendor/**/package.json
+      - .github/actions/install-dependencies/**
+      - .github/workflows/dependency-cache.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: dependency-cache-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: ./.github/actions/install-dependencies
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}

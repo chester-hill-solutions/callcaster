@@ -73,7 +73,7 @@ jobs:
           bun-version-file: .bun-version
 
       - name: Install dependencies
-        run: npm ci
+        uses: ./.github/actions/install-dependencies
         env:
           # Vendored CHS auth packages do not need this; keep for future registry deps.
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
