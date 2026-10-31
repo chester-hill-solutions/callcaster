@@ -845,6 +845,14 @@ it applies the SQL before recording and checking both ledgers. Keep this local
 proof separate from deployed verification; never write ledger rows merely to
 clear a check.
 
+## Node CI shards
+
+For Node CI sharding, collect the unsharded file inventory from the same config
+and require the passing shard reports to cover every file exactly once. Reject
+missing, duplicate, empty or failed reports, and keep the required `test-node`
+check name. Run the Bun runtime tier once. Keep file isolation when suites use
+different module mocks; resetting mock calls does not reset imported modules.
+
 ## Entry points
 
 - First run or repair: `make init` (`npm run setup`, idempotent). Services already running elsewhere: `npm run setup -- --skip-docker`.
