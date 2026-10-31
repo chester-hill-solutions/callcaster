@@ -62,9 +62,19 @@ describe("agent audio OpenAPI view boundaries", () => {
     const readResponses = path.get.responses["200"].content["application/json"].schema.oneOf;
     expect(readResponses).toHaveLength(3);
     const current = readResponses[2];
-    expect(current.required).toEqual(["workspace_id", "user_id", "active", "pending", "recovery_required", "customer_pending"]);
+    expect(current.required).toEqual(["workspace_id", "user_id", "active", "pending", "recovery_required", "customer_pending", "predictive"]);
     expect(current.properties.recovery_required.type).toBe("boolean");
     expect(current.properties.customer_pending.type).toBe("boolean");
+    const recovery = current.properties.predictive;
+    expect(recovery.required).toEqual(["revision", "customer"]);
+    expect(recovery.properties.revision).toMatchObject({ type: "string", pattern: "^(0|[1-9][0-9]*)$", maxLength: 19 });
+    const customer = recovery.properties.customer;
+    expect(customer.nullable).toBe(true);
+    expect(customer.required).toEqual(["workspace_id", "user_id", "call_sid", "campaign_id", "contact_id", "outreach_attempt_id", "queue_id", "attempt",
+      "conference_id", "conference_sid", "conference_sequence", "human_state"]);
+    expect(customer.properties.human_state.enum).toEqual(["pending", "joined"]);
+    expect(customer.properties.queue_id).toEqual({ type: "integer", minimum: 1 });
+    expect(customer.properties.attempt.required).toEqual(expect.arrayContaining(["id", "workspace", "user_id", "campaign_id", "contact_id", "result", "disposition"]));
     for (const role of ["active", "pending"]) {
       expect(current.properties[role].nullable).toBe(true);
       expect(current.properties[role].required).toEqual(["workspace_id", "user_id", "connection_intent_id", "intent_state", "request", "connection"]);

@@ -16,6 +16,8 @@ libraries or using a different Node major.
 
 ## Check cadence
 
+Before reading source, find the exact path with `rg --files` and use the returned path. Do not infer file names from a hook or feature name. Quote shell search patterns and pass them with `rg --glob`; an unquoted pattern can fail in zsh before the search runs.
+
 For outbound estimates, trace the current batch size, successor schedule and
 worker polling cadence together. A configured provider rate alone does not
 describe queue progress. Confirm when rows dequeue before calling an estimate
