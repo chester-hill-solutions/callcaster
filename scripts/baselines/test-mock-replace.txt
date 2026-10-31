@@ -85,7 +85,6 @@ test/auto-dial-room.route.test.ts::@/lib/user-audio.server#1
 test/auto-dial-room.route.test.ts::@/lib/workspace-members-db.server#1
 test/auto-dial-status.test.ts::@/lib/auth.server#1
 test/auto-dial-status.test.ts::@/lib/auto-dial.server#1
-test/auto-dial-status.test.ts::@/lib/campaign-queue-db.server#1
 test/auto-dial-status.test.ts::@/lib/env.server#1
 test/auto-dial-status.test.ts::@/lib/logger.server#1
 test/auto-dial-status.test.ts::@/lib/telephony-db.server#1
