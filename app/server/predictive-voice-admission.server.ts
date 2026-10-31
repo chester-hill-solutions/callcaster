@@ -20,6 +20,7 @@ import { startVoiceBridgeReservationInTransaction } from "./voice-bridge-reserva
 import { repeatedConferenceStart, type PredictiveStartIntent } from "./predictive-start-replay.server";
 import type { VerifiedVoiceAudioCustomerIntent } from "./voice-audio-customer-admission.server";
 import { voiceRecordingCallbackUrl } from "@/lib/voice-recording";
+import { findBusyPredictiveHuman } from "./predictive-human-admission.server";
 export { replayPredictiveConferenceStart } from "./predictive-start-replay.server";
 
 type CoreRefusal = Extract<Awaited<ReturnType<typeof reserveVoiceCreditsInTransaction>>, { ok: false }>;
@@ -80,6 +81,12 @@ async function admitInTransaction(tx: CreditTransaction, input: PredictiveVoiceA
   }
   if (savedCampaign.status !== "running") return { ok: false, reason: "campaign_stopped" } as const;
   await input.lockTurn?.(tx);
+  if (await findBusyPredictiveHuman(tx, input.workspaceId, input.userId)) return { ok: false, reason: "queue_pending" } as const;
+  return selectRecipient(tx, input, publish);
+}
+
+async function selectRecipient(tx: CreditTransaction, input: PredictiveVoiceAdmissionInput, publish: Array<() => Promise<void>>) {
+  const tdb = createTenantDb(input.workspaceId, tx);
   const deferEmit = (emit: () => Promise<void>) => { publish.push(emit); };
   let outsideWindow = false;
   const deferredClaims: Array<{ id: number; generation: string }> = [];
@@ -122,7 +129,8 @@ async function fundClaimedRecipient(
       kind: "staffed", to, from, campaignId: input.campaignId, contactId: contact.contact_id, queueId: contact.queue_id,
       expectedQueueGeneration: queue.dispatch_generation, userId: input.userId, conferenceId: input.conferenceId,
       setupTo: input.audioSource ? undefined : input.setup?.to, audioSource: input.audioSource,
-      predictiveOperationId: input.operationId, operationKey: input.setup?.intentKey ?? (input.operationId ? `predictive-operation:${input.operationId}` : `predictive-queue:${contact.queue_id}`),
+      predictiveOperationId: input.operationId, operationKey: input.setup?.intentKey ?? (input.operationId ? `predictive-operation:${input.operationId}`
+        : `predictive-queue:${contact.queue_id}${input.audioSource ? `:${queue.dispatch_generation}` : ""}`),
       prepareOutreach: (ownedTx) => rpcCreateOutreachAttempt(ownedTx, { queueId: contact.queue_id, contactId: contact.contact_id,
         campaignId: input.campaignId, workspaceId: input.workspaceId, userId: input.userId }),
     });

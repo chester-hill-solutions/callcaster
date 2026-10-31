@@ -165,6 +165,15 @@ Recording nonce preparation needs only the reservation lock. Prove
 cross-service races at the real ledger boundary and wait for `pg_blocking_pids`
 before releasing the barrier; a timing-only overlap can miss a deadlock.
 
+Predictive human admission must commit before returning customer Conference
+TwiML. Serialize it through the workspace fence and keep one pending or joined
+human per agent. An extra answered call gets Hangup, while only its exact queue
+generation and reservation can be restored with a new generation. Keep its
+credit hold until a real terminal receipt arrives. Give a later queue generation
+its own send key; a saved phone source must not collapse that retry into the old
+send. Test pending, joined and simultaneous answers, late events, refusal replay,
+queue-write rollback, busy dispatch and billing through the real database.
+
 Twilio inbound and outbound media share one timestamp clock. Test simultaneous
 tracks against fixed G.711 vectors and one mono duration; byte concatenation
 doubles elapsed audio. Keep startup and jitter buffers bounded, own every timer

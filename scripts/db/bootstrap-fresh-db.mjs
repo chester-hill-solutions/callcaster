@@ -153,6 +153,7 @@ const steps = [
   "client/migrations/20261030000006_voice_customer_audio_source.sql",
   "client/migrations/20261030000007_voice_customer_recording_launch.sql",
   "client/migrations/20261030000008_voice_audio_request_controls.sql",
+  "client/migrations/20261031000001_predictive_human_admission.sql",
 ];
 
 /**

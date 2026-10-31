@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Predictive calls admit one human per agent. An extra answered call ends and its contact stays queued for a later attempt. Pending or joined conversations stop new dispatch, and late events cannot release the current human or remove the restored contact. Phone audio stays connected; each real call keeps its own final billing ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
+
 - Fixed: Handset End Session retains its workspace, identity, device and captured calls through replies. Old commands cannot close a newer session; pending dials still cancel, and an incoming SDK call survives before the screen receives it ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
 
 - Fixed: Predictive customer joins update only the queue generation and reservation that funded the call. Answer and queue writes commit together, so a failed callback can retry; a terminal Call cannot be revived by an older lookup ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).

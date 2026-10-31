@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { call, job, workspace_voice_reservation as reservations } from "@/db/schema";
+import { call, job, workspace, workspace_voice_reservation as reservations } from "@/db/schema";
 import { db } from "@/server/db";
 import { terminalVoiceCallDuration } from "@/lib/voice-recovery-duration";
 import { callStatusSideEffectsParams } from "@/lib/worker/job-params.server";
@@ -13,6 +13,7 @@ export async function enqueueFundedVoiceTerminalOutcome(workspaceId: string, sid
   const duration = terminalVoiceCallDuration(params.CallStatus ?? null, params.CallDuration ?? null);
   if (duration === null) return null;
   return db.transaction(async (tx) => {
+    await tx.select({ id: workspace.id }).from(workspace).where(eq(workspace.id, workspaceId)).for("no key update");
     const [reservation] = await tx.select().from(reservations).where(and(
       eq(reservations.workspace, workspaceId), eq(reservations.provider_sid, sid),
     )).for("update");
@@ -25,7 +26,8 @@ export async function enqueueFundedVoiceTerminalOutcome(workspaceId: string, sid
     const event = parseTwilioVoiceCallback(receipt);
     await recordFundedPredictiveTerminalReceipt(tx, reservation, sid, status);
     const storedParams = callStatusSideEffectsParams.parse({ sid, twilioParams: receipt, event });
-    await tx.update(reservations).set({ terminal_status: status, terminal_duration: seconds, updated_at: new Date() })
+    await tx.update(reservations).set({ terminal_status: status, terminal_duration: seconds,
+      human_state: reservation.human_state && reservation.human_state !== "refused" ? "ended" : reservation.human_state, updated_at: new Date() })
       .where(eq(reservations.id, reservation.id));
     await tx.update(call).set({ status, duration: seconds })
       .where(and(eq(call.workspace, workspaceId), eq(call.sid, sid)));

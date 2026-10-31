@@ -38,6 +38,7 @@ export async function settleVoiceReservation(args: {
       campaignId: reservation.campaign_id, emitEvent: false,
     }) : null;
     await tx.update(reservations).set({ state: "settled", terminal_status: status, terminal_duration: String(duration),
+      human_state: reservation.human_state && reservation.human_state !== "refused" ? "ended" : reservation.human_state,
       updated_at: new Date(), last_error: null })
       .where(eq(reservations.id, reservation.id));
     return { handled: true as const, billingResult, amount };

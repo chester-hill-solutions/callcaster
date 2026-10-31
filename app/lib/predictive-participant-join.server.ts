@@ -1,5 +1,5 @@
 import type { Tables } from "@/lib/db-types";
-import type { ParticipantJoinEvent } from "@/lib/twilio/voice-callback";
+import type { ParticipantJoinEvent, ParticipantLeaveEvent } from "@/lib/twilio/voice-callback";
 import { findOutreachAttemptById, updateCallBySid, updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
 import { logger } from "@/lib/logger.server";
 import { emitPredictiveBroadcast } from "@/lib/workspace-events.server";
@@ -7,6 +7,19 @@ import { predictiveCustomerBroadcast, predictiveCustomerParticipation } from "@/
 import { findVoiceReservationForCall } from "@/server/voice-bridge-reservation.server";
 import { isTerminalStatus, normalizeProviderStatus } from "@/lib/call-status";
 import { recordFundedPredictiveJoin } from "@/server/funded-predictive-join.server";
+import { recordFundedPredictiveLeave } from "@/server/predictive-human-presence.server";
+
+export async function handlePredictiveParticipantLeave(event: ParticipantLeaveEvent, call: Tables<"call">) {
+  if (!call.workspace) return false;
+  const owner = await findVoiceReservationForCall(call.workspace, call.sid);
+  if (!owner) return false;
+  const current = await recordFundedPredictiveLeave(owner, event);
+  if (!current) return false;
+  const participation = predictiveCustomerParticipation(event);
+  const broadcast = participation ? predictiveCustomerBroadcast(current, "completed", participation) : null;
+  if (broadcast) await emitPredictiveBroadcast(call.workspace, broadcast);
+  return true;
+}
 
 async function publishJoin(event: ParticipantJoinEvent, call: Parameters<typeof predictiveCustomerBroadcast>[0]) {
   const participation = predictiveCustomerParticipation(event);

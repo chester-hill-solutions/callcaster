@@ -61,6 +61,35 @@ async function voice(url: string, callSid: string, patch: Record<string, string>
   }, body: new URLSearchParams(params) }), { roomId: decodeURIComponent(new URL(url).pathname.split('/').at(-1) ?? '') })));
 }
 
+async function busyPair() {
+  const f = await scenario(3); expect((await start(f)).status).toBe(200);
+  expect(await runAutoDialerTurn({ user_id: actor, workspace_id: workspaceId, campaign_id: f.campaignId,
+    conference_id: f.row.conference_id })).toMatchObject({ success: true });
+  const roots = await sql`select id, provider_sid, voice_url, status_callback, queue_id from public.workspace_voice_reservation
+    where workspace = ${workspaceId}::uuid and audio_mode = 'predictive' order by created_at, id`;
+  expect(roots).toHaveLength(2);
+  expect(await (await voice(roots[0].voice_url, roots[0].provider_sid)).text()).toContain('<Conference');
+  expect(await (await voice(roots[1].voice_url, roots[1].provider_sid)).text()).toContain('<Hangup');
+  return { f, roots, turn: () => runAutoDialerTurn({ user_id: actor, workspace_id: workspaceId,
+    campaign_id: f.campaignId, conference_id: f.row.conference_id }) };
+}
+
+async function participant(f: Awaited<ReturnType<typeof scenario>>, root: Record<string, string>, event: string, sequence: string) {
+  return signedAudio(f.row.conference_callback, { AccountSid: accountSid, CallSid: root.provider_sid,
+    ConferenceSid: f.row.conference_sid ?? '', FriendlyName: f.row.conference_id, ParticipantLabel: `customer:${root.id}`,
+    StatusCallbackEvent: event, SequenceNumber: sequence, Timestamp: new Date().toISOString(), ReasonParticipantLeft: 'participant_hung_up' });
+}
+
+async function finalStatus(root: Record<string, string>, seconds = '42') {
+  const params = { AccountSid: accountSid, CallSid: root.provider_sid, To: web.records.get(root.provider_sid)?.to ?? customer,
+    From: callerId, Direction: 'outbound-api', CallStatus: 'completed', CallDuration: seconds };
+  const { action } = await import('../../app/routes/api+/auto-dial/status.action.server');
+  return asRouteResponse(action(routeArgs(new Request(root.status_callback, { method: 'POST', headers: {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'X-Twilio-Signature': twilio.getExpectedTwilioSignature('owned-audio-token', root.status_callback, params),
+  }, body: new URLSearchParams(params) }))));
+}
+
 describe("predictive Start reuses confirmed phone audio", () => {
   useOwnedAudioFixture();
   beforeEach(async () => {
@@ -510,5 +539,199 @@ describe("predictive Start reuses confirmed phone audio", () => {
     expect(web.create).toHaveBeenCalledTimes(1); expect(await state()).toMatchObject({ reservations: 1, attempts: 1 });
     await expect(runPredictiveMachineContinuation({ workspaceId, operationId: operation.id })).resolves.toMatchObject({ completed: true });
     expect(web.create).toHaveBeenCalledTimes(2);
+  });
+
+  test.each([false, true])("single-human admission: a second funded human cannot enter an occupied or pending room (joined %s)", async joined => {
+    const f = await scenario(2), first = await start(f); expect(first.status).toBe(200);
+    expect(await runAutoDialerTurn({ user_id: actor, workspace_id: workspaceId, campaign_id: f.campaignId,
+      conference_id: f.row.conference_id })).toMatchObject({ success: true });
+    const roots = await sql`select id, provider_sid, voice_url from public.workspace_voice_reservation
+      where workspace = ${workspaceId}::uuid and audio_mode = 'predictive' order by created_at, id`;
+    expect(roots).toHaveLength(2); expect(web.create).toHaveBeenCalledTimes(2);
+    const firstHuman = await voice(roots[0].voice_url, roots[0].provider_sid);
+    expect(await firstHuman.text()).toContain('<Conference');
+    if (joined) expect((await signedAudio(f.row.conference_callback, { AccountSid: accountSid,
+      CallSid: roots[0].provider_sid, ConferenceSid: f.row.conference_sid ?? '', FriendlyName: f.row.conference_id,
+      ParticipantLabel: `customer:${roots[0].id}`, StatusCallbackEvent: 'participant-join', SequenceNumber: '7',
+      Timestamp: new Date().toISOString() })).status).toBe(204);
+    const secondHuman = await voice(roots[1].voice_url, roots[1].provider_sid);
+    expect(secondHuman.status).toBe(200);
+    expect(await secondHuman.text()).toContain('<Hangup');
+    expect(await state()).toMatchObject({ reservations: 2, ledger: 0, credits: 100 });
+    expect(rooms.update).not.toHaveBeenCalled();
+  });
+  test("single-human admission: simultaneous funded answers issue only one room join", async () => {
+    const f = await scenario(2), first = await start(f); expect(first.status).toBe(200);
+    expect(await runAutoDialerTurn({ user_id: actor, workspace_id: workspaceId, campaign_id: f.campaignId,
+      conference_id: f.row.conference_id })).toMatchObject({ success: true });
+    const roots = await sql`select provider_sid, voice_url from public.workspace_voice_reservation
+      where workspace = ${workspaceId}::uuid and audio_mode = 'predictive' order by created_at, id`;
+    expect(roots).toHaveLength(2); expect(web.create).toHaveBeenCalledTimes(2);
+    const replies = await Promise.all(roots.map(row => voice(row.voice_url, row.provider_sid)));
+    expect(replies.every(reply => reply.status === 200)).toBe(true);
+    const instructions = await Promise.all(replies.map(reply => reply.text()));
+    expect(instructions.filter(xml => xml.includes('<Conference'))).toHaveLength(1);
+    expect(await state()).toMatchObject({ reservations: 2, ledger: 0, credits: 100 });
+    expect(rooms.update).not.toHaveBeenCalled();
+  });
+
+  test.each([false, true])("single-human policy: an extra answered customer is kept queued (primary joined %s)", async joined => {
+    const f = await scenario(2), first = await start(f); expect(first.status).toBe(200);
+    expect(await runAutoDialerTurn({ user_id: actor, workspace_id: workspaceId, campaign_id: f.campaignId,
+      conference_id: f.row.conference_id })).toMatchObject({ success: true });
+    const roots = await sql`select id, provider_sid, voice_url, queue_id, queue_generation from public.workspace_voice_reservation
+      where workspace = ${workspaceId}::uuid and audio_mode = 'predictive' order by created_at, id`;
+    expect(roots).toHaveLength(2);
+    expect(await (await voice(roots[0].voice_url, roots[0].provider_sid)).text()).toContain('<Conference');
+    if (joined) expect((await signedAudio(f.row.conference_callback, { AccountSid: accountSid,
+      CallSid: roots[0].provider_sid, ConferenceSid: f.row.conference_sid ?? '', FriendlyName: f.row.conference_id,
+      ParticipantLabel: `customer:${roots[0].id}`, StatusCallbackEvent: 'participant-join', SequenceNumber: '7',
+      Timestamp: new Date().toISOString() })).status).toBe(204);
+    const [primary] = await sql`select queue_state, provider_status, dispatch_generation, voice_reservation_id, dequeued_at
+      from public.campaign_queue where id = ${roots[0].queue_id}`;
+    const [before] = await sql`select dispatch_generation, voice_reservation_id from public.campaign_queue where id = ${roots[1].queue_id}`;
+    expect(before).toMatchObject({ dispatch_generation: roots[1].queue_generation, voice_reservation_id: roots[1].id });
+    expect((await voice(roots[1].voice_url, roots[1].provider_sid)).status).toBe(200);
+    expect((await sql`select queue_state, provider_status, dispatch_generation, voice_reservation_id, dequeued_at
+      from public.campaign_queue where id = ${roots[0].queue_id}`)[0]).toEqual(primary);
+    const [retry] = await sql`select queue_state, dequeued_at, dispatch_generation, voice_reservation_id
+      from public.campaign_queue where id = ${roots[1].queue_id}`;
+    expect(retry).toMatchObject({ queue_state: 'queued', dequeued_at: null, voice_reservation_id: null });
+    expect(retry.dispatch_generation).not.toBe(roots[1].queue_generation);
+    expect(await state()).toMatchObject({ reservations: 2, ledger: 0, credits: 100 });
+    expect(rooms.update).not.toHaveBeenCalled();
+  });
+
+  test.each([false, true])('busy human defers dispatch without claiming a third contact (joined %s)', async joined => {
+    const f = await scenario(3); expect((await start(f)).status).toBe(200);
+    const roots = await sql`select id, provider_sid, voice_url from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;
+    expect(roots).toHaveLength(1);
+    expect(await (await voice(roots[0].voice_url, roots[0].provider_sid)).text()).toContain('<Conference');
+    if (joined) expect((await participant(f, roots[0], 'participant-join', '7')).status).toBe(204);
+    const before = await sql`select id, queue_state, dispatch_generation, voice_reservation_id from public.campaign_queue
+      where campaign_id = ${f.campaignId} order by id`;
+    expect(await runAutoDialerTurn({ user_id: actor, workspace_id: workspaceId, campaign_id: f.campaignId,
+      conference_id: f.row.conference_id })).toMatchObject({ success: true, message: 'Predictive admission deferred: queue_pending' });
+    expect(web.create).toHaveBeenCalledTimes(1);
+    expect(await sql`select id, queue_state, dispatch_generation, voice_reservation_id from public.campaign_queue
+      where campaign_id = ${f.campaignId} order by id`).toEqual(before);
+  });
+
+  test('a refused answer replay cannot rotate the restored queue or later enter the idle room', async () => {
+    const { f, roots } = await busyPair();
+    const [retry] = await sql`select * from public.campaign_queue where id = ${roots[1].queue_id}`;
+    expect((await participant(f, roots[0], 'participant-leave', '8')).status).toBe(204);
+    expect(await (await voice(roots[1].voice_url, roots[1].provider_sid)).text()).toContain('<Hangup');
+    expect((await participant(f, roots[1], 'participant-join', '9')).status).toBe(204);
+    expect((await sql`select * from public.campaign_queue where id = ${roots[1].queue_id}`)[0]).toEqual(retry);
+    expect((await sql`select human_state from public.workspace_voice_reservation where id = ${roots[1].id}::uuid`)[0].human_state).toBe('refused');
+  });
+
+  test('extra customer join and leave events cannot replace or release the primary human', async () => {
+    const { f, roots, turn } = await busyPair();
+    expect((await participant(f, roots[0], 'participant-join', '7')).status).toBe(204);
+    vi.mocked(emitPredictiveBroadcast).mockClear();
+    expect((await participant(f, roots[1], 'participant-join', '8')).status).toBe(204);
+    expect((await participant(f, roots[1], 'participant-leave', '9')).status).toBe(204);
+    expect(emitPredictiveBroadcast).not.toHaveBeenCalled();
+    expect(await turn()).toMatchObject({ message: 'Predictive admission deferred: queue_pending' });
+    expect(web.create).toHaveBeenCalledTimes(2); expect(rooms.update).not.toHaveBeenCalled();
+  });
+
+  test('conference order rejects an older leave and never revives a customer after a newer leave', async () => {
+    const { f, roots, turn } = await busyPair();
+    expect((await finalStatus(roots[1], '0')).status).toBe(200);
+    expect((await participant(f, roots[0], 'participant-join', '7')).status).toBe(204);
+    vi.mocked(emitPredictiveBroadcast).mockClear();
+    expect((await participant(f, roots[0], 'participant-leave', '6')).status).toBe(204);
+    expect(emitPredictiveBroadcast).not.toHaveBeenCalled();
+    expect(await turn()).toMatchObject({ message: 'Predictive admission deferred: queue_pending' });
+    expect((await participant(f, roots[0], 'participant-leave', '8')).status).toBe(204);
+    vi.mocked(emitPredictiveBroadcast).mockClear();
+    expect((await participant(f, roots[0], 'participant-join', '7')).status).toBe(204);
+    expect(emitPredictiveBroadcast).not.toHaveBeenCalled();
+    expect((await sql`select human_state, human_conference_sequence from public.workspace_voice_reservation
+      where id = ${roots[0].id}::uuid`)[0]).toMatchObject({ human_state: 'left', human_conference_sequence: '8' });
+    expect(await turn()).toMatchObject({ success: true }); expect(web.create).toHaveBeenCalledTimes(3);
+    const [next] = await sql`select provider_sid, voice_url from public.workspace_voice_reservation
+      where workspace = ${workspaceId}::uuid and provider_sid not in (${roots[0].provider_sid}, ${roots[1].provider_sid})`;
+    expect(await (await voice(next.voice_url, next.provider_sid)).text()).toContain('<Conference');
+    expect(rooms.update).not.toHaveBeenCalled();
+  });
+
+  test('a final extra-customer receipt bills once without dequeuing its restored contact or ending the primary', async () => {
+    const { f, roots, turn } = await busyPair();
+    expect((await participant(f, roots[0], 'participant-join', '7')).status).toBe(204);
+    const [retry] = await sql`select * from public.campaign_queue where id = ${roots[1].queue_id}`;
+    expect(await state()).toMatchObject({ ledger: 0, credits: 100 });
+    expect((await finalStatus(roots[1])).status).toBe(200);
+    expect((await finalStatus(roots[1])).status).toBe(200);
+    expect(await state()).toMatchObject({ ledger: 1, credits: 96 });
+    expect((await sql`select * from public.campaign_queue where id = ${roots[1].queue_id}`)[0]).toEqual(retry);
+    expect(await turn()).toMatchObject({ message: 'Predictive admission deferred: queue_pending' });
+    expect(rooms.update).not.toHaveBeenCalled(); expect(web.create).toHaveBeenCalledTimes(2);
+  });
+
+  test('the primary terminal receipt releases its owner and a late join cannot take it back', async () => {
+    const { f, roots, turn } = await busyPair();
+    expect((await finalStatus(roots[1], '0')).status).toBe(200);
+    expect((await finalStatus(roots[0])).status).toBe(200);
+    vi.mocked(emitPredictiveBroadcast).mockClear();
+    expect((await participant(f, roots[0], 'participant-join', '7')).status).toBe(204);
+    expect(emitPredictiveBroadcast).not.toHaveBeenCalled();
+    expect(await turn()).toMatchObject({ success: true }); expect(web.create).toHaveBeenCalledTimes(3);
+    expect((await sql`select human_state from public.workspace_voice_reservation where id = ${roots[0].id}::uuid`)[0].human_state).toBe('ended');
+    expect(await state()).toMatchObject({ ledger: 1, credits: 96 }); expect(rooms.update).not.toHaveBeenCalled();
+  });
+
+  test('a restored contact waits for the old Call to end, then gets a new funded attempt', async () => {
+    const { f, roots, turn } = await busyPair();
+    expect((await participant(f, roots[0], 'participant-leave', '8')).status).toBe(204);
+    expect(await turn()).toMatchObject({ success: true, message: 'Predictive admission deferred: dispatch_in_progress' });
+    expect(web.create).toHaveBeenCalledTimes(2);
+    expect((await finalStatus(roots[1], '0')).status).toBe(200);
+    expect(await turn()).toEqual({ success: true }); expect(web.create).toHaveBeenCalledTimes(3);
+    const retried = await sql`select id, queue_generation, operation_key, outreach_attempt_id from public.workspace_voice_reservation
+      where workspace = ${workspaceId}::uuid and queue_id = ${roots[1].queue_id} order by created_at`;
+    expect(retried).toHaveLength(2);
+    expect(retried[1].queue_generation).not.toBe(retried[0].queue_generation);
+    expect(retried[1].operation_key).not.toBe(retried[0].operation_key);
+    expect(retried[1].outreach_attempt_id).not.toBe(retried[0].outreach_attempt_id);
+    expect(await state()).toMatchObject({ ledger: 0, credits: 100 });
+  });
+
+  test.each(['generation', 'reservation', 'both'])('extra answer cannot requeue a replaced queue owner (%s)', async changed => {
+    const f = await scenario(2); expect((await start(f)).status).toBe(200);
+    expect(await runAutoDialerTurn({ user_id: actor, workspace_id: workspaceId, campaign_id: f.campaignId,
+      conference_id: f.row.conference_id })).toEqual({ success: true });
+    const roots = await sql`select id, provider_sid, voice_url, queue_id from public.workspace_voice_reservation
+      where workspace = ${workspaceId}::uuid order by created_at, id`;
+    expect(await (await voice(roots[0].voice_url, roots[0].provider_sid)).text()).toContain('<Conference');
+    if (changed !== 'reservation') await sql`update public.campaign_queue set dispatch_generation = gen_random_uuid() where id = ${roots[1].queue_id}`;
+    if (changed !== 'generation') await sql`update public.campaign_queue set voice_reservation_id = ${randomUUID()}::uuid where id = ${roots[1].queue_id}`;
+    const [before] = await sql`select * from public.campaign_queue where id = ${roots[1].queue_id}`;
+    expect(await (await voice(roots[1].voice_url, roots[1].provider_sid)).text()).toContain('<Hangup');
+    expect((await sql`select * from public.campaign_queue where id = ${roots[1].queue_id}`)[0]).toEqual(before);
+    expect(rooms.update).not.toHaveBeenCalled(); expect(await state()).toMatchObject({ ledger: 0, credits: 100 });
+  });
+
+  test('a failed extra-customer requeue rolls back the refusal and permits the same callback to retry', async () => {
+    const f = await scenario(2); expect((await start(f)).status).toBe(200);
+    await runAutoDialerTurn({ user_id: actor, workspace_id: workspaceId, campaign_id: f.campaignId, conference_id: f.row.conference_id });
+    const roots = await sql`select id, provider_sid, voice_url, queue_id from public.workspace_voice_reservation
+      where workspace = ${workspaceId}::uuid order by created_at, id`;
+    expect(await (await voice(roots[0].voice_url, roots[0].provider_sid)).text()).toContain('<Conference');
+    const [before] = await sql`select * from public.campaign_queue where id = ${roots[1].queue_id}`;
+    await sql.unsafe(`create function public.${fault}() returns trigger language plpgsql as $$ begin raise exception 'Owned extra customer queue fault'; end $$`);
+    await sql.unsafe(`create trigger ${fault} before update on public.campaign_queue for each row execute function public.${fault}()`);
+    expect((await voice(roots[1].voice_url, roots[1].provider_sid)).status).toBe(500);
+    expect((await sql`select human_state, recipient_instruction_issued_at from public.workspace_voice_reservation
+      where id = ${roots[1].id}::uuid`)[0]).toEqual({ human_state: null, recipient_instruction_issued_at: null });
+    expect((await sql`select * from public.campaign_queue where id = ${roots[1].queue_id}`)[0]).toEqual(before);
+    await clearFault();
+    expect(await (await voice(roots[1].voice_url, roots[1].provider_sid)).text()).toContain('<Hangup');
+    expect((await sql`select queue_state, voice_reservation_id from public.campaign_queue
+      where id = ${roots[1].queue_id}`)[0]).toMatchObject({ queue_state: 'queued', voice_reservation_id: null });
+    expect(await state()).toMatchObject({ ledger: 0, credits: 100 }); expect(rooms.update).not.toHaveBeenCalled();
   });
 });

@@ -3,10 +3,8 @@ import { stopVoiceAudioConferenceForParticipant } from "@/lib/voice-audio-stop.s
 import { observeVoiceAudioConferenceEvent, observeVoiceAudioBridgeEvent, type VoiceAudioConferenceEvent } from "@/server/voice-audio-conference.server";
 import type { VoiceAudioConnection } from "@/server/voice-audio-connection.server";
 import { bindVoicePhoneCustomerParticipant } from "@/server/voice-phone-customer.server";
-import { handlePredictiveParticipantJoin } from "@/lib/predictive-participant-join.server";
+import { handlePredictiveParticipantJoin, handlePredictiveParticipantLeave } from "@/lib/predictive-participant-join.server";
 import { findCallBySid } from "@/lib/telephony-db.server";
-import { predictiveCustomerBroadcast, predictiveCustomerParticipation } from "@/lib/predictive-customer-broadcast.server";
-import { emitPredictiveBroadcast } from "@/lib/workspace-events.server";
 
 type ParticipantEvent = Extract<TwilioVoiceCallback, { kind: "participant" }>;
 
@@ -17,11 +15,7 @@ export async function handleBoundVoiceAudioCustomerParticipant(owner: VoiceAudio
     const call = await findCallBySid(event.callSid ?? "");
     if (!call || call.workspace !== row.workspace) throw new Error("Predictive phone customer Call is missing");
     if (isParticipantJoin(event)) await handlePredictiveParticipantJoin(event, call);
-    else {
-      const participation = predictiveCustomerParticipation(event);
-      const broadcast = participation ? predictiveCustomerBroadcast(call, "completed", participation) : null;
-      if (broadcast) await emitPredictiveBroadcast(row.workspace, broadcast);
-    }
+    else await handlePredictiveParticipantLeave(event, call);
   }
   return row;
 }

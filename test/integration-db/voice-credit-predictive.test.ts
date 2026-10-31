@@ -141,6 +141,24 @@ describe("predictive and conference funding (#2879)", () => {
     return { AccountSid: accountSid, CallSid: agent.setupSid, ConferenceSid: "CF00000000000000000000000000005879",
       FriendlyName: agent.conferenceName, StatusCallbackEvent: "participant-join", Timestamp: new Date().toISOString() };
   }
+  test('legacy funded browser answers share one human owner and keep the extra contact queued', async () => {
+    await turn(); await turn();
+    const roots = await sql`select id, provider_sid, recipient, voice_url, queue_id from public.workspace_voice_reservation
+      where workspace = ${workspaceId}::uuid order by created_at, id`;
+    expect(roots).toHaveLength(2);
+    const replies = await Promise.all(roots.map(root => signedRoute(root.voice_url, { AccountSid: accountSid,
+      CallSid: root.provider_sid, To: root.recipient, From: from, Direction: 'outbound-api', CallStatus: 'in-progress', AnsweredBy: 'human' }, true)));
+    expect(replies.map(reply => reply.status)).toEqual([200, 200]);
+    const xml = await Promise.all(replies.map(reply => reply.text()));
+    expect(xml.filter(value => value.includes('<Conference'))).toHaveLength(1);
+    expect(xml.filter(value => value.includes('<Hangup'))).toHaveLength(1);
+    const [extra] = await sql`select id, queue_id, queue_generation from public.workspace_voice_reservation
+      where workspace = ${workspaceId}::uuid and human_state = 'refused'`;
+    const [queue] = await sql`select queue_state, dequeued_at, dispatch_generation, voice_reservation_id from public.campaign_queue where id = ${extra.queue_id}`;
+    expect(queue).toMatchObject({ queue_state: 'queued', dequeued_at: null, voice_reservation_id: null });
+    expect(queue.dispatch_generation).not.toBe(extra.queue_generation);
+    expect(await state()).toEqual({ credits: 100, holds: 2, ledger: 0 }); expect(provider.update).not.toHaveBeenCalled();
+  });
   test("zero credits refuse predictive recipients before the provider", async () => {
     await sql`update public.workspace set credits = 0 where id = ${workspaceId}::uuid`; await turn();
     expect(provider.create).not.toHaveBeenCalled(); expect(await state()).toEqual({ credits: 0, holds: 0, ledger: 0 });
