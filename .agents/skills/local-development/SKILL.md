@@ -77,6 +77,8 @@ Inspect warning counts in focused lint results. ESLint can exit zero while a
 ratchet still rejects new warnings. For nested fields, use the canonical
 `FormFieldControl` contract instead of overriding spacing owned by `FormField`.
 Keep layout-only wrappers outside the control association.
+Compare warnings in each changed file with the tested base as well. Aggregate
+ratchet headroom can hide a new warning in the changed implementation.
 
 Before a push or pull request, run `npm run ci:local` and the focused tests
 for changed behavior. CI owns the complete Node, UI and Bun suites, production
@@ -251,6 +253,15 @@ including classes constructed by `useMemo`. Defer browser storage, media and
 network access until mount or explicit actions. Test the real hooks through the
 installed Router client-boundary transform and a server renderer; JSDOM tests
 and a successful production build do not prove that the route can render.
+
+For current-resource recovery, an empty server read cannot discard a saved
+request whose POST is still unknown. Retain that nonce for explicit Check or
+Cancel. Keep cancellation and browser-readiness continuations tied to their
+captured owner; discovery must not transfer them to a newer control intent.
+Validate the full recovered snapshot before changing either audio role, and
+retain known terminal intents so a later read cannot revive them.
+Admission fences block new operations. Keep an explicit Check for an already
+submitted Start on its captured request even when the server reports busy.
 
 Discover uncertain module paths with `rg --files` before reading them. An ADR's
 planned layout can differ from the active source. A referenced skill can also

@@ -46,6 +46,12 @@ const intentSnapshot = { type: "object", required: ["workspace_id", "user_id", "
   intent_state: { type: "string", enum: ["bound", "canceled", "superseded"] }, request: { ...requestIdentity, nullable: true },
   connection: { ...snapshot, nullable: true },
 } };
+const currentSnapshot = { type: "object", required: ["workspace_id", "user_id", "active", "pending", "recovery_required", "customer_pending"], properties: {
+  workspace_id: workspaceId, user_id: { type: "string", minLength: 1 },
+  active: { ...intentSnapshot, nullable: true }, pending: { ...intentSnapshot, nullable: true },
+  recovery_required: { type: "boolean", description: "Unresolved physical cleanup, room stop or promotion blocks new audio work." },
+  customer_pending: { type: "boolean", description: "An unresolved staffed customer reservation blocks another Start until its customer owner is confirmed. This does not prove that a human joined." },
+} };
 
 /** One owned audio operation covers session control and signed provider callbacks. */
 export const voiceAudioPathOverrides: Record<string, Record<string, unknown>> = {
@@ -82,10 +88,11 @@ export const voiceAudioPathOverrides: Record<string, Record<string, unknown>> = 
     },
     get: {
       operationId: "getAgentAudioConnection", summary: "Read an owned audio connection attempt",
-      security: [...sessionCookieSecurity], parameters: query,
-      description: "Exactly one connection_id or connection_intent_id is required. Intent reads never create a provider call. They resolve the submitted request even when it reused a connection with an older original intent. A canceled or superseded request cannot adopt another request's controls.",
+      security: [...sessionCookieSecurity], parameters: [...query,
+        { name: "current", in: "query", required: false, schema: { type: "string", enum: ["1"] }, description: "Discover this session actor's current audio. Omit all connection and intent IDs. GET only." }],
+      description: "Choose exactly one connection_id, connection_intent_id or current=1. Reads never send a provider command, claim another customer or change a control owner. Current discovery returns working and pending audio under the workspace/actor fence, plus unresolved cleanup and customer-busy state. It retains original-account resources when credentials change. Intent reads resolve the submitted request even when it reused a connection with an older original intent. A canceled or superseded request cannot adopt another request's controls. DELETE does not accept current or a workspace-only query.",
       responses: { "200": { description: "Operation state; active requires a verified conference join and completed transport commit.",
-        content: { "application/json": { schema: { oneOf: [snapshot, intentSnapshot] } } } }, "400": errorResponse("Invalid query"),
+        content: { "application/json": { schema: { oneOf: [snapshot, intentSnapshot, currentSnapshot] } } } }, "400": errorResponse("Invalid query"),
         "401": errorResponse("Unauthorized"), "404": errorResponse("Connection or submitted intent not found"), "409": errorResponse("The control owner changed") },
     },
     delete: {

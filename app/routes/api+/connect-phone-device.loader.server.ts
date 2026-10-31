@@ -1,10 +1,11 @@
 import { getSession } from "@/lib/auth.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
 import { defineLoader } from "@/lib/handler.server";
-import { parseVoiceAudioQuery, voiceAudioFailureResponse, voiceAudioSnapshot, voiceAudioIntentSnapshot, voiceAudioActorConflict } from "@/lib/voice-audio-api.server";
+import { parseVoiceAudioReadQuery, voiceAudioFailureResponse, voiceAudioSnapshot, voiceAudioIntentSnapshot, voiceAudioActorConflict } from "@/lib/voice-audio-api.server";
 import { readOwnedVoiceAudioConnection } from "@/server/voice-audio-lifecycle.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { controlOwnedVoiceAudioIntent } from "@/server/voice-audio-intent-control.server";
+import { readCurrentOwnedVoiceAudio } from "@/server/voice-audio-current.server";
 
 export const loader = defineLoader({
   auth: async ({ request }) => {
@@ -17,9 +18,13 @@ export const loader = defineLoader({
   },
   sideEffects: ["db-read"],
   handler: async ({ request, auth }) => {
-    const query = parseVoiceAudioQuery(request);
+    const query = parseVoiceAudioReadQuery(request);
     if (!query) return Response.json({ error: "Invalid audio connection query" }, { status: 400, headers: auth.headers });
     await requireWorkspaceAccess({ user: auth.user, workspaceId: query.workspaceId });
+    if ("current" in query) {
+      const result = await readCurrentOwnedVoiceAudio({ workspaceId: query.workspaceId, userId: auth.user.id });
+      return result.ok ? Response.json(result.current, { headers: auth.headers }) : voiceAudioFailureResponse(result.reason, auth.headers);
+    }
     if ("connection_intent_id" in query) {
       const result = await controlOwnedVoiceAudioIntent({ workspaceId: query.workspaceId, userId: auth.user.id, intentId: query.connection_intent_id });
       return result.ok ? Response.json(voiceAudioIntentSnapshot(result), { headers: auth.headers }) : voiceAudioFailureResponse(result.reason, auth.headers);
