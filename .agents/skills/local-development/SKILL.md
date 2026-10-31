@@ -237,6 +237,9 @@ guidance. `openapi-ts.config.ts` generates the integrator subset into
 `app/lib/api-generated`; session-only dialer controls use their documented
 OpenAPI override and a client-safe response schema. Infer internal client types
 from that schema. Do not broaden route authentication to fit an old example.
+Run the matching OpenAPI contract tests with focused route/client checks when
+parameters or response variants change. Check each HTTP method separately;
+a new GET discovery mode must not broaden DELETE controls or its documentation.
 
 Quote literal route paths containing `$` or shell glob characters; otherwise
 the shell can remove a route segment before the command runs. Read script names
