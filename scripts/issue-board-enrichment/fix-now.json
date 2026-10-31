@@ -31,7 +31,7 @@
     "blockedBy": [],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Native Bug, Priority High, assigned @wra-sol, native parent #2546. Project Status In progress, verified in the authenticated board on 2026-10-31. Local branch bug/3085-reuse-workspace-contacts passes full local CI. Publication is held because #3081 and #3086 are open; the queue decision is pending."
+    "trackerRecommendation": "Native Bug, Priority High, assigned @wra-sol, native parent #2546. Project Status In progress, verified in the authenticated board on 2026-10-31. Draft PR #3087 targets dev and is the only open PR. Full local CI passes on clean 030d8bd4; publication changes only planning evidence and a changelog PR link. PRs #3081 and #3086 are parked with both branches preserved. GitHub checks, an approved dev merge and deployed acceptance follow."
   },
   {
     "issueNumber": 2638,
