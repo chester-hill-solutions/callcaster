@@ -49,6 +49,33 @@ describe("current customer control ownership", () => {
     expect(result.current.displayState).toBe("connected");
   });
 
+  test("a manual receipt binds its root without claiming the customer has answered", () => {
+    const { result, send } = renderCustomer();
+    let accept: (sid: string) => boolean = () => false;
+    act(() => { accept = result.current.beginDial(); });
+    send.mockClear();
+    act(() => { expect(accept(current)).toBe(true); });
+    expect(result.current.customerCallSid).toBe(current);
+    expect(result.current.displayState).toBe("dialing");
+    expect(polling.options?.callSid).toBe(current);
+    expect(send).not.toHaveBeenCalledWith({ type: "CONNECT" });
+    act(() => polling.onStatus?.("in-progress", current));
+    expect(result.current.displayState).toBe("connected");
+    act(() => polling.onStatus?.("completed", current));
+    act(() => { expect(accept(current)).toBe(true); });
+    expect(result.current.displayState).toBe("completed");
+  });
+
+  test("a manual receipt cannot bind an agent leg or cross into the next customer owner", () => {
+    const { result } = renderCustomer();
+    let accept: (sid: string) => boolean = () => false;
+    act(() => { accept = result.current.beginDial(); });
+    act(() => { expect(accept(agent)).toBe(false); });
+    act(() => result.current.beginDial());
+    act(() => { expect(accept(current)).toBe(false); });
+    expect(result.current.customerCallSid).toBeNull();
+  });
+
   test("a fresh callback cannot restore the previous customer during a new dial", () => {
     const { result, send } = renderCustomer();
     act(() => polling.onStatus?.("completed", previous));

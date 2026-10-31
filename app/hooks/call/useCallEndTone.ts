@@ -25,9 +25,11 @@ const TERMINAL_STATES = new Set([
  * (e.g. revisiting a finished call's disposition).
  */
 export function useCallEndTone({
+  enabled = true,
   displayState,
   outputDeviceId,
 }: {
+  enabled?: boolean;
   displayState: string;
   outputDeviceId: string | null;
 }) {
@@ -39,7 +41,7 @@ export function useCallEndTone({
    * @effect Play a short end-of-call tone exactly when displayState crosses
    * from a live state (dialing/connected) into a terminal one, regardless of
    * which side hung up.
-   * @effect-deps displayState (the call screen's single display source of
+   * @effect-deps enabled, displayState (the call screen's single display source of
    * truth from useCampaignCallFlow; the previous value is tracked in a ref so
    * only genuine live→terminal transitions fire)
    * @effect-side-effects dom — creates a short-lived AudioContext + detached
@@ -51,7 +53,7 @@ export function useCallEndTone({
   useEffect(() => {
     const previous = previousStateRef.current;
     previousStateRef.current = displayState;
-    if (!LIVE_STATES.has(previous) || !TERMINAL_STATES.has(displayState)) {
+    if (!enabled || !LIVE_STATES.has(previous) || !TERMINAL_STATES.has(displayState)) {
       return;
     }
 
@@ -81,5 +83,5 @@ export function useCallEndTone({
       clearTimeout(stopTimer);
       player.stop();
     };
-  }, [displayState]);
+  }, [displayState, enabled]);
 }

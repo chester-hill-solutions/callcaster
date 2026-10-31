@@ -25,11 +25,12 @@ export const SPEAKER_TEST_TONE_MS = 450;
 export const SPEAKER_TEST_TONE_HZ = 440;
 
 type UseAudioDeviceTestOptions = {
+  enabled?: boolean;
   /** The live MediaStream from `getUserMedia`; only used for mic monitoring. */
   stream: MediaStream | null;
 };
 
-export function useAudioDeviceTest({ stream }: UseAudioDeviceTestOptions) {
+export function useAudioDeviceTest({ stream, enabled = true }: UseAudioDeviceTestOptions) {
   const [micLevel, setMicLevel] = useState(0);
   const [isMicMonitoring, setIsMicMonitoring] = useState(false);
   const [isSpeakerPlaying, setIsSpeakerPlaying] = useState(false);
@@ -43,6 +44,8 @@ export function useAudioDeviceTest({ stream }: UseAudioDeviceTestOptions) {
 
   const speakerAudioElRef = useRef<HTMLAudioElement | null>(null);
   const speakerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const speakerCleanupRef = useRef<(() => void) | null>(null);
+  const speakerGenerationRef = useRef(0);
 
   const stopMicMonitor = useCallback(() => {
     if (rafRef.current != null) {
@@ -65,6 +68,7 @@ export function useAudioDeviceTest({ stream }: UseAudioDeviceTestOptions) {
   }, []);
 
   const startMicMonitor = useCallback(() => {
+    if (!enabled) return;
     if (!stream || stream.getAudioTracks().length === 0) {
       setError("No microphone stream available. Grant mic access first.");
       return;
@@ -123,9 +127,12 @@ export function useAudioDeviceTest({ stream }: UseAudioDeviceTestOptions) {
       setError("Could not start the microphone meter.");
       stopMicMonitor();
     }
-  }, [stream, stopMicMonitor]);
+  }, [enabled, stream, stopMicMonitor]);
 
   const stopSpeakerTest = useCallback(() => {
+    speakerGenerationRef.current += 1;
+    speakerCleanupRef.current?.();
+    speakerCleanupRef.current = null;
     if (speakerTimeoutRef.current) {
       clearTimeout(speakerTimeoutRef.current);
       speakerTimeoutRef.current = null;
@@ -145,10 +152,12 @@ export function useAudioDeviceTest({ stream }: UseAudioDeviceTestOptions) {
 
   const playSpeakerTone = useCallback(
     async (outputDeviceId?: string | null) => {
+      if (!enabled) return;
       setError(null);
       // Cancel any in-flight test first — a double-click should never
       // stack two concurrent tones.
       stopSpeakerTest();
+      const generation = speakerGenerationRef.current;
       try {
         const AudioCtx =
           window.AudioContext ??
@@ -161,6 +170,10 @@ export function useAudioDeviceTest({ stream }: UseAudioDeviceTestOptions) {
         }
         const ctx = new AudioCtx();
         const oscillator = ctx.createOscillator();
+        speakerCleanupRef.current = () => {
+          try { oscillator.stop(); } catch { /* The oscillator can be stopped before it starts. */ }
+          void ctx.close().catch((closeErr) => logger.debug("useAudioDeviceTest ctx close", closeErr));
+        };
         oscillator.type = "sine";
         oscillator.frequency.value = SPEAKER_TEST_TONE_HZ;
         const gain = ctx.createGain();
@@ -187,19 +200,10 @@ export function useAudioDeviceTest({ stream }: UseAudioDeviceTestOptions) {
           }
         }
 
+        if (generation !== speakerGenerationRef.current) return;
         oscillator.start();
         setIsSpeakerPlaying(true);
         speakerTimeoutRef.current = setTimeout(() => {
-          try {
-            oscillator.stop();
-          } catch {
-            // already stopped
-          }
-          ctx
-            .close()
-            .catch((closeErr) =>
-              logger.debug("useAudioDeviceTest ctx close", closeErr),
-            );
           stopSpeakerTest();
         }, SPEAKER_TEST_TONE_MS);
       } catch (err) {
@@ -208,7 +212,7 @@ export function useAudioDeviceTest({ stream }: UseAudioDeviceTestOptions) {
         stopSpeakerTest();
       }
     },
-    [stopSpeakerTest],
+    [enabled, stopSpeakerTest],
   );
 
   /**
@@ -216,7 +220,7 @@ export function useAudioDeviceTest({ stream }: UseAudioDeviceTestOptions) {
    * analyser graph, and any lingering `<audio>` element on unmount so the
    * hook never holds an open mic stream or a scheduled tone past the
    * component that opened them.
-   * @effect-deps [] — mount-once cleanup, no external state.
+   * @effect-deps enabled, stream, stopMicMonitor, stopSpeakerTest (release on suspension or stream replacement).
    * @effect-side-effects timer (clearTimeout ×2), subscription (cancelAnimationFrame),
    * dom (AudioContext close + audio element cleanup)
    * @effect-why-not-loader Pure resource release, not data fetching.
@@ -235,7 +239,7 @@ export function useAudioDeviceTest({ stream }: UseAudioDeviceTestOptions) {
           );
       }
     },
-    [stopMicMonitor, stopSpeakerTest],
+    [enabled, stream, stopMicMonitor, stopSpeakerTest],
   );
 
   return {

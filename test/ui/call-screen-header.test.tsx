@@ -182,7 +182,7 @@ describe("app/components/call/CallScreen.Header.tsx", () => {
       />,
     );
 
-    expect(screen.getByText("Connecting...")).toBeInTheDocument();
+    expect(screen.getByText("Connecting your phone. Keep your current audio connected.")).toBeInTheDocument();
     expect(screen.getByText("+15550001111")).toBeInTheDocument();
     expect(screen.getByText("+15551234567")).toBeInTheDocument();
     expect(screen.getByText("Computer Audio")).toBeInTheDocument();

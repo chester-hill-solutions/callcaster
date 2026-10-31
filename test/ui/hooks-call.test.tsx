@@ -554,4 +554,22 @@ describe("call hooks", () => {
     // the FSM from dialing to connected.
     expect(send).not.toHaveBeenCalledWith({ type: "CONNECT" });
   });
+
+  test.each([false, true])("agent resource close keeps its customer owner independent (%s)", async separateAudio => {
+    const { useTwilioDevice } = await import("@/hooks/call/useTwilioDevice");
+    const send = vi.fn(), call = createMockTwilioCall({ parameters: { CallSid: "CA-agent-audio", To: "client:agent" } });
+    const { result, rerender } = renderHook(({ enabled }) => useTwilioDevice({ token: "tok", selectedDevice: "computer", workspaceId: "ws", send,
+      enabled, managesCustomerAudio: () => separateAudio }), { initialProps: { enabled: true } });
+    await act(async () => { await mockTwilioDevice.register(); });
+    act(() => mockTwilioDevice.emit("incoming", call));
+    expect(result.current.activeCall).toBe(call);
+    mockTwilioDevice.destroy.mockClear(); send.mockClear();
+    rerender({ enabled: false });
+    expect(mockTwilioDevice.destroy).not.toHaveBeenCalled();
+    expect(call.disconnect).not.toHaveBeenCalled();
+    act(() => call.emit("disconnect"));
+    expect(result.current.activeCall).toBeNull();
+    expect(mockTwilioDevice.destroy).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls.some(([action]) => action.type === "HANG_UP")).toBe(!separateAudio);
+  });
 });

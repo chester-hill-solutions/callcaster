@@ -371,6 +371,7 @@ export function CallScreenLayout({
                 creditState={creditState}
                 hasAccess={hasAccess}
                 phoneStatus={phoneConnectionStatus}
+                audioConnection={phoneVerification.audioConnection}
                 selectedDevice={selectedDevice}
                 onDeviceSelect={setSelectedDevice}
                 verifiedNumbers={verifiedNumbers}
@@ -407,6 +408,12 @@ export function CallScreenLayout({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {callControls.manualDialError ? (
+        <div className="space-y-2 p-4" role="status">
+          <p>{callControls.manualDialError}</p>
+          <Button type="button" variant="outline" disabled={callControls.isCheckingManualDial} onClick={callControls.onCheckManualDial}>Check call request</Button>
+        </div>
+      ) : null}
       <CallWorkbench
         incoming={
           incomingCall &&
@@ -430,6 +437,7 @@ export function CallScreenLayout({
             predictive={campaign.dial_type === "predictive"}
             isStartingConference={isStartingConference}
             startDisabledReason={startDisabledReason}
+            awaitingCustomerReceipt={callControls.awaitingCustomerReceipt}
             nextRecipient={nextRecipient}
             questionContact={questionContact}
             activeCall={activeCall as unknown as ActiveCall}
@@ -453,7 +461,7 @@ export function CallScreenLayout({
             callDuration={callDuration}
             voiceDrop={Boolean(campaignDetails.voicedrop_audio)}
             isMicrophoneMuted={isMicrophoneMuted}
-            onToggleMute={handleMuteMicrophone}
+            onToggleMute={selectedDevice === "computer" ? handleMuteMicrophone : undefined}
             onLoadQueue={() => fetchMore({ householdMap })}
             onResetCall={resetCall}
           />

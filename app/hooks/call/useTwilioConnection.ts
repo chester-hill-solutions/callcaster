@@ -38,6 +38,7 @@ interface UseTwilioConnectionOptions {
 }
 
 interface UseTwilioConnectionReturn {
+  releaseIdleDevice: () => void;
   device: Device | null;
   status: string;
   error: Error | null;
@@ -424,6 +425,7 @@ export function useTwilioConnection({
   }, [teardownDevice]);
 
   return {
+    releaseIdleDevice: suspendIdleDevice,
     device,
     status,
     error,
