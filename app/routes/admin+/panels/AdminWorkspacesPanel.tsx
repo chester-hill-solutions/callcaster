@@ -1,3 +1,4 @@
+import { WorkspaceRestoreDialog } from "./WorkspaceRestoreDialog";
 import { Form, NavLink } from "react-router";
 import { MoreHorizontal, RefreshCw, Search } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -35,7 +36,7 @@ export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProp
     const [itemsPerPage, setItemsPerPage] = useState(10);
     const [filter, setFilter] = useState<{
         search: string;
-        status: "all" | "active" | "disabled";
+        status: "all" | "active" | "disabled" | "archived";
         owner: string;
         opsState: "all" | "ready" | "attention" | "pending";
         sortKey: WorkspaceSortKey;
@@ -119,7 +120,7 @@ export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProp
                         <div className="w-full min-w-0 sm:w-[160px]">
                             <Select
                                 value={filter.status}
-                                onValueChange={(value: "all" | "active" | "disabled") =>
+                                onValueChange={(value: "all" | "active" | "disabled" | "archived") =>
                                     setFilter((prev) => ({ ...prev, status: value }))
                                 }
                             >
@@ -130,6 +131,7 @@ export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProp
                                     <SelectItem value="all">All statuses</SelectItem>
                                     <SelectItem value="active">Active</SelectItem>
                                     <SelectItem value="disabled">Disabled</SelectItem>
+                                    <SelectItem value="archived">Archived</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -263,7 +265,14 @@ export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProp
                                         </TableCell>
                                         <TableCell>{workspace.ownerUsername}</TableCell>
                                         <TableCell>
-                                            {workspace.disabled ? (
+                                            {workspace.archivedAt ? (
+                                                <div className="flex flex-col items-start gap-1">
+                                                    <Badge variant="outline">Archived</Badge>
+                                                    <time className="text-xs text-muted-foreground" dateTime={workspace.archivedAt}>
+                                                        {new Date(workspace.archivedAt).toLocaleDateString("en-CA", { year: "numeric", month: "short", day: "numeric" })}
+                                                    </time>
+                                                </div>
+                                            ) : workspace.disabled ? (
                                                 <Badge variant="destructive">Disabled</Badge>
                                             ) : (
                                                 <Badge variant="secondary">Active</Badge>
@@ -315,6 +324,7 @@ export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProp
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex items-center gap-2">
+                                                {workspace.archivedAt && <WorkspaceRestoreDialog workspaceId={workspace.id} name={workspace.name} />}
                                                 <Button variant="outline" size="sm" asChild>
                                                     <NavLink to={`/admin/workspaces/${workspace.id}`}>Open</NavLink>
                                                 </Button>

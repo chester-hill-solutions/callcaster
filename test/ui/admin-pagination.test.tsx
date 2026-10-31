@@ -35,6 +35,7 @@ function workspaces(count: number): WorkspaceAdminRow[] {
     ownerUserId: null,
     credits: 10,
     disabled: false,
+    archivedAt: null,
     campaignCount: 0,
     memberCount: 1,
     phoneNumberCount: 0,

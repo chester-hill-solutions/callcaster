@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { AuthzError, InviteError } from "@chester-hill-solutions/auth";
 import {
   campaign as campaignTable,
@@ -765,7 +765,7 @@ export async function listUserWorkspaceMembershipsForProfile(userId: string) {
       workspaceTable,
       eq(workspaceMemberTable.workspace_id, workspaceTable.id),
     )
-    .where(eq(workspaceMemberTable.user_id, userId))
+    .where(and(eq(workspaceMemberTable.user_id, userId), isNull(workspaceTable.archived_at)))
     .orderBy(desc(workspaceMemberTable.created_at));
 
   return rows.map((row) => ({

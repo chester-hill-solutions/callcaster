@@ -1,4 +1,6 @@
 import { data as routeData } from "react-router";
+import { z } from "zod";
+import { restoreArchivedWorkspace } from "@/server/workspace-restore.server";
 import {
   disableUser,
   repointAllWorkspacesTwilioWebhooks,
@@ -16,12 +18,26 @@ import { isValidPhoneNumber, normalizePhoneNumber } from "@/lib/phone";
 import { adminRouteAuth } from "@/lib/admin-route.server";
 import { defineAction } from "@/lib/handler.server";
 
+async function restoreWorkspace(formData: FormData, actorId: string) {
+  const workspaceId = z.string().trim().uuid().safeParse(formData.get("workspaceId"));
+  if (!workspaceId.success || formData.get("confirmRestore") !== "yes") {
+    return routeData({ error: "Select a valid workspace and confirm its restore." }, { status: 400 });
+  }
+  const result = await restoreArchivedWorkspace(workspaceId.data, actorId);
+  if (!result.ok) return routeData({ error: result.error }, { status: result.status });
+  return routeData({ success: result.restored ? "Workspace restored. Released numbers were not rented again." : "Workspace is already restored; no changes made." });
+}
+
 export const action = defineAction({
   auth: adminRouteAuth,
   sideEffects: ["db-write", "twilio"],
-  handler: async ({ request }) => {
+  handler: async ({ request, auth }) => {
   const formData = await request.formData();
   const actionType = formData.get("_action") as string;
+
+  if (actionType === "restore_workspace") {
+    return restoreWorkspace(formData, auth.user.id);
+  }
 
   if (actionType === "toggle_workspace_status") {
     const workspaceId = formData.get("workspaceId") as string;

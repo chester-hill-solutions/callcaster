@@ -17,6 +17,7 @@ export type WorkspaceAdminRow = {
   memberCount: number;
   phoneNumberCount: number;
   createdAt: string;
+  archivedAt: string | null;
   twilioSyncStatus: "never_synced" | "syncing" | "healthy" | "error";
   twilioAccountStatus: string | null;
   twilioLastSyncedAt: string | null;
@@ -33,7 +34,7 @@ export function filterWorkspaceAdminRows(
   rows: WorkspaceAdminRow[],
   filters: {
     search: string;
-    status: "all" | "active" | "disabled";
+    status: "all" | "active" | "disabled" | "archived";
     owner: string;
     opsState: "all" | WorkspaceAdminRow["opsState"];
   },
@@ -48,8 +49,9 @@ export function filterWorkspaceAdminRows(
       row.ownerUsername.toLowerCase().includes(search);
     const matchesStatus =
       filters.status === "all" ||
-      (filters.status === "active" && !row.disabled) ||
-      (filters.status === "disabled" && row.disabled);
+      (filters.status === "active" && !row.archivedAt && !row.disabled) ||
+      (filters.status === "disabled" && !row.archivedAt && row.disabled) ||
+      (filters.status === "archived" && Boolean(row.archivedAt));
     const matchesOwner =
       filters.owner === "all" || row.ownerUserId === filters.owner;
     const matchesOpsState =
