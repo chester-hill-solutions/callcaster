@@ -5,7 +5,7 @@
     "summary": "High-priority child of user requirement #2546. Reuse an unambiguous workspace contact when importing its phone into another audience.",
     "currentBehavior": "The local candidate adds the audience membership and reuse receipt without replacing the saved contact. A transaction lock serializes imports in one workspace. Ambiguous legacy contacts receive an invalid row result without another contact or membership.",
     "rootCause": "The old import lookup checked only the target audience, so another audience could create a second workspace contact and make manual SMS ambiguous.",
-    "resolution": "Complete full local CI and publish one atomic draft from dev under the one-open-PR rule. Verify dev after an approved merge. Keep legacy repair and remaining SMS requirements in #2546.",
+    "resolution": "Publish the tested atomic draft from dev after the one-open-PR queue is resolved. Verify dev after an approved merge. Keep legacy repair and remaining SMS requirements in #2546.",
     "lookIn": [
       "app/server/audience-import-effects.server.ts",
       "app/lib/database/contact.server.ts",
@@ -15,10 +15,11 @@
     ],
     "existingTests": [
       "50 real-database cases pass without skips. The original implementation fails four contact-reuse cases while 33 controls pass. The original renderer fails the new reuse/ambiguity download assertion while three controls pass.",
-      "35 focused Node cases pass. Changed runtime files and the report test have no lint warnings; the recovery test retains its one existing warning."
+      "35 focused Node cases pass. Changed runtime files and the report test have no lint warnings; the recovery test retains its one existing warning.",
+      "Full npm run ci:local passes on clean 030d8bd45cec1ab46243489322ce0306f4181d9a in 698.38 seconds: 6,153 Node tests with three existing skips, 34 Bun tests and 1,568 UI tests. All guards, typecheck, lint, build, bundle and codegen checks pass. Start/end commit and source hashes match."
     ],
     "missingTests": [
-      "Full npm run ci:local is required on the clean publication commit. Record that result and applicable remote checks in the PR. Deployed dev acceptance and release remain."
+      "Applicable exact-head GitHub checks, approved dev merge, deployed dev acceptance and release remain."
     ],
     "acceptanceCriteria": [
       "One workspace contact can belong to two audiences.",
@@ -30,7 +31,7 @@
     "blockedBy": [],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Native Bug, Priority High, assigned @wra-sol, native parent #2546. Project Status In progress, verified in the authenticated board on 2026-10-31. Local branch bug/3085-reuse-workspace-contacts; no implementation PR yet."
+    "trackerRecommendation": "Native Bug, Priority High, assigned @wra-sol, native parent #2546. Project Status In progress, verified in the authenticated board on 2026-10-31. Local branch bug/3085-reuse-workspace-contacts passes full local CI. Publication is held because #3081 and #3086 are open; the queue decision is pending."
   },
   {
     "issueNumber": 2638,

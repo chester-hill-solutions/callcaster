@@ -1090,7 +1090,8 @@
     "risk": "high",
     "trackerRecommendation": "Native Bug, Priority High, Effort Medium. Parent and native child #3085 have Project Status In progress, verified in the authenticated board on 2026-10-31. This child does not repair existing duplicate contacts or complete every SMS requirement.",
     "existingTests": [
-      "The #3085 focused real-database run passes 50 cases, including cross-audience reuse, concurrent imports, formatted phones, opt-out preservation, workspace isolation, replay/recovery, manual-SMS identity and download messages. The original implementation fails four regression cases."
+      "The #3085 focused real-database run passes 50 cases, including cross-audience reuse, concurrent imports, formatted phones, opt-out preservation, workspace isolation, replay/recovery, manual-SMS identity and download messages. The original implementation fails four regression cases.",
+      "Full npm run ci:local passes on clean 030d8bd45cec1ab46243489322ce0306f4181d9a in 698.38 seconds: 6,153 Node tests with three existing skips, 34 Bun tests and 1,568 UI tests. All guards, typecheck, lint, build, bundle and codegen checks pass. Start/end commit and source hashes match."
     ]
   },
   {
