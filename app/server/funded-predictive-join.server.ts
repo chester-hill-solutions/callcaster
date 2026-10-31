@@ -7,13 +7,8 @@ import type { ParticipantJoinEvent } from "@/lib/twilio/voice-callback";
 import { db } from "./db";
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
 import type { VoiceReservation } from "./voice-credit-reservation.server";
-
-function matchesCustomer(current: typeof call.$inferSelect, owner: VoiceReservation) {
-  return current.account_sid === owner.account_sid && current.user_id === owner.user_id &&
-    current.campaign_id === owner.campaign_id && current.contact_id === owner.contact_id &&
-    current.outreach_attempt_id === owner.outreach_attempt_id &&
-    (!current.conference_id || current.conference_id === owner.conference_id);
-}
+import { matchesFundedHumanCall } from "./predictive-human-admission.server";
+import { observePredictiveHumanPresence } from "./predictive-human-presence.server";
 
 async function lockJoin(tx: CreditTransaction, owner: VoiceReservation, event: ParticipantJoinEvent) {
   await tx.select({ id: workspace.id }).from(workspace).where(eq(workspace.id, owner.workspace)).for("no key update");
@@ -26,7 +21,7 @@ async function lockJoin(tx: CreditTransaction, owner: VoiceReservation, event: P
   const [current] = await tx.select().from(call).where(and(
     eq(call.workspace, owner.workspace), eq(call.sid, reservation.provider_sid),
   )).for("update");
-  if (!current || !matchesCustomer(current, reservation) || isTerminalStatus(normalizeProviderStatus(current.status))) return null;
+  if (!current || !matchesFundedHumanCall(current, reservation) || isTerminalStatus(normalizeProviderStatus(current.status))) return null;
   return { reservation, current };
 }
 
@@ -37,6 +32,7 @@ export async function recordFundedPredictiveJoin(owner: VoiceReservation, event:
     const joined = await lockJoin(tx, owner, event);
     if (!joined) return null;
     const { reservation, current } = joined;
+    if (!await observePredictiveHumanPresence(tx, reservation, event)) return null;
     if (!current.outreach_attempt_id || !current.campaign_id || !current.contact_id) return null;
     const [attempt] = await tx.select().from(outreach_attempt).where(and(
       eq(outreach_attempt.workspace, owner.workspace), eq(outreach_attempt.id, current.outreach_attempt_id),

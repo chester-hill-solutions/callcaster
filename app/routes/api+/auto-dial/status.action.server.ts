@@ -9,11 +9,12 @@ import {
 import {
   isParticipantHangup,
   isParticipantJoin,
+  isParticipantLeave,
   parseTwilioVoiceCallback,
   userIdFromConferenceName,
   type TwilioVoiceCallback,
 } from "@/lib/twilio/voice-callback";
-import { handlePredictiveParticipantJoin } from "@/lib/predictive-participant-join.server";
+import { handlePredictiveParticipantJoin, handlePredictiveParticipantLeave } from "@/lib/predictive-participant-join.server";
 import {
   dequeueQueueEntry
 } from "@/lib/campaign-queue-db.server";
@@ -190,7 +191,10 @@ async function handleFundedConferenceEvent(
           else if (first) await stopRefusedPredictiveSetup(first.reservation, twilio);
         }
         await handlePredictiveParticipantJoin(event, context.call);
-      } else if (isParticipantHangup(event)) await handleConferenceParticipantHangup(event, context.call, twilio);
+      } else if (isParticipantLeave(event)) {
+        const owned = context.setup || await handlePredictiveParticipantLeave(event, context.call);
+        if (owned && isParticipantHangup(event)) await handleConferenceParticipantHangup(event, context.call, twilio);
+      }
 }
 
 export const action = defineAction({

@@ -25,6 +25,7 @@ import type { VoiceReservation } from "@/server/voice-credit-reservation.server"
 import { findVoiceReservationForCall } from "@/server/voice-bridge-reservation.server";
 import { findVoicePhoneCustomerOwner } from "@/server/voice-phone-customer.server";
 import { voicePhoneCustomerInstruction } from "@/lib/voice-phone-customer.server";
+import { claimPredictiveHumanInstruction } from "@/server/predictive-human-admission.server";
 
 function resolveUserIdFromConferenceName(conferenceName: string): string {
     // Conference names are generated as `${userId}~${uuid}`. The user id is a UUID,
@@ -115,6 +116,15 @@ const handleDeviceCheck = async (dbCall: NonNullable<Partial<Call>>) => {
     const userId = resolveUserIdFromConferenceName(conferenceId);
     return addToConference({ conferenceId, campaignId: String(dbCall.campaign_id ?? ''), workspaceId: dbCall.workspace?.toString() ?? '', userId, callSid: dbCall.sid ?? '' });
 };
+
+async function handleFundedHumanAnswer(request: Request, dbCall: NonNullable<Partial<Call>>, called: string, params: Record<string, string>) {
+  const funded = new URL(request.url).searchParams.has("credit_reservation")
+    ? await findVoiceReservationForCall(String(dbCall.workspace ?? ""), dbCall.sid ?? "") : null;
+  if (funded?.audio_connection_id) return await voicePhoneCustomerInstruction(request, funded, params, "predictive")
+    ?? new Response(hangupTwiml(), { headers: { "Content-Type": "text/xml" } });
+  if (funded && !await claimPredictiveHumanInstruction(funded)) return new Response(hangupTwiml(), { headers: { "Content-Type": "text/xml" } });
+  return handleHumanAnswer(dbCall, called, funded ? predictiveConferenceCallbackUrl(funded) : undefined);
+}
 
 async function addToConference(context: { conferenceId: string; campaignId: string; workspaceId: string; userId: string; callSid: string }, funded?: VoiceReservation) {
     const { conferenceId, campaignId, workspaceId, userId, callSid } = context;
@@ -226,10 +236,7 @@ export const action = defineAction({
           response = await predictiveMachineResponse(binding);
         } else {
           //This is a human answer
-          const funded = query.has("credit_reservation") ? await findVoiceReservationForCall(workspaceId, callSid) : null;
-          response = funded?.audio_connection_id
-            ? await voicePhoneCustomerInstruction(request, funded, callbackParams, "predictive") ?? new Response(hangupTwiml(), { headers: { "Content-Type": "text/xml" } })
-            : await handleHumanAnswer(dbCall, called, funded ? predictiveConferenceCallbackUrl(funded) : undefined);
+          response = await handleFundedHumanAnswer(request, dbCall, called, callbackParams);
         }
       }
     } catch (error) {

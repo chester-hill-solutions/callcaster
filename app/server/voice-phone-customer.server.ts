@@ -6,6 +6,7 @@ import { voiceAudioCustomerSendGuard } from "./voice-audio-customer-admission.se
 import { withVoiceAudioConnection, type VoiceAudioConnection } from "./voice-audio-connection.server";
 import type { VoiceAudioCustomerSourceProof } from "./voice-audio-customer-source.server";
 import type { VoiceReservation } from "./voice-credit-reservation.server";
+import { claimPredictiveHumanInTransaction, publishHumanAdmissionEvents, type HumanAdmissionEvents } from "./predictive-human-admission.server";
 
 /** Provider-only nonce lookup; the original-account signature still must match. */
 export async function findVoicePhoneCustomerOwner(reservationId: string) {
@@ -19,7 +20,8 @@ export async function claimVoicePhoneCustomerInstruction(owner: VoiceReservation
   const { provider_sid: customerSid, customer_recording_id: recordingId, customer_recording_callback: recordingCallback } = owner;
   if (!owner.audio_connection_id || !owner.audio_mode || !["manual", "predictive"].includes(owner.audio_mode) || !customerSid || !recordingId || !recordingCallback)
     throw new VoiceAudioBindingError("Customer conference instruction has no saved owner");
-  return db.transaction(async tx => {
+  const publish: HumanAdmissionEvents = [];
+  const result = await db.transaction(async tx => {
     const source = await voiceAudioCustomerSendGuard(tx, owner, proof);
     const [issued] = await tx.update(reservations).set({ recipient_instruction_issued_at: sql`clock_timestamp()`, updated_at: new Date() })
       .where(and(eq(reservations.id, owner.id), eq(reservations.workspace, owner.workspace), source,
@@ -27,8 +29,11 @@ export async function claimVoicePhoneCustomerInstruction(owner: VoiceReservation
         eq(reservations.customer_recording_callback, recordingCallback),
         inArray(reservations.state, ["creating", "active"]), isNull(reservations.recipient_instruction_issued_at),
         isNull(reservations.recipient_refused_at), isNull(reservations.terminal_status))).returning();
-    return issued ?? null;
+    if (!issued || issued.audio_mode === "predictive" && !await claimPredictiveHumanInTransaction(tx, issued, publish)) return null;
+    return issued;
   });
+  await publishHumanAdmissionEvents(publish);
+  return result;
 }
 
 /** Customer events retain the first phone's callback; they do not end its room. */
