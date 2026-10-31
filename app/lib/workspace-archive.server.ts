@@ -10,13 +10,13 @@ import {
 import { createTenantDb } from "@/server/tenant-db";
 
 export type ArchiveWorkspaceResult =
-  | { ok: true; archivedAt: Date; releasedNumbers: number }
+  | { ok: true; archivedAt: Date; releasedNumbers: number; revokedApiKeys: number }
   | { ok: false; error: string; status: number };
 
 /**
  * Is this workspace archived? (#2732)
  *
- * Archived workspaces keep every row but are hidden from the people who used
+ * Archived workspaces keep business data but are hidden from the people who used
  * them: the picker omits them and the workspace layout redirects away. Operators
  * still reach the data through the admin surfaces, which is the point of
  * archiving rather than deleting.
@@ -28,7 +28,7 @@ export async function isWorkspaceArchived(
 }
 
 /**
- * Archive a workspace: release its numbers at the provider, then hide it.
+ * Archive a workspace: release its numbers, then revoke its API keys and hide it.
  *
  * Order matters, and it is the whole reason this is an archive rather than a
  * delete. `workspace_number` and `workspace_number_purchase` carry
@@ -82,5 +82,5 @@ export async function archiveWorkspace(
     return { ok: false, status: 404, error: "Workspace not found." };
   }
 
-  return { ok: true, archivedAt, releasedNumbers: numbers.length };
+  return { ok: true, archivedAt: archived.archivedAt, releasedNumbers: numbers.length, revokedApiKeys: archived.revokedApiKeys };
 }

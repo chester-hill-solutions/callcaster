@@ -18,7 +18,7 @@ export function WorkspaceRestoreDialog({ workspaceId, name }: { workspaceId: str
           <DialogTitle>Restore workspace</DialogTitle>
           <DialogDescription>
             Restore access to {name} for its members. Released phone numbers will not be rented again.
-            Add new numbers after restore if they are needed. A disabled workspace will stay disabled.
+            Add new numbers after restore if they are needed. Old API keys will not work; create new keys after restore. A disabled workspace will stay disabled.
           </DialogDescription>
         </DialogHeader>
         <Form method="post">

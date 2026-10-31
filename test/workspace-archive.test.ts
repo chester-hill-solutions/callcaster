@@ -22,7 +22,7 @@ vi.mock("@/lib/workspace-members-db.server", async (importOriginal) => ({
   >()),
   archiveWorkspaceById: async (_workspaceId: string, archivedAt: Date) => {
     state.archiveSets.push({ archived_at: archivedAt });
-    return state.updateReturnsRow ? { id: "w1" } : null;
+    return state.updateReturnsRow ? { id: "w1", archivedAt, revokedApiKeys: 0 } : null;
   },
   isWorkspaceArchivedById: async () => state.archivedAt !== null,
 }));

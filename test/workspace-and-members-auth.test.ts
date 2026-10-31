@@ -147,7 +147,7 @@ describe("PATCH|DELETE /api/workspaces/:workspaceId — dataPlaneSessionMinRoleA
     "role %s reaches the handler (min-role gate is Caller; finer role checks live in updateWorkspaceName/deleteWorkspaceApi)",
     async (role) => {
       withRole(role);
-      mocks.deleteWorkspaceApi.mockResolvedValue({ ok: true });
+      mocks.deleteWorkspaceApi.mockResolvedValue({ ok: true, revokedApiKeys: 0 });
       const res = await asRouteResponse(
         workspaceAction((await args("", { method: "DELETE" })) as never),
       );

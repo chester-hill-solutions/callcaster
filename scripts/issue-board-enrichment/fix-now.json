@@ -1,5 +1,36 @@
 [
   {
+    "issueNumber": 2994,
+    "verdict": "fix-now",
+    "summary": "The owner chose permanent API-key revocation on archive on 2026-10-31. The active branch implements the rule; CI, merge, deployed and release acceptance remain.",
+    "currentBehavior": "At dev@86e4d3a, archive retains API keys and shared member access does not check archived_at. Old keys can still authenticate. Restore can revive their access.",
+    "rootCause": "The final archive write does not revoke keys. API-key creation and archive do not share a lock. The shared membership check accepts archived workspaces.",
+    "resolution": "Commit archive and key deletion in one transaction. Use the same workspace row lock for key creation, require an active workspace in shared membership checks, remove legacy keys before restore and return the revoked-key count. Keep release-first behavior and owner-only archive.",
+    "lookIn": [
+      "app/server/workspace-credentials.server.ts",
+      "app/lib/workspace-membership.server.ts",
+      "app/server/workspace-restore.server.ts",
+      "test/integration-db/workspace-archive-credentials.test.ts"
+    ],
+    "existingTests": [
+      "The original implementation fails seven of nine initial database cases; two controls pass. The candidate passes 23 real-session database tests, 149 affected Node tests and 10 UI tests. Coverage includes archived sessions and keys, legacy restore, exact counts, foreign isolation, provider failure, rollback and concurrent key creation."
+    ],
+    "missingTests": [
+      "Full exact-head GitHub CI, merge, deployed acceptance and release acceptance remain. Provider tests use an isolated fake; no deployed keys or provider resources were changed."
+    ],
+    "acceptanceCriteria": [
+      "Archive permanently revokes the workspace keys and reports the exact count.",
+      "Archived workspaces refuse key and session access.",
+      "Restore requires new keys, including for workspaces archived under the old rule.",
+      "Concurrent key creation cannot leave a valid key after archive.",
+      "Failed number release keeps the workspace and its keys active; database failures roll back key deletion."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Native Project Status is In progress. The task is assigned to @wra-sol and is a child of High-priority #2732; its own Priority, Effort and Enviornment fields are unset. Decision: https://github.com/chester-hill-solutions/callcaster/issues/2994#issuecomment-6549744222 . Keep open for dev and release acceptance."
+  },
+  {
     "issueNumber": 2638,
     "verdict": "fix-now",
     "summary": "PR #3023 names the Call list selection controls and reuses one named Rows per page control. Review, merge and deployed acceptance remain.",

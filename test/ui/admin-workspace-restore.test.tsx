@@ -52,11 +52,12 @@ describe("admin archive visibility and restore confirmation (#2992, #2993)", () 
     expect(within(live).queryByRole("button", { name: /Restore/ })).not.toBeInTheDocument();
   });
 
-  test("explains number loss before confirmation and cancel sends nothing", async () => {
+  test("explains number loss and new keys before confirmation and cancel sends nothing", async () => {
     const { user, submitted } = mount();
     await user.click(await screen.findByRole("button", { name: "Restore Archive site" }));
     const dialog = screen.getByRole("dialog", { name: "Restore workspace" });
     expect(within(dialog).getByText(/Released phone numbers will not be rented again/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Old API keys will not work; create new keys after restore/)).toBeInTheDocument();
     expect(submitted).not.toHaveBeenCalled();
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

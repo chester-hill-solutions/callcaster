@@ -344,7 +344,7 @@ export default function WorkspaceSettings() {
             branded={false}
             compact
             title="Archive this workspace"
-            description="Archiving releases every phone number first, then hides this workspace and its people from your account. Calls, contacts and campaigns are kept."
+            description="Archiving releases every phone number first, then hides this workspace and its people from your account. All API keys are revoked. Calls, contacts and campaigns are kept. Restore requires new API keys."
           />
           <Form method="POST" className="flex flex-col gap-3">
             <input type="hidden" name="formName" value="deleteWorkspace" />
@@ -357,7 +357,7 @@ export default function WorkspaceSettings() {
               />
               <span>
                 I understand the numbers will be released and the workspace will
-                disappear from my account.
+                disappear from my account. All API keys will be revoked. New keys will be needed after restore.
               </span>
             </label>
             <Button

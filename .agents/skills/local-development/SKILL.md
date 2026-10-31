@@ -60,6 +60,11 @@ Compare normal default runs as well as any explicit worker limits; do not
 attribute a worker-count change to a faster test implementation.
 Check composed Vitest configs against the installed TypeScript and Vitest types;
 the app TypeScript program does not include root configuration files.
+Before adding an `admin-db` or unscoped `db` import, run
+`npm run check:unscoped-db-imports`. Shared auth code must keep global workspace
+query construction in the server data layer; a typed predicate can stay inside
+the scoped membership query. Do not increase the debt baseline for a new import.
+
 Full test suites and production validation run in CI before merge.
 `ci:local:full` is optional for local diagnosis; do not require it before a push.
 

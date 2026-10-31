@@ -56,6 +56,12 @@ export const createWorkspaceBodySchema = z.object({
   name: z.string().min(1).max(200),
 });
 
+/** DELETE /api/workspaces/:workspaceId response; the OpenAPI contract leads. */
+export const workspaceArchiveResponseSchema = z.object({
+  success: z.literal(true),
+  revoked_api_keys: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+});
+
 export const updateWorkspaceBodySchema = z.object({
   name: z.string().min(1).max(200).optional(),
 });

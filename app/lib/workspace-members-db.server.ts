@@ -306,30 +306,6 @@ export async function listWorkspaceApiKeyRows(workspaceId: string, tdbIn?: Tenan
   });
 }
 
-export async function insertWorkspaceApiKeyRow(args: {
-  workspaceId: string;
-  userId: string;
-  name: string;
-  keyPrefix: string;
-  keyHash: string;
-  scopes: readonly string[];
-  expiresAt: string;
-  tdb?: TenantDb;
-}) {
-  const tdb = args.tdb ?? createTenantDb(args.workspaceId);
-  const rows = await tdb.workspace_api_key.insert({
-    id: crypto.randomUUID(),
-    name: args.name.trim(),
-    key_prefix: args.keyPrefix,
-    key_hash: args.keyHash,
-    created_by: args.userId,
-    created_at: new Date().toISOString(),
-    scopes: [...args.scopes],
-    expires_at: args.expiresAt,
-  });
-  return rows[0] ?? null;
-}
-
 export async function deleteWorkspaceApiKeyRow(args: {
   workspaceId: string;
   keyId: string;
@@ -370,16 +346,6 @@ export async function insertWorkspaceMembership(args: {
   const row = rows[0] ?? null;
   if (!row) return null;
   return { ...row, role: row.role_id };
-}
-
-/** Mark a workspace archived (#2732). The row and all of its data stay. */
-export async function archiveWorkspaceById(workspaceId: string, archivedAt: Date) {
-  const rows = await adminDb
-    .update(workspaceTable)
-    .set({ archived_at: archivedAt })
-    .where(eq(workspaceTable.id, workspaceId))
-    .returning({ id: workspaceTable.id });
-  return rows[0] ?? null;
 }
 
 /** Whether a workspace is archived (#2732). */
@@ -795,3 +761,5 @@ export async function listUserWorkspaceMembershipsWithWorkspace(userId: string) 
     workspace: workspaceById.get(membership.workspace_id) ?? null,
   }));
 }
+
+export { archiveWorkspaceById, insertWorkspaceApiKeyRow } from "@/server/workspace-credentials.server";

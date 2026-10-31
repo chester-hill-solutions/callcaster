@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Base inventory: complete native Issue and Project snapshots from 2026-10-29 UTC, 401 open issues. Selected refresh: #1724, #2546, #2943, #2992, #2993, #3085, #3088 and new child #3091 on 2026-10-31. Refresh the full board with npm run tools:issues:board.
+Base inventory: complete native Issue and Project snapshots from 2026-10-29 UTC, 401 open issues. Selected refresh: #1724, #2546, #2943, #2992, #2993, #2994, #3085, #3088 and new child #3091 on 2026-10-31. Refresh the full board with npm run tools:issues:board.
 
 Live native Issue metadata covers all 401 open issues. Type, Priority, Effort and Environment come from those Issue fields. The complete authenticated Project export has 398 unique issue URLs, matching the visible filtered count after hierarchy was turned off and all rows loaded. #100, #2902 and #2906 are absent from that complete Project view and retain unknown Project Status. No status is inferred from a PR, label or issue state.
 
@@ -13,6 +13,8 @@ Priority correction, 2026-10-31: take existing urgent and high-priority app requ
 Question #1724 is answered and closed as completed on 2026-10-31. The real renderer passes 27 existing tests and 11 direct missing/null/empty/fallback output checks. It is identical in master and dev. The live Project Status was still Backlog after closure; no closed-item move was made.
 
 Restore slice #3094 is merged and deployed to dev. #2992 and #2993 are on-dev, assigned @wra-sol and linked as children of High-priority #2732. Their own Priority, Effort and Enviornment fields remain unset. The keep-address decision for #2943 is recorded; that styling fix is on-dev for mail-client acceptance.
+
+Archive-key rule #2994 was decided by the owner on 2026-10-31: revoke keys permanently; restore needs new keys. The active branch is in progress, with the task linked to #2732. Full CI, merge and deployed acceptance remain. Other sections retain their dated evidence.
 
 ## How to use this board
 
@@ -41,9 +43,21 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 24
+## Fix now — 25
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
+
+### [#2994](https://github.com/chester-hill-solutions/callcaster/issues/2994) Task: decide whether an archived workspace's API keys stay valid
+- **IN PROGRESS** · Verdict: **Fix now** · Type: Task · Priority: unset · Effort: unset · Environment: unset · Size: M · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
+- The owner chose permanent API-key revocation on archive on 2026-10-31. The active branch implements the rule; CI, merge, deployed and release acceptance remain.
+- Current behavior: At dev@86e4d3a, archive retains API keys and shared member access does not check archived_at. Old keys can still authenticate. Restore can revive their access.
+- Root cause: The final archive write does not revoke keys. API-key creation and archive do not share a lock. The shared membership check accepts archived workspaces.
+- Resolution: Commit archive and key deletion in one transaction. Use the same workspace row lock for key creation, require an active workspace in shared membership checks, remove legacy keys before restore and return the revoked-key count. Keep release-first behavior and owner-only archive.
+- Look in: `app/server/workspace-credentials.server.ts`, `app/lib/workspace-membership.server.ts`, `app/server/workspace-restore.server.ts`, `test/integration-db/workspace-archive-credentials.test.ts`
+- Existing tests: The original implementation fails seven of nine initial database cases; two controls pass. The candidate passes 23 real-session database tests, 149 affected Node tests and 10 UI tests. Coverage includes archived sessions and keys, legacy restore, exact counts, foreign isolation, provider failure, rollback and concurrent key creation.
+- Missing tests: Full exact-head GitHub CI, merge, deployed acceptance and release acceptance remain. Provider tests use an isolated fake; no deployed keys or provider resources were changed.
+- Done when: Archive permanently revokes the workspace keys and reports the exact count.; Archived workspaces refuse key and session access.; Restore requires new keys, including for workspaces archived under the old rule.; Concurrent key creation cannot leave a valid key after archive.; Failed number release keeps the workspace and its keys active; database failures roll back key deletion.
+- Tracker: Native Project Status is In progress. The task is assigned to @wra-sol and is a child of High-priority #2732; its own Priority, Effort and Enviornment fields are unset. Decision: https://github.com/chester-hill-solutions/callcaster/issues/2994#issuecomment-6549744222 . Keep open for dev and release acceptance.
 
 ### [#3073](https://github.com/chester-hill-solutions/callcaster/issues/3073) Align the patched Twilio redirect dependency
 - **IN PROGRESS** · Verdict: **Fix now** · Type: Task · Priority: High · Effort: Low · Environment: unset · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-29
@@ -1952,7 +1966,7 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 227
+## Needs triage — 226
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
 
@@ -2273,10 +2287,6 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2995](https://github.com/chester-hill-solutions/callcaster/issues/2995) Task: keep a released number's row with a released status
-- Status: Backlog · Type: Task · Priority: unset · Effort: unset · Environment: unset · Labels: none · Assignee: none · Updated: 2026-10-25
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2994](https://github.com/chester-hill-solutions/callcaster/issues/2994) Task: decide whether an archived workspace's API keys stay valid
 - Status: Backlog · Type: Task · Priority: unset · Effort: unset · Environment: unset · Labels: none · Assignee: none · Updated: 2026-10-25
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 

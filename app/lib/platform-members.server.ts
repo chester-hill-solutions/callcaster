@@ -711,7 +711,7 @@ export async function createWorkspaceApiKey(
       expiresAt,
     });
     if (!row) {
-      return { ok: false as const, error: "Failed to create API key", status: 500 };
+      return { ok: false as const, error: "Workspace not found", status: 404 };
     }
 
     await safeRecordWorkspaceAuditEvent({

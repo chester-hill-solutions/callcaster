@@ -11,12 +11,25 @@ import {
 import { createWithScriptBodySchema } from "../app/lib/schemas/api/create-with-script";
 import { chatSmsBodySchema } from "../app/lib/schemas/api/chat-sms";
 import { campaignSmsDispatchBodySchema } from "../app/lib/schemas/api/sms";
-import { tokenBodySchema } from "../app/lib/schemas/api/platform-auth";
+import { tokenBodySchema, workspaceArchiveResponseSchema } from "../app/lib/schemas/api/platform-auth";
 import { zConversationSummaryMode, zWorkspaceUnreadCountResponse } from "../app/lib/api-generated/zod.gen";
 
 const scriptCampaignTypes = ["live_call", "robocall"] as const;
 
 describe("openapi spec", () => {
+  test("documents permanent archive-key revocation and its count (#2994)", () => {
+    const operation = openApiSpec.paths["/api/workspaces/{workspaceId}"].delete;
+    expect(operation.operationId).toBe("deleteWorkspace");
+    expect(operation.description).toContain("permanently revoked");
+    expect(operation.responses["404"]).toBeDefined();
+    const response = openApiSpec.components.schemas.DeleteWorkspaceResponse;
+    expect(response.required).toContain("revoked_api_keys");
+    expect(response.properties.revoked_api_keys).toMatchObject({ type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER });
+    for (const count of [0, 2]) expect(workspaceArchiveResponseSchema.safeParse({ success: true, revoked_api_keys: count }).success).toBe(true);
+    for (const count of [-1, 0.5, "2", Number.MAX_SAFE_INTEGER + 1]) expect(workspaceArchiveResponseSchema.safeParse({ success: true, revoked_api_keys: count }).success).toBe(false);
+    expect(workspaceArchiveResponseSchema.safeParse({ success: true }).success).toBe(false);
+  });
+
   test.each([
     { route: "/api/workspaces/:workspaceId/billing/checkout-session", path: "/api/workspaces/{workspaceId}/billing/checkout-session", method: "post" },
     { route: "/api/workspaces/:workspaceId/billing/sessions/:sessionId", path: "/api/workspaces/{workspaceId}/billing/sessions/{sessionId}", method: "get" },
