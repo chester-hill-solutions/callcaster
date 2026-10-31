@@ -22,7 +22,15 @@ Optional env:
 
 - `E2E_SKIP_BOOTSTRAP=1` — DB already migrated
 - `E2E_SKIP_BUILD=1` — reuse existing `build/`
+- `E2E_SKIP_INTEGRATION_DB=1` — omit the database suite only when a separate job runs it
 - `E2E_DISABLE_2FA_ENFORCEMENT=1` — default in compose runner; skips privileged-role 2FA enrollment gate during E2E
+
+CI runs database integration tests and browser tests in parallel, with a separate
+Postgres instance for each job. The required `e2e` check passes only when both
+jobs pass. The local compose command runs both suites in order by default.
+
+Each compose phase prints its elapsed time and result. In GitHub Actions, these
+timings also appear in the browser job summary, including the failed phase.
 
 ## Manual steps (same stack)
 

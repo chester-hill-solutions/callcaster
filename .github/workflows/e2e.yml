@@ -51,7 +51,50 @@ jobs:
         id: changes
         run: node scripts/ci-changes.mjs --base "${{ github.event.pull_request.base.sha || github.event.before }}"
 
-  e2e:
+  integration-db:
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: callcaster
+          POSTGRES_PASSWORD: callcaster
+          POSTGRES_DB: callcaster
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U callcaster -d callcaster"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://callcaster:callcaster@127.0.0.1:5433/callcaster
+      DATABASE_DIRECT_URL: postgresql://callcaster:callcaster@127.0.0.1:5433/callcaster
+      INTEGRATION_DB_URL: postgresql://callcaster:callcaster@127.0.0.1:5433/callcaster
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
+      - name: Bootstrap test database
+        run: node scripts/e2e/bootstrap-compose-db.mjs
+      - name: Run database integration tests
+        run: npm run test:integration-db
+
+  browser:
     needs: changes
     if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
@@ -130,6 +173,8 @@ jobs:
         run: npm run test:e2e:compose
         env:
           CI: "true"
+          # The integration-db job owns its own database and runs in parallel.
+          E2E_SKIP_INTEGRATION_DB: "1"
 
       - name: Upload Playwright report
         if: failure()
@@ -140,3 +185,13 @@ jobs:
             e2e/playwright-report/
             playwright-report/
             test-results/
+
+  # Keep the existing required check name. Both parallel jobs must pass;
+  # failure, cancellation or an unexpected skip must never report success.
+  e2e:
+    needs: [changes, integration-db, browser]
+    if: always() && needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require database and browser tests
+        run: test "${{ needs.integration-db.result }}" = success && test "${{ needs.browser.result }}" = success

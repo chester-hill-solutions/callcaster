@@ -231,6 +231,12 @@
       "migrationTarget": "config.services.scripts"
     },
     {
+      "key": "E2E_SKIP_INTEGRATION_DB",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
       "key": "E2E_STRIPE_SESSION",
       "classification": "non-secret-config",
       "owner": "local-tooling",
@@ -289,6 +295,12 @@
       "classification": "generated-deployment-value",
       "owner": "app",
       "migrationTarget": "config.generated.host"
+    },
+    {
+      "key": "INTEGRATION_DB_URL",
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.integration_db_url"
     },
     {
       "key": "LABEL",

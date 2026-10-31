@@ -9,12 +9,14 @@
  * Optional:
  *   E2E_SKIP_BOOTSTRAP=1  — skip the schema bootstrap (DB already migrated)
  *   E2E_SKIP_BUILD=1      — skip npm run build
+ *   E2E_SKIP_INTEGRATION_DB=1 — CI runs this suite in its own parallel job
  */
 import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertLocalTarget } from "../lib/local-target-guard.mjs";
 import { isDatabaseReady } from "../lib/apply-sql-steps.mjs";
+import { timeE2ePhase } from "./timing.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
@@ -31,7 +33,8 @@ const e2eS3Env = {
   S3_ENDPOINT: process.env.S3_ENDPOINT ?? "http://127.0.0.1:9000",
   S3_REGION: process.env.S3_REGION ?? "us-east-1",
   S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID ?? "callcaster",
-  S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY ?? "callcaster-dev-secret",
+  S3_SECRET_ACCESS_KEY:
+    process.env.S3_SECRET_ACCESS_KEY ?? "callcaster-dev-secret",
   S3_BUCKET: process.env.S3_BUCKET ?? "callcaster",
 };
 assertLocalTarget(e2eS3Env.S3_ENDPOINT, "S3_ENDPOINT");
@@ -43,7 +46,9 @@ function run(command, args, options = {}) {
     ...options,
   });
   if (result.status !== 0) {
-    process.exit(result.status ?? 1);
+    throw new Error(
+      `${command} ${args.join(" ")} failed (status ${result.status ?? result.signal})`,
+    );
   }
 }
 
@@ -56,17 +61,29 @@ function runAsync(command, args, env = process.env) {
 }
 
 console.log("[e2e-compose] starting Postgres + Inbucket via docker compose…");
-run("docker", ["compose", "-f", composeFile, "up", "-d", "postgres", "inbucket"]);
+await timeE2ePhase("Start database and mail services", () =>
+  run("docker", [
+    "compose",
+    "-f",
+    composeFile,
+    "up",
+    "-d",
+    "postgres",
+    "inbucket",
+  ]),
+);
 
 // Object storage is `stow`, not a container. Docker Hub's minio/minio and
 // quay.io/minio/minio both return 401 for anonymous pulls, which failed this
 // job before a single test ran (#1800, and again from 2026-09-24). A pinned
 // release binary needs no registry at all.
 console.log("[e2e-compose] starting stow object storage…");
-run("node", ["scripts/e2e/start-stow.mjs", "--start"]);
+await timeE2ePhase("Start object storage", () =>
+  run("node", ["scripts/e2e/start-stow.mjs", "--start"]),
+);
 
 console.log("[e2e-compose] waiting for Postgres…");
-await (async function waitForPostgres() {
+await timeE2ePhase("Wait for database", async function waitForPostgres() {
   // The official postgres image starts a temporary server for initdb, then
   // RESTARTS the real server — so an early host connection to the mapped port
   // gets "server closed the connection unexpectedly". Probe the SAME host path
@@ -83,18 +100,22 @@ await (async function waitForPostgres() {
     await new Promise((r) => setTimeout(r, 1000));
   }
   throw new Error("Postgres did not become ready");
-})();
+});
 console.log("[e2e-compose] Postgres ready");
 
-run("node", ["scripts/e2e/ensure-bucket.mjs"], {
-  env: { ...process.env, ...e2eS3Env },
-});
+await timeE2ePhase("Prepare storage bucket", () =>
+  run("node", ["scripts/e2e/ensure-bucket.mjs"], {
+    env: { ...process.env, ...e2eS3Env },
+  }),
+);
 
 if (process.env.E2E_SKIP_BOOTSTRAP !== "1") {
   console.log("[e2e-compose] bootstrapping schema…");
-  run("node", ["scripts/e2e/bootstrap-compose-db.mjs"], {
-    env: { ...process.env, DATABASE_URL: databaseUrl },
-  });
+  await timeE2ePhase("Bootstrap database", () =>
+    run("node", ["scripts/e2e/bootstrap-compose-db.mjs"], {
+      env: { ...process.env, DATABASE_URL: databaseUrl },
+    }),
+  );
 }
 
 // The real-Postgres test tier. Every other ledger test mocks the db client and
@@ -102,40 +123,55 @@ if (process.env.E2E_SKIP_BOOTSTRAP !== "1") {
 // apply_ledger_entry_and_sync_credits (ADR-0003/0006); these run it. Placed
 // before the seed and the build so a broken ledger fails in seconds rather than
 // after a full app build and Playwright run.
-console.log("[e2e-compose] running integration-db suites…");
-run("npm", ["run", "test:integration-db"], {
-  env: { ...process.env, DATABASE_URL: databaseUrl },
-});
+if (process.env.E2E_SKIP_INTEGRATION_DB !== "1") {
+  console.log("[e2e-compose] running integration-db suites…");
+  await timeE2ePhase("Database integration tests", () =>
+    run("npm", ["run", "test:integration-db"], {
+      env: { ...process.env, DATABASE_URL: databaseUrl },
+    }),
+  );
+}
 
 console.log("[e2e-compose] seeding E2E data…");
-run("npm", ["run", "test:e2e:seed"], {
-  env: { ...process.env, DATABASE_URL: databaseUrl },
-});
+await timeE2ePhase("Seed database", () =>
+  run("npm", ["run", "test:e2e:seed"], {
+    env: { ...process.env, DATABASE_URL: databaseUrl },
+  }),
+);
 
 console.log("[e2e-compose] seeding object storage fixtures…");
-run("node", ["scripts/e2e/seed-object-storage.mjs"], {
-  env: { ...process.env, DATABASE_URL: databaseUrl, ...e2eS3Env },
-});
+await timeE2ePhase("Seed storage", () =>
+  run("node", ["scripts/e2e/seed-object-storage.mjs"], {
+    env: { ...process.env, DATABASE_URL: databaseUrl, ...e2eS3Env },
+  }),
+);
 
 if (process.env.E2E_SKIP_BUILD !== "1") {
   console.log("[e2e-compose] building app…");
-  run("npm", ["run", "build"], {
-    env: {
-      ...process.env,
-      BASE_URL: baseURL,
-      TWILIO_VALIDATE_WEBHOOKS: "true",
-      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ?? "sk_test_e2e_placeholder",
-      STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET ?? "whsec_e2e_placeholder",
-      RESEND_API_KEY: process.env.RESEND_API_KEY ?? "re_e2e_placeholder",
-      TWILIO_SID: process.env.TWILIO_SID ?? "AC_e2e_test_sid_placeholder",
-      TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN ?? "e2e_twilio_auth_token",
-      TWILIO_APP_SID: process.env.TWILIO_APP_SID ?? "AP_e2e_test_app_sid",
-      TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER ?? "+15555501001",
-      BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? "e2e-better-auth-secret-min-32-chars!!",
-      BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? baseURL,
-      ...e2eS3Env,
-    },
-  });
+  await timeE2ePhase("Build application", () =>
+    run("npm", ["run", "build"], {
+      env: {
+        ...process.env,
+        BASE_URL: baseURL,
+        TWILIO_VALIDATE_WEBHOOKS: "true",
+        STRIPE_SECRET_KEY:
+          process.env.STRIPE_SECRET_KEY ?? "sk_test_e2e_placeholder",
+        STRIPE_WEBHOOK_SECRET:
+          process.env.STRIPE_WEBHOOK_SECRET ?? "whsec_e2e_placeholder",
+        RESEND_API_KEY: process.env.RESEND_API_KEY ?? "re_e2e_placeholder",
+        TWILIO_SID: process.env.TWILIO_SID ?? "AC_e2e_test_sid_placeholder",
+        TWILIO_AUTH_TOKEN:
+          process.env.TWILIO_AUTH_TOKEN ?? "e2e_twilio_auth_token",
+        TWILIO_APP_SID: process.env.TWILIO_APP_SID ?? "AP_e2e_test_app_sid",
+        TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER ?? "+15555501001",
+        BETTER_AUTH_SECRET:
+          process.env.BETTER_AUTH_SECRET ??
+          "e2e-better-auth-secret-min-32-chars!!",
+        BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? baseURL,
+        ...e2eS3Env,
+      },
+    }),
+  );
 }
 
 const serverEnv = {
@@ -151,13 +187,15 @@ const serverEnv = {
   // Webhook fixtures sign with the seeded subaccount token (e2e/fixtures/webhooks.ts).
   TWILIO_VALIDATE_WEBHOOKS: "true",
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ?? "sk_test_e2e_placeholder",
-  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET ?? "whsec_e2e_placeholder",
+  STRIPE_WEBHOOK_SECRET:
+    process.env.STRIPE_WEBHOOK_SECRET ?? "whsec_e2e_placeholder",
   RESEND_API_KEY: process.env.RESEND_API_KEY ?? "re_e2e_placeholder",
   TWILIO_SID: process.env.TWILIO_SID ?? "AC_e2e_test_sid_placeholder",
   TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN ?? "e2e_twilio_auth_token",
   TWILIO_APP_SID: process.env.TWILIO_APP_SID ?? "AP_e2e_test_app_sid",
   TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER ?? "+15555501001",
-  BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? "e2e-better-auth-secret-min-32-chars!!",
+  BETTER_AUTH_SECRET:
+    process.env.BETTER_AUTH_SECRET ?? "e2e-better-auth-secret-min-32-chars!!",
   BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? baseURL,
   E2E_DISABLE_2FA_ENFORCEMENT: process.env.E2E_DISABLE_2FA_ENFORCEMENT ?? "1",
   // The suite signs in far more often than a human would; the strict
@@ -183,7 +221,9 @@ freePort(e2ePort);
 const server = runAsync("bun", ["run", "./server/bun.ts"], serverEnv);
 server.on("exit", (code, signal) => {
   if (code != null && code !== 0) {
-    console.error(`[e2e-compose] server exited early code=${code} signal=${signal ?? ""}`);
+    console.error(
+      `[e2e-compose] server exited early code=${code} signal=${signal ?? ""}`,
+    );
   }
 });
 
@@ -194,7 +234,9 @@ console.log("[e2e-compose] starting job worker…");
 const worker = runAsync("bun", ["run", "./worker/index.ts"], serverEnv);
 worker.on("exit", (code, signal) => {
   if (code != null && code !== 0) {
-    console.error(`[e2e-compose] worker exited early code=${code} signal=${signal ?? ""}`);
+    console.error(
+      `[e2e-compose] worker exited early code=${code} signal=${signal ?? ""}`,
+    );
   }
 });
 
@@ -213,35 +255,51 @@ async function waitForReady(url, attempts = 120) {
 
 let exitCode = 0;
 try {
-  await waitForReady(baseURL);
+  await timeE2ePhase("Wait for application", () => waitForReady(baseURL));
 
   // Surface contract probe: asserts every inventoried endpoint is actually
   // routed (unit tests import handlers directly and cannot catch a routing
   // failure) and that no-credential requests match the declared authClass.
   // Signature validation is on in this harness, so unsigned provider
   // webhooks must 403 here exactly as they do in deployed environments.
-  // Uses spawnSync + throw rather than run(), whose
-  // process.exit would skip the finally block and orphan bun children.
+  // A failed probe throws so the finally block can stop the Bun children.
   console.log("[e2e-compose] probing surface contracts…");
-  const probe = spawnSync(
-    "npx",
-    ["tsx", "--tsconfig", "tsconfig.json", "scripts/probe-surfaces.mjs", baseURL, "--strict"],
-    { cwd: rootDir, stdio: "inherit", env: { ...process.env, DATABASE_URL: databaseUrl } },
-  );
-  if (probe.status !== 0) {
-    throw new Error("surface contract probe failed");
-  }
+  await timeE2ePhase("API contract probe", () => {
+    const probe = spawnSync(
+      "npx",
+      [
+        "tsx",
+        "--tsconfig",
+        "tsconfig.json",
+        "scripts/probe-surfaces.mjs",
+        baseURL,
+        "--strict",
+      ],
+      {
+        cwd: rootDir,
+        stdio: "inherit",
+        env: { ...process.env, DATABASE_URL: databaseUrl },
+      },
+    );
+    if (probe.status !== 0) {
+      throw new Error("surface contract probe failed");
+    }
+  });
 
   console.log("[e2e-compose] running Playwright…");
-  run("npx", ["playwright", "install", "chromium"], { env: process.env });
-  run("npm", ["run", "test:e2e"], {
-    env: {
-      ...process.env,
-      CI: process.env.CI ?? "true",
-      E2E_BASE_URL: baseURL,
-      DATABASE_URL: databaseUrl,
-    },
-  });
+  await timeE2ePhase("Verify browser installation", () =>
+    run("npx", ["playwright", "install", "chromium"], { env: process.env }),
+  );
+  await timeE2ePhase("Browser tests", () =>
+    run("npm", ["run", "test:e2e"], {
+      env: {
+        ...process.env,
+        CI: process.env.CI ?? "true",
+        E2E_BASE_URL: baseURL,
+        DATABASE_URL: databaseUrl,
+      },
+    }),
+  );
 } catch (error) {
   console.error(error);
   exitCode = 1;
@@ -258,14 +316,15 @@ try {
   }
   // stow is detached (it outlives the harness), so nothing above reaps it.
   // Without this it holds :9000 and the next run's `stow serve` cannot bind.
-  // spawnSync directly, not run(): run() calls process.exit on failure, which
-  // would replace the real exit code with stow's.
+  // A storage cleanup failure must not replace the test result.
   const stopStow = spawnSync("node", ["scripts/e2e/start-stow.mjs", "--stop"], {
     cwd: rootDir,
     stdio: "inherit",
   });
   if (stopStow.status !== 0) {
-    console.warn("[e2e-compose] WARNING: could not stop stow; :9000 may be held");
+    console.warn(
+      "[e2e-compose] WARNING: could not stop stow; :9000 may be held",
+    );
   }
   process.exit(exitCode);
 }
