@@ -1,7 +1,14 @@
-import { eq } from "drizzle-orm";
+import { and, eq, exists, isNull } from "drizzle-orm";
 import { workspace, workspace_api_key } from "@/db/schema";
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb } from "@/server/tenant-db";
+
+/** Keep the active-workspace predicate inside the membership query. */
+export function activeWorkspaceExists(workspaceId: string) {
+  return exists(adminDb.select({ id: workspace.id }).from(workspace).where(and(
+    eq(workspace.id, workspaceId), isNull(workspace.archived_at),
+  )));
+}
 
 /** Archive and mint share this row lock, so no key can survive an archive. */
 export async function archiveWorkspaceById(workspaceId: string, archivedAt: Date) {
