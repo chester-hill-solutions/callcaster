@@ -19,7 +19,7 @@ type WorkspaceUserRecord = {
 };
 type WorkspaceNumberRecord = Tables<"workspace_number">;
 
-import { parseOptionalString } from "@/lib/parse-utils.server";
+import { timestampToIsoStringOrNull , parseOptionalString } from "@/lib/parse-utils.server";
 import { isObject } from "@/lib/type-safety-utils";
 import {
   parsePortalConfigFromTwilioData,
@@ -93,6 +93,7 @@ export function deriveWorkspaceAdminRows({
       memberCount: members.length,
       phoneNumberCount: phoneNumbers.length,
       createdAt: workspace.created_at,
+      archivedAt: timestampToIsoStringOrNull(workspace.archived_at),
       twilioSyncStatus: syncSnapshot.lastSyncStatus,
       twilioAccountStatus: syncSnapshot.accountStatus,
       twilioLastSyncedAt: syncSnapshot.lastSyncedAt,
