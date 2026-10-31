@@ -1,6 +1,7 @@
-import { data as routeData } from "react-router";
+import { data as routeData, redirect } from "react-router";
 import { findContactsByPhone } from "@/lib/database/contact.server";
 import { parseContactEditorData, saveContactEditor } from "@/server/contact-editor.server";
+import { applyContactMerge, parseMergeConfirmation, parseMergeContactIds, previewContactMerge } from "@/server/contact-merge.server";
 import { AppError } from "@/lib/errors.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
@@ -48,6 +49,22 @@ export const action = defineAction({
     });
 
     const formData = await request.formData();
+    const intent = formData.get("intent");
+    if (intent === "preview-contact-merge" || intent === "merge-contacts") {
+      const contactId = Number(selected_id);
+      if (!Number.isSafeInteger(contactId) || contactId <= 0) {
+        return routeData({ error: "Invalid contact ID" }, { status: 400, headers });
+      }
+      if (intent === "merge-contacts") {
+        const result = await applyContactMerge(workspace_id, user.id, contactId, parseMergeContactIds(formData), parseMergeConfirmation(formData));
+        return redirect(`/workspaces/${workspace_id}/contacts/${result.retainedContactId}?merge_receipt=${result.requestId}`, { status: 303, headers });
+      }
+      const review = await previewContactMerge(workspace_id, contactId, parseMergeContactIds(formData));
+      return routeData({ mergeReview: review }, { headers });
+    }
+    if (intent != null && intent !== "save") {
+      return routeData({ error: "Unknown contact action" }, { status: 400, headers });
+    }
     const editor = parseContactEditorData(formData);
     // Normalize phone using the same helper as CSV import path (app/lib/csv-contacts.ts).
     // Read-side compensates today via buildExactPhoneCandidates fan-out;

@@ -1,14 +1,14 @@
 # CallCaster — Open Issue Board for Agents
 
-Base inventory: complete native Issue and Project snapshots from 2026-10-29 UTC, 401 open issues. Selected refresh: #2546, #3085 and #3088 on 2026-10-31. Refresh the full board with npm run tools:issues:board.
+Base inventory: complete native Issue and Project snapshots from 2026-10-29 UTC, 401 open issues. Selected refresh: #2546, #3085, #3088 and new child #3091 on 2026-10-31. Refresh the full board with npm run tools:issues:board.
 
 Live native Issue metadata covers all 401 open issues. Type, Priority, Effort and Environment come from those Issue fields. The complete authenticated Project export has 398 unique issue URLs, matching the visible filtered count after hierarchy was turned off and all rows loaded. #100, #2902 and #2906 are absent from that complete Project view and retain unknown Project Status. No status is inferred from a PR, label or issue state.
 
 Current dev includes the merged SMS export and credential-log fixes plus auth isolation #3074, compiler #3075 and credential limits #3079. The current Project export confirms their linked auth, compiler and credential-limit issues are on-dev. Keep issues open for deployed verification and release acceptance.
 
-The approved merge batch #3070 and CI changes #3082–#3084 are merged into dev. PR #3087 is now also merged at 6f940f35; its tree matches tested e93fb40a and both dev app/worker deployments pass. PRs #3081 and #3086 remain parked with both original branches saved. No PR is open at this selected refresh.
+The approved merge batch #3070 and CI changes #3082–#3084 are merged into dev. PR #3087 is now also merged at 6f940f35; its tree matches tested e93fb40a and both dev app/worker deployments pass. PRs #3081 and #3086 remain parked with both original branches saved. PR #3092 is parked unmerged and its branch is preserved. The active repair is #3091; publication and full remote validation follow its local checks.
 
-Priority correction, 2026-10-31: take existing urgent and high-priority app requirements before more self-generated phone hardening. #3085 is on-dev and needs deployed/release verification. Parent #2546 and consent child #3088 are In progress in the authenticated board. Draft PR #3090 is the only open PR. It passes the rebased local gate, 136 affected Node cases and 36 real-database cases; full local CI passed before the CI tooling rebase. Exact-head GitHub CI, approved merge and deployed acceptance remain. Legacy contact repair remains separate. Other issue sections retain their snapshot evidence.
+Priority correction, 2026-10-31: take existing urgent and high-priority app requirements first. #3085 and #3088 are on-dev. Parent #2546 and reviewed-repair child #3091 are In progress in the authenticated board. PR #3090 is merged with green CI and successful dev app/worker deployments. Draft PR #3093 is the only open PR for the #3091 repair; full GitHub CI is running. Keep #2679 person identity and the #2089 ambiguous-recipient guard. Other sections retain their prior snapshot evidence.
 
 ## How to use this board
 
@@ -41,17 +41,18 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
-### [#3088](https://github.com/chester-hill-solutions/callcaster/issues/3088) Honor opt-outs across duplicate workspace contacts in campaign SMS
-- **IN PROGRESS** · Verdict: **Fix now** · Type: Bug · Priority: High · Effort: Medium · Environment: unset · Size: S · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
-- High-priority consent requirement from #2546. A saved opt-out on any workspace copy must block campaign SMS to that normalized phone.
-- Current behavior: Draft PR #3090 loads bounded canonical phone matches before row work and uses the existing opt-out queue outcome. A failed read sends nothing and leaves queued work for retry. Dev still has the old queued-contact-only check until an approved merge.
-- Root cause: Bulk campaign dispatch checks only member.contact.opt_out; its message duplicate lookup and in-process phone claim do not read other saved contact opt-outs.
-- Resolution: Require exact-head GitHub CI on draft PR #3090, then obtain approval before making it ready or merging. Verify deployed dev behavior and release acceptance. Preserve eligible sends, existing one-send controls, tenant isolation, queue attempts, credits and sender policies. Do not merge or rewrite contact profiles.
-- Look in: `app/lib/campaign-sms-dispatch.server.ts`, `app/lib/database/contact.server.ts`, `test/campaign-sms-dispatch-contract.test.ts`, `test/integration-db/sms-recipient-identity.test.ts`
-- Existing tests: The new requirement fails on both real adapters with the old coordinator; 17 controls pass.; Rebased 982371e6 passes all 37 local checks, 136 affected Node cases and 36 real-Postgres cases with no test skips. Checks cover both adapters, no intent/provider/outreach work on opt-out or read failure, eligible and all-opted-in duplicate controls, formatted and international phones, another workspace, and 65,536 selected phones.; Before the CI tooling rebase, full local CI passed on clean 3f532afa in 698.01 seconds: 6,159 Node cases with three existing skips, 34 Bun cases and 1,568 UI cases; all guards, typecheck, lint, build, bundle and codegen checks passed. The rebase changes only approved CI tooling paths; application and affected test sources are unchanged.
-- Missing tests: Full GitHub CI at the final draft head, then deployed dev and release acceptance.
-- Done when: An opted-out same-workspace phone copy blocks the queued copy, including records outside the selected audience.; Both adapters enforce the rule before message intents, provider calls and outreach attempts.; Other phones and other workspaces cannot block a permitted recipient.; All-opted-in duplicates retain the existing one-send behavior.; A failed read consumes no contact attempts and removes no queued work.; Bound database parameters and reuse canonical normalized phone identity.
-- Tracker: Native Bug, Priority High, Effort Medium, assigned @wra-sol, native parent #2546. Actual Project Status In progress, verified in the authenticated board. Draft PR #3090 is the only open PR and has the native Development link to #3088. CI PR #3089 is merged into dev. PRs #3081 and #3086 remain parked with branches preserved.
+### [#3091](https://github.com/chester-hill-solutions/callcaster/issues/3091) Provide a reviewed repair for duplicate workspace contacts
+- **IN PROGRESS** · Verdict: **Fix now** · Type: Bug · Priority: High · Effort: High · Environment: unset · Size: L · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
+- High-priority reviewed repair from #2546 for legacy copies of the same person. Shared-phone different people stay separate.
+- Current behavior: Draft PR #3093 provides review, retained-profile choice, explicit confirmation and an atomic merge. Local checks pass; full GitHub CI and dev merge remain.
+- Root cause: Legacy duplicate-person rows leave the strict manual-SMS identity guard ambiguous. Direct deletion would cascade through history and queue links.
+- Resolution: Structural review, focused checks and all 37 fast local checks pass. Require full exact-head CI on draft PR #3093 before the standing-authorized dev merge, then verify deployment and the native board.
+- Look in: `app/server/contact-merge.server.ts`, `app/server/contact-merge-relations.server.ts`, `app/components/contact/ContactMergePanel.tsx`, `test/integration-db/contact-merge.test.ts`
+- Existing tests: 30 real database repair and authenticated-route cases pass. They cover history, queues, rollback, opt-outs, identity conflicts, roles, stale reviews, concurrent imports, repeat confirmations and the manual SMS route with its provider send stubbed.; 116 affected database/schema cases and 37 affected UI cases pass. The original apply regressions fail while 11 controls pass. The import/repair lock-order regression failed before the shared lock fix.
+- Missing tests: Full exact-head GitHub CI and deployed acceptance.
+- Done when: Do not merge distinct external or voter identities or bypass ambiguous-recipient protection.; Retain the chosen profile, source snapshots, history and completed queue state. Any saved opt-out remains effective.; Keep import receipts immutable and serialize imports with repair. Reject active work and stale reviews; roll back failures; repeat requests apply once.
+- Tracker: Native Bug, Priority High, Effort High, assigned @wra-sol, native parent #2546. Actual Project Status In progress was verified in the authenticated board. Draft PR #3093 is the only open PR and has the native Development link to #3091. PR #3092 is parked unmerged with its branch preserved.
+
 
 ### [#3073](https://github.com/chester-hill-solutions/callcaster/issues/3073) Align the patched Twilio redirect dependency
 - **IN PROGRESS** · Verdict: **Fix now** · Type: Task · Priority: High · Effort: Low · Environment: unset · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-29
@@ -332,9 +333,21 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 54
+## Verify and close — 55
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#3088](https://github.com/chester-hill-solutions/callcaster/issues/3088) Honor opt-outs across duplicate workspace contacts in campaign SMS
+- Verdict: **Verify and close** · Type: Bug · Priority: High · Effort: Medium · Environment: unset · Size: S · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
+- High-priority consent requirement from #2546. A saved opt-out on any workspace copy must block campaign SMS to that normalized phone.
+- Current behavior: PR #3090 is merged into dev at 71ecaadd. Campaign SMS reads all normalized workspace phone matches and blocks any saved opt-out before intent, provider and outreach work.
+- Root cause: Bulk campaign dispatch checks only member.contact.opt_out; its message duplicate lookup and in-process phone claim do not read other saved contact opt-outs.
+- Resolution: Verify deployed behavior and release acceptance. Preserve eligible sends, tenant isolation, queue attempts, credits and sender policies. No further implementation is needed without a failing requirement.
+- Look in: `app/lib/campaign-sms-dispatch.server.ts`, `app/lib/database/contact.server.ts`, `test/campaign-sms-dispatch-contract.test.ts`, `test/integration-db/sms-recipient-identity.test.ts`
+- Existing tests: The new requirement fails on both real adapters with the old coordinator; 17 controls pass.; Rebased 982371e6 passes all 37 local checks, 136 affected Node cases and 36 real-Postgres cases with no test skips. Checks cover both adapters, no intent/provider/outreach work on opt-out or read failure, eligible and all-opted-in duplicate controls, formatted and international phones, another workspace, and 65,536 selected phones.; Before the CI tooling rebase, full local CI passed on clean 3f532afa in 698.01 seconds: 6,159 Node cases with three existing skips, 34 Bun cases and 1,568 UI cases; all guards, typecheck, lint, build, bundle and codegen checks passed. The rebase changes only approved CI tooling paths; application and affected test sources are unchanged.; Final publication head 4395c28a passes the fast local gate, 136 affected Node cases, 36 real database cases and all applicable GitHub CI. Squash merge 71ecaadd has the identical tested tree.
+- Missing tests: Deployed dev and release acceptance.
+- Done when: An opted-out same-workspace phone copy blocks the queued copy, including records outside the selected audience.; Both adapters enforce the rule before message intents, provider calls and outreach attempts.; Other phones and other workspaces cannot block a permitted recipient.; All-opted-in duplicates retain the existing one-send behavior.; A failed read consumes no contact attempts and removes no queued work.; Bound database parameters and reuse canonical normalized phone identity.
+- Tracker: Native Bug, Priority High, Effort Medium, assigned @wra-sol, native parent #2546. Actual Project Status on-dev was verified in the authenticated board. All applicable exact-head GitHub checks pass; both dev app and worker deployments succeeded. Keep the issue open until release acceptance.
 
 ### [#3071](https://github.com/chester-hill-solutions/callcaster/issues/3071) Patch Better Auth verification token isolation
 - Verdict: **Verify and close** · Type: Task · Priority: Urgent · Effort: Medium · Environment: unset · Size: M · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-29
@@ -1150,15 +1163,15 @@ Product, security, or operations decision required before implementation can be 
 - Done when: No implementation until the tax decision is recorded
 
 ### [#2546](https://github.com/chester-hill-solutions/callcaster/issues/2546) Audience imports create duplicate workspace contacts and block or duplicate SMS
-- **IN PROGRESS** · Verdict: **Needs decision** · Type: Bug · Priority: High · Effort: Medium · Environment: unset · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-15
-- High-priority user requirement. Import reuse under #3085 is merged into dev. Active child #3088 enforces saved opt-outs across duplicate workspace phones. Legacy repair and the remaining SMS requirements stay open.
-- Current behavior: Dev includes contact reuse and clear import outcomes from PR #3087. Draft PR #3090 implements the #3088 saved-consent rule before campaign dispatch; it awaits exact-head GitHub CI and merge approval.
+- **IN PROGRESS** · Verdict: **Needs decision** · Type: Bug · Priority: High · Effort: Medium · Environment: unset · Size: L · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
+- High-priority user requirement. Import reuse #3085 and campaign consent #3088 are merged into dev. Reviewed legacy repair is active under child #3091. The parent stays open for remaining identity rollout and acceptance.
+- Current behavior: Dev includes PR #3087 contact reuse and PR #3090 cross-contact opt-out protection. The #2089 manual-SMS guard still blocks ambiguous recipients. The #3091 repair is tested locally and not yet published.
 - Root cause: Contact identity is deduplicated inside one audience, while SMS recipient identity is workspace-wide.
-- Resolution: Finish #3088 and verify deployed #3085 behavior. Keep legacy repair separate until profile, consent, history and queue conflict rules are recorded. Preserve existing campaign duplicate-send checks and prove any further gap before adding another fix.
+- Resolution: Complete #3091 as one atomic app feature and verify deployed #3085/#3088 behavior. Keep #2679 person identity: external IDs can differ for people with the same phone. Audit identity duplicates before any partial unique external-ID rollout; never add a unique-phone rule.
 - Look in: `app/lib/audience-import-map.server.ts`, `app/server/audience-import-effects.server.ts`, `app/lib/chat-sms-guards.server.ts`
-- Existing tests: The #3085 focused real-database run passes 50 cases, including cross-audience reuse, concurrent imports, formatted phones, opt-out preservation, workspace isolation, replay/recovery, manual-SMS identity and download messages. The original implementation fails four regression cases.; Full npm run ci:local passes on clean 030d8bd45cec1ab46243489322ce0306f4181d9a in 698.38 seconds: 6,153 Node tests with three existing skips, 34 Bun tests and 1,568 UI tests. All guards, typecheck, lint, build, bundle and codegen checks pass. Start/end commit and source hashes match.; The #3088 old coordinator fails both HTTP and worker consent regressions while 17 controls pass. Draft PR #3090 passes 37 local checks, 136 affected Node cases and 36 real-database cases after rebasing onto merged CI PR #3089. Full local CI passed before that tooling-only rebase; application and affected test sources are unchanged.
+- Existing tests: The #3085 focused real-database run passes 50 cases, including cross-audience reuse, concurrent imports, formatted phones, opt-out preservation, workspace isolation, replay/recovery, manual-SMS identity and download messages. The original implementation fails four regression cases.; Full npm run ci:local passes on clean 030d8bd45cec1ab46243489322ce0306f4181d9a in 698.38 seconds: 6,153 Node tests with three existing skips, 34 Bun tests and 1,568 UI tests. All guards, typecheck, lint, build, bundle and codegen checks pass. Start/end commit and source hashes match.; The #3088 old coordinator fails both HTTP and worker consent regressions while 17 controls pass. Draft PR #3090 passes 37 local checks, 136 affected Node cases and 36 real-database cases after rebasing onto merged CI PR #3089. Full local CI passed before that tooling-only rebase; application and affected test sources are unchanged.; PR #3090 is merged at 71ecaadd with an identical tested tree, green applicable GitHub checks and successful dev app/worker deployments. Child #3091 has real database red/green evidence for reviewed repair.
 - Done when: Never pick an arbitrary duplicate or loosen opt-out checks.; The data repair must preserve history and apply the most restrictive consent state.; Reusing a canonical contact must add a conflict-safe audience membership.
-- Tracker: Native Bug, Priority High, Effort Medium. Project Status In progress, verified in the authenticated board. Native children #3085 and #3088 cover the merged import fix and draft PR #3090 for campaign consent. Keep the parent open for its remaining requirements.
+- Tracker: Native Bug, Priority High, Effort Medium. Actual Project Status remains In progress. Children #3085 and #3088 are on-dev; child #3091 is In progress. Keep the parent open for its remaining requirements.
 
 ### [#1709](https://github.com/chester-hill-solutions/callcaster/issues/1709) Workspace Sidebar
 - Verdict: **Needs decision** · Type: Change Request · Priority: Medium · Effort: Medium · Environment: unset · Size: S · Risk: medium · Labels: design, ux · Assignee: @sai-sy · Updated: 2026-10-21

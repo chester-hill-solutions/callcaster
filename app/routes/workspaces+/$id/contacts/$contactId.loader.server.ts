@@ -1,13 +1,16 @@
+import { findSmsRecipientContacts } from "@/lib/database/contact.server";
+import type { ContactMergeProfile, ContactMergeResult } from "@/lib/contact-merge";
 import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData, redirect } from "react-router";
 import { getUserRole } from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
-import { MemberRole } from "@/lib/member-role";
+import { hasMinRole, MemberRole } from "@/lib/member-role";
 import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
 import {
   audience as audienceTable,
   campaign as campaignTable,
   contact as contactTable,
+  contact_merge_receipt as mergeReceiptTable,
   contact_audience as contactAudienceTable,
   outreach_attempt as outreachAttemptTable,
 } from "@/db/schema";
@@ -25,11 +28,13 @@ export type ContactIdLoaderData = {
   contact: Contact | null;
   userRole: MemberRole;
   audiences: Audience[];
+  mergeCandidates?: ContactMergeProfile[];
+  mergeResult?: ContactMergeResult;
 };
 
 export const loader = defineLoader({
   sideEffects: ["db-read"],
-  handler: async ({ params, context }) => {
+  handler: async ({ params, context, url }) => {
   const { id: workspace_id, contactId: selected_id } = params;
 
   if (!workspace_id) {
@@ -106,7 +111,19 @@ export const loader = defineLoader({
       limit: 200,
     })) as Audience[];
 
+    const mergeCandidates = contact?.phone && hasMinRole(userRole, MemberRole.Member)
+      ? await findSmsRecipientContacts(workspace_id, contact.phone)
+      : [];
+    const receiptId = url.searchParams.get("merge_receipt");
+    const receipt = receiptId && /^[a-f0-9-]{36}$/i.test(receiptId) && hasMinRole(userRole, MemberRole.Member)
+      ? await tdb.contact_merge_receipt.findFirst({ where: eq(mergeReceiptTable.id, receiptId) })
+      : undefined;
+    const mergeResult = receipt && receipt.retained_contact_id === contact?.id ? {
+      retainedContactId: receipt.retained_contact_id, mergedCount: receipt.source_profiles.length - 1, requestId: receipt.id,
+    } : undefined;
     return routeData({
+      mergeResult,
+      mergeCandidates,
       workspace: workspaceData,
       workspace_id,
       selected_id,

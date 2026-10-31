@@ -8,13 +8,14 @@ import {
   createWorkspaceEventSourceMock,
 } from "./hooks-test-helpers";
 
+const navigate = vi.fn();
 const toastMocks = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn() }));
 vi.mock("sonner", async (importOriginal) => ({
   ...(await importOriginal<typeof import("sonner")>()),
   toast: toastMocks,
 }));
 const messageFetcher = createMockFetcher<
-  { error?: string; billing?: { nextSendBlocked?: boolean } } | undefined
+  { error?: string; recipientVerificationError?: boolean; billing?: { nextSendBlocked?: boolean } } | undefined
 >();
 const paginationFetcher = createMockFetcher();
 const loader = {
@@ -74,7 +75,7 @@ vi.mock("react-router", async (importOriginal) => ({
     key === "messages" ? messageFetcher : paginationFetcher,
   useOutlet: () => null,
   useParams: () => ({ contact_number: contactNumber }),
-  useNavigate: () => vi.fn(),
+  useNavigate: () => navigate,
 }));
 const Form = ({ children, ...props }: React.ComponentProps<"form">) =>
   createElement("form", props, children);
@@ -115,6 +116,7 @@ beforeEach(() => {
   setImages.mockReset();
   addOptimisticMessage.mockReset();
   markOptimisticMessageFailed.mockReset();
+  navigate.mockReset();
   toastMocks.error.mockReset();
   toastMocks.warning.mockReset();
 });
@@ -406,4 +408,23 @@ test("does not replay retained old error data after a first-send redirect", () =
   expect(messageFetcher.submit).toHaveBeenCalledTimes(2);
   expect(c.textarea()).toHaveValue("");
   expect(toastMocks.error).not.toHaveBeenCalled();
+});
+
+test("recipient verification failure links to this workspace's contacts and keeps the message draft", () => {
+  const c = mount();
+  c.type("Keep my message"); c.send(); c.start();
+  c.settle({ error: "Unable to verify the message recipient", recipientVerificationError: true });
+  expect(c.textarea()).toHaveValue("Keep my message");
+  const options = toastMocks.error.mock.calls[0][1];
+  expect(options.action.label).toBe("Review contacts");
+  options.action.onClick();
+  expect(navigate).toHaveBeenCalledWith("/workspaces/ws1/contacts?q=%2B15551234567");
+});
+
+test("a late verification error cannot link an old recipient from a new workspace", () => {
+  const c = mount(); c.type("Original workspace draft"); c.send(); c.start();
+  workspaceId = "ws2"; c.refresh();
+  c.settle({ error: "Unable to verify the message recipient", recipientVerificationError: true });
+  expect(toastMocks.error).toHaveBeenCalledExactlyOnceWith("Unable to verify the message recipient");
+  expect(navigate).not.toHaveBeenCalled();
 });

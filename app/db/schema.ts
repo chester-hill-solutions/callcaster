@@ -17,6 +17,7 @@ import {
   uniqueIndex, unique,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
+export { contact_merge_receipt } from "./schema-contact-merge";
 export { audience_import_run, audience_import_row } from "./schema-audience-import";
 export { workspace_number_release } from "./schema-number-release";
 export { predictive_machine_operation } from "./schema-predictive-machine";
@@ -439,37 +440,7 @@ export const call = pgTable("call", {
   workspace: uuid(),
 });
 
-export const message = pgTable("message", {
-  account_sid: text(),
-  api_version: text(),
-  body: text(),
-  campaign_id: bigint({ mode: "number" }),
-  contact_id: bigint({ mode: "number" }),
-  date_created: timestamp({ withTimezone: true, mode: "date" }).defaultNow(),
-  date_sent: timestamp({ withTimezone: true, mode: "date" }),
-  date_updated: timestamp({ withTimezone: true, mode: "date" }),
-  direction: text(),
-  error_code: integer(),
-  error_message: text(),
-  from: text(),
-  inbound_media: text().array(),
-  messaging_service_sid: text(),
-  num_media: text(),
-  num_segments: text(),
-  outbound_media: text().array(),
-  /** Requested "send later" time for scheduled sends (Twilio doesn't echo `sendAt` back). */
-  scheduled_at: timestamp({ withTimezone: true, mode: "date" }),
-  outreach_attempt_id: bigint({ mode: "number" }),
-  price: text(),
-  price_unit: text(),
-  sid: text().notNull(),
-  status: text(),
-  subresource_uris: jsonb(),
-  to: text(),
-  uri: text(),
-  workspace: uuid().notNull(),
-  client_ref: text(),
-});
+export { message } from "./schema-message";
 
 export const outreach_attempt = pgTable("outreach_attempt", {
   answered_at: timestamp({ withTimezone: true, mode: "string" }),
