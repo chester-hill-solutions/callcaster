@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Call } from "@twilio/voice-sdk";
 import { useTwilioConnection } from "@/hooks/call/useTwilioConnection";
 import { useCallHandling } from "@/hooks/call/useCallHandling";
+import { useOwnedSdkCallCleanup } from "@/hooks/call/useOwnedSdkCallCleanup";
 import { declineIncomingCall } from "@/components/calls/IncomingCallPanel";
 import { normalizePhoneNumber } from "@/lib/phone";
 import { sendCallDigits } from "@/lib/twilio/twilio-call-adapter.client";
@@ -131,31 +132,7 @@ export function useSoftphoneController({
     onNavigateBack,
   ]);
 
-  const activeCallRef = useRef(callHandling.activeCall);
-  const hangUpRef = useRef(callHandling.hangUp);
-  activeCallRef.current = callHandling.activeCall;
-  hangUpRef.current = callHandling.hangUp;
-
-  /**
-   * @effect On unmount (e.g. navigating away from the softphone), hang up any
-   * in-progress call through the provider so a call session never
-   * outlives the component and keeps consuming a line/credits.
-   * @effect-deps [] — intentionally mount-once, cleanup-only; reads activeCall/
-   * hangUp via refs kept fresh on every render (see activeCallRef/
-   * hangUpRef above) so the cleanup always sees the latest call
-   * without re-running (and re-teardown-registering) this effect each render.
-   * @effect-side-effects fetch (hangUp() calls the Twilio hangup API).
-   * useTwilioConnection owns device teardown.
-   * @effect-why-not-loader Imperative SDK teardown tied to component unmount,
-   * not request/response data.
-   */
-  useEffect(() => {
-    return () => {
-      if (activeCallRef.current) {
-        hangUpRef.current?.().catch(() => {});
-      }
-    };
-  }, []);
+  useOwnedSdkCallCleanup(callHandling.activeCall, workspaceId);
 
   const handleKeypadPress = useCallback(
     (key: string) => {

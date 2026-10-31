@@ -362,12 +362,14 @@ export function useCampaignCallFlow({
   const terminalCallSid =
     providerStatus && isTerminalForOutcome(providerStatus) ? customerLegSid : null;
 
+  const isCurrentCustomer = useCallback(() => ownerRef.current === owner, [owner]);
+
   const confirmCustomerEnded = useCallback(() => {
-    if (ownerRef.current !== owner) return false;
+    if (!isCurrentCustomer()) return false;
     setLifecycle(previous => callLifecycleReducer(previous, { type: "HANG_UP" }));
     send({ type: "HANG_UP" });
     return true;
-  }, [owner, send]);
+  }, [isCurrentCustomer, send]);
 
   return {
     displayState,
@@ -375,6 +377,7 @@ export function useCampaignCallFlow({
     beginDial,
     terminalCallSid,
     customerCallSid: customerLegSid,
+    isCurrentCustomer,
     confirmCustomerEnded,
     getDisplayState: (
       callStateValue: string,
