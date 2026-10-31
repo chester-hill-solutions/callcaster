@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Handset End Session retains its workspace, identity, device and captured calls through replies. Old commands cannot close a newer session; pending dials still cancel, and an incoming SDK call survives before the screen receives it ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
+
 - Fixed: Predictive customer joins update only the queue generation and reservation that funded the call. Answer and queue writes commit together, so a failed callback can retry; a terminal Call cannot be revived by an older lookup ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
 
 - Changed: The call screen recovers working and pending phone audio from the server when browser storage is unavailable. An unresolved customer or cleanup operation blocks another Start. Unknown submitted requests keep their nonce for Check or Cancel, and an old cancel or browser return cannot control a newer request. Phone selection waits for a confirmed connection, replaces browser capture and tones, and keeps current audio during failed changes. Return to computer waits for SDK registration and microphone readiness. Manual phone Start retains its request and binds the returned customer call ID. Live handoff acceptance and recording continuity remain in development ([#3081](https://github.com/chester-hill-solutions/callcaster/pull/3081), [#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).

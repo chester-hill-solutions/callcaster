@@ -417,6 +417,17 @@ bootstrap does not prove runtime session state or per-file recovery.
 
 ## Call teardown regressions
 
+Session End must own its committed actor, workspace, device and captured call
+set before send and after each reply. Check raw `Device.calls` as well as React
+incoming state: the SDK can receive a call before its event commits. Keep one
+pending end operation, and release a retired end's outbound block only while
+that same session still owns it. Cancel the canonical SDK request generation
+even when no Call object exists yet. Do not use a missing-call Hang Up error
+as cancellation. Test normal held/active closure and delayed SDK completion,
+plus commands and replies after scope exit, device replacement, new calls,
+pending preparation and an uncommitted render. Verify navigation ownership
+again after the session callback.
+
 SDK call and device teardown can throw before local session cleanup runs. Test
 the real session hook and call controls together: a provider terminal event
 must remove Hang Up even when either teardown throws. Keep an unrelated-call
@@ -1008,6 +1019,9 @@ invalid-target controls, plus a valid indexed-loader control that proves discove
 Ignore imported assets; keep CSS and image controls beside the script controls.
 
 For SQL write guards, cover raw SQL, conflict updates and tuple assignments.
+For in-memory text faults, match a complete expression and require one match.
+A property suffix can also occur in a longer ref expression. A match-count
+failure is fixture setup failure, not an executed behavior counterexample.
 Keep reads, non-order writes, quoted values and unrelated-statement controls.
 Verify rejection through the actual CLI as well as the parser.
 Include canonical lower-level writers in the bypass inventory. A public API

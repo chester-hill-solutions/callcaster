@@ -46,6 +46,7 @@ interface UseCallHandlingReturn {
   isActiveCallOnLocalHold: boolean;
   makeCall: (params: CallConnectParams) => Promise<Call | undefined> | undefined;
   hangUp: (call?: Call) => Promise<void>;
+  cancelPendingDial: () => void;
   answer: () => void;
   holdAndAnswer: () => void;
   switchTo: (call: Call) => void;
@@ -117,6 +118,9 @@ export function useCallHandling({
   const incomingListenerCleanupsRef = useRef<Map<Call, () => void>>(new Map());
   const callGenerationRef = useRef(0);
   const scopeOwner = useMemo(() => ({ workspaceId, active: false }), [workspaceId]);
+  const cancelPendingDial = useCallback(() => {
+    if (scopeOwner.active) callGenerationRef.current += 1;
+  }, [scopeOwner]);
 
   /**
    * @effect Mirror `heldCalls` state into a ref so callbacks/other effects
@@ -427,7 +431,8 @@ export function useCallHandling({
     // A provider acknowledgement can precede SDK transport cleanup failure.
     try { target.disconnect(); }
     catch (error) { logger.debug("Call disconnect failed during hangup cleanup", error); }
-    if (isActive && held.length === 0 && !incomingCallRef.current && device) {
+    if (isActive && held.length === 0 && !incomingCallRef.current && device &&
+      (device.calls ?? []).every(call => call === target || call.status?.() === "closed")) {
       try { device.disconnectAll(); }
       catch (error) { logger.debug("Device disconnect failed during hangup cleanup", error); }
     }
@@ -719,6 +724,7 @@ export function useCallHandling({
     isActiveCallOnLocalHold,
     makeCall,
     hangUp,
+    cancelPendingDial,
     answer,
     holdAndAnswer,
     switchTo,
