@@ -18,10 +18,15 @@ import useDebouncedSave from "@/hooks/utils/useDebouncedSave";
 import useCallRoom from "@/hooks/call/useCallRoom";
 import { useTwilioDevice } from "@/hooks/call/useTwilioDevice";
 import { useCallEndTone } from "@/hooks/call/useCallEndTone";
+import { useCallDuration } from "@/hooks/call/useCallDuration";
 import { useStartConferenceAndDial } from "@/hooks/call/useStartConferenceAndDial";
 import { useCallState } from "@/hooks/call/useCallState";
 import { useCallScreenDialogs } from "@/hooks/call/useCallScreenDialogs";
 import { usePhoneVerification } from "@/hooks/call/usePhoneVerification";
+import { useAgentAudioConnection, useAgentBrowserReadiness } from "@/hooks/call/useAgentAudioConnection";
+import { useManualAudioDial } from "@/hooks/call/useManualAudioDial";
+import { agentAudioStartReason, useCallScreenAudio } from "@/hooks/call/useCallScreenAudio";
+import type { StartCallArgs } from "@/lib/manual-dial-client";
 import { useCallAudioControls } from "@/hooks/call/useCallAudioControls";
 import { useAudioDeviceTest } from "@/hooks/call/useAudioDeviceTest";
 
@@ -173,9 +178,11 @@ export function useCallScreen() {
   const [hasJoined, setHasJoined] = useState(!dialogs.isDialogOpen);
   const onJoin = useCallback(() => setHasJoined(true), []);
 
-  const phoneVerification = usePhoneVerification({
-    verifiedNumbers,
-  });
+  const phoneVerification = usePhoneVerification();
+  const agentAudio = useAgentAudioConnection(workspaceId, user.id);
+  const selectedDevice = agentAudio.state.selectedDevice;
+  const { phoneSource, wantsBrowser } = agentAudio;
+  const manualAudioDial = useManualAudioDial(workspaceId, user.id, campaign?.id ?? 0);
 
   const { state, send } = useCallState();
   const navigate = useNavigate();
@@ -193,18 +200,25 @@ export function useCallScreen() {
     callDuration,
     setCallDuration,
     deviceIsBusy,
+    hasOwnedCalls,
+    hasHeldCalls,
     error: deviceError,
     reconnect: reconnectDevice,
   } = useTwilioDevice({
     token,
-    selectedDevice: phoneVerification.selectedDevice,
+    selectedDevice,
     workspaceId,
     send: send as unknown as (action: { type: string }) => void,
     onTokenWillExpire: handleTokenWillExpire,
-    enabled: hasJoined,
+    enabled: hasJoined && wantsBrowser,
+    managesCustomerAudio: agentAudio.resource.managesCustomerAudio,
   });
 
+  const browserAudioEnabled = hasJoined && (wantsBrowser || hasOwnedCalls);
+  const audioStartDisabledReason = agentAudioStartReason({ joined: hasJoined, ready: agentAudio.ready,
+    pendingCustomer: manualAudioDial.state.pending || Boolean(manualAudioDial.state.error), selectedDevice, deviceStatus, hasPhoneSource: Boolean(phoneSource) });
   const audioControls = useCallAudioControls({
+    enabled: browserAudioEnabled,
     device,
     activeCall,
     micCoordinator: { isMicMuted, setMicMuted },
@@ -213,7 +227,8 @@ export function useCallScreen() {
   // #1339: opt-in "test my mic / speaker" affordances for the settings
   // sheet. Keyed on the live mic stream from useCallAudioControls so the
   // meter reflects the same input the call will use.
-  const audioDeviceTest = useAudioDeviceTest({ stream: audioControls.stream });
+  const audioDeviceTest = useAudioDeviceTest({ stream: audioControls.stream, enabled: browserAudioEnabled });
+  useAgentBrowserReadiness(agentAudio.resource, agentAudio.state.preparingBrowser, deviceStatus === "Registered", audioControls.inputReady);
 
   const showStartError = useCallback((message: string, creditFailure: boolean) => {
     if (creditFailure) {
@@ -236,7 +251,8 @@ export function useCallScreen() {
       campaignId: campaign?.id?.toString() || "",
       workspaceId,
       callerId: campaign?.caller_id || "",
-      selectedDevice: phoneVerification.selectedDevice,
+      selectedDevice,
+      audioSource: phoneSource,
       showError: showStartError,
     },
   );
@@ -292,23 +308,24 @@ export function useCallScreen() {
   const agentLegSid = getCallSid(activeCall) ?? null;
 
   const { displayState, displayColor, beginDial, terminalCallSid, customerCallSid, confirmCustomerEnded } = useCampaignCallFlow({
-    callSid: campaign?.dial_type === "predictive" ? joinedCustomerSid : agentLegSid,
+    callSid: campaign?.dial_type === "predictive" ? joinedCustomerSid : agentAudio.resource.managesCustomerAudio() ? null : agentLegSid,
     confirmedCustomerSid: campaign?.dial_type === "predictive" ? joinedCustomerSid : null,
-    agentLegSid,
+    agentLegSid: agentAudio.state.active?.callSid ?? agentLegSid,
     workspaceId,
     state,
-    activeCall,
+    activeCall: agentAudio.resource.managesCustomerAudio() ? null : activeCall,
     recentAttemptDisposition: recentAttempt?.disposition,
     predictiveState,
     isPredictive: campaign?.dial_type === "predictive",
     send: send as unknown as (action: { type: string }) => void,
   });
   const callSid = customerCallSid;
+  const logicalDuration = useCallDuration(displayState);
 
   const hangUp = useCallback(async () => {
     try {
       if (!callSid) {
-        if (campaign?.dial_type === "predictive") return;
+        if (campaign?.dial_type === "predictive" || agentAudio.resource.managesCustomerAudio()) return;
         await sdkHangUp();
         send({ type: "HANG_UP" });
         return;
@@ -316,15 +333,16 @@ export function useCallScreen() {
       const result = await hangupCall({ callSid, workspaceId });
       if (result?.success !== true) throw new Error("Could not confirm that the customer call ended. Try again.");
       if (!confirmCustomerEnded()) return;
-      if (campaign?.dial_type !== "predictive") activeCall?.disconnect();
+      if (campaign?.dial_type !== "predictive" && !agentAudio.resource.managesCustomerAudio()) activeCall?.disconnect();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not end the customer call. Try again.");
     }
-  }, [callSid, workspaceId, campaign?.dial_type, sdkHangUp, send, confirmCustomerEnded, activeCall]);
+  }, [callSid, workspaceId, campaign?.dial_type, sdkHangUp, send, confirmCustomerEnded, activeCall, agentAudio.resource]);
 
   // Two short busy-style bursts when the call ends — either side hanging up —
   // so the agent gets audible confirmation, not just the status text (#1363).
   useCallEndTone({
+    enabled: selectedDevice === "computer",
     displayState,
     outputDeviceId: audioControls.output,
   });
@@ -343,7 +361,7 @@ export function useCallScreen() {
   useRemoteHangupReconcile({
     displayState,
     callState,
-    isPredictive: campaign?.dial_type === "predictive",
+    isPredictive: campaign?.dial_type === "predictive" || agentAudio.resource.managesCustomerAudio(),
     terminalCallSid,
     hangUp,
   });
@@ -361,7 +379,11 @@ export function useCallScreen() {
     showError: (message) => toast.error(message),
   });
 
-  const { startCall } = handleCall({ submit });
+  const { startCall: startLegacyCall } = handleCall({ submit });
+  const startCall = (args: StartCallArgs) => {
+    if (args.audioSource) void manualAudioDial.resource.begin(args);
+    else startLegacyCall(args);
+  };
   const { handleConferenceEnd } = handleConference({ begin });
 
   const queueFlow = useCampaignQueueFlow({
@@ -411,17 +433,20 @@ export function useCallScreen() {
 
   const handleDialButton = useCampaignDialActions({
     campaign,
-    deviceIsBusy,
+    deviceIsBusy: hasHeldCalls || (deviceIsBusy && !(agentAudio.state.active?.transport === "computer" && agentAudio.state.active.callSid === agentLegSid)),
     incomingCall,
     deviceStatus,
-    callState,
+    callState: displayState,
     begin,
     startCall,
     nextRecipient,
     user,
     workspaceId,
     recentAttempt,
-    selectedDevice: phoneVerification.selectedDevice,
+    selectedDevice,
+    audioSource: phoneSource,
+    audioReady: agentAudio.ready && !manualAudioDial.state.pending && !manualAudioDial.state.error &&
+      (selectedDevice === "computer" ? deviceStatus === "Registered" : Boolean(phoneSource)),
     send: send as unknown as (action: { type: string }) => void,
     beginDial,
   });
@@ -520,15 +545,12 @@ export function useCallScreen() {
     setConference,
   });
 
-  const handleDeviceSelect = useCallback(
-    (device: string) => {
-      void phoneVerification.handlePhoneDeviceSelection(
-        device,
-        audioControls.requestMicrophoneAccess,
-      );
-    },
-    [phoneVerification, audioControls.requestMicrophoneAccess],
-  );
+  const liveCustomer = displayState === "dialing" || displayState === "connected";
+  const screenAudio = useCallScreenAudio({ audio: agentAudio, hasJoined, workspaceId, verifiedNumbers,
+    customerSid: liveCustomer ? callSid : null, agentSid: agentLegSid,
+    customerPending: manualAudioDial.state.pending || (liveCustomer && !callSid), browserEnabled: wantsBrowser,
+    browserError: audioControls.permissionError ?? audioControls.inputError ?? deviceError?.message ?? null,
+    requestMicrophone: audioControls.requestMicrophoneAccess, reconnect: () => { if (!hasOwnedCalls) reconnectDevice(); } });
 
   const currentState = {
     callState,
@@ -552,18 +574,22 @@ export function useCallScreen() {
   }, [hangUp, send, reconnectDevice]);
 
   const callControls = {
+    awaitingCustomerReceipt: manualAudioDial.state.pending && !callSid,
+    manualDialError: manualAudioDial.state.error,
+    isCheckingManualDial: manualAudioDial.state.sending,
+    onCheckManualDial: () => { void manualAudioDial.resource.retry(beginDial); },
     hangUp,
     answer,
     holdAndAnswer,
     incomingCall,
     activeCall,
-    callState,
-    callDuration,
+    callState: displayState,
+    callDuration: logicalDuration.callDuration,
     deviceIsBusy,
     isStartingConference,
-    startDisabledReason,
+    startDisabledReason: startDisabledReason ?? audioStartDisabledReason,
     handleDialButton,
-    handleDequeueNext,
+    handleDequeueNext: () => { if (!manualAudioDial.state.pending && !liveCustomer) handleDequeueNext(); },
     handleVoiceDrop,
     handleConferenceEnd,
     displayState,
@@ -578,7 +604,7 @@ export function useCallScreen() {
     creditState,
     deviceError,
     reconnectDevice,
-    resetCall,
+    resetCall: agentAudio.resource.managesCustomerAudio() ? undefined : resetCall,
   };
 
   const queueControls = {
@@ -651,7 +677,10 @@ export function useCallScreen() {
     audioControls: audioControlsGroup,
     phoneVerification: {
       ...phoneVerification,
-      setSelectedDevice: handleDeviceSelect,
+      selectedDevice,
+      phoneConnectionStatus: screenAudio.phoneConnectionStatus,
+      audioConnection: screenAudio.controls,
+      setSelectedDevice: screenAudio.onSelect,
     },
     featureFlags,
     callSid,

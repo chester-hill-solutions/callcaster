@@ -1,6 +1,8 @@
 import { useCallback } from "react";
 import { recordFlashBreadcrumb } from "@/lib/flash-telemetry.client";
 import type { Call } from "@twilio/voice-sdk";
+import type { VoiceAudioSourceIdentity } from "@/lib/voice-audio-connection";
+import type { StartCallArgs } from "@/lib/manual-dial-client";
 import type {
   Campaign,
   Contact,
@@ -9,16 +11,6 @@ import type {
 } from "@/lib/types";
 
 type CallStateMachineSend = (action: { type: string }) => void;
-
-type StartCallArgs = {
-  contact: Contact;
-  campaign: Campaign;
-  user: { id: string };
-  workspaceId: string;
-  nextRecipient: QueueItem | null;
-  recentAttempt: OutreachAttempt | null;
-  selectedDevice: string | null;
-};
 
 type UseCampaignDialActionsOptions = {
   campaign: Campaign | null | undefined;
@@ -33,6 +25,8 @@ type UseCampaignDialActionsOptions = {
   workspaceId: string;
   recentAttempt: OutreachAttempt | null;
   selectedDevice: string;
+  audioReady?: boolean;
+  audioSource?: VoiceAudioSourceIdentity;
   send: (action: { type: string }) => void;
   /**
    * Resets the canonical call lifecycle for the new dial, in the same batch as
@@ -41,7 +35,7 @@ type UseCampaignDialActionsOptions = {
    * FSM→lifecycle bridge effect can clear it — the residual flash left over
    * from #1220.
    */
-  beginDial: () => void;
+  beginDial: () => ((sid: string) => boolean) | void;
 };
 
 export function useCampaignDialActions({
@@ -57,15 +51,17 @@ export function useCampaignDialActions({
   workspaceId,
   recentAttempt,
   selectedDevice,
+  audioReady = true,
+  audioSource,
   send,
   beginDial,
 }: UseCampaignDialActionsOptions) {
   return useCallback(() => {
-    if (!campaign) return;
+    if (!campaign || !audioReady) return;
     recordFlashBreadcrumb("dial-press", `type=${campaign.dial_type}`);
 
     if (campaign.dial_type === "predictive") {
-      if (deviceIsBusy || incomingCall || deviceStatus !== "Registered") {
+      if (deviceIsBusy || incomingCall || (selectedDevice === "computer" && deviceStatus !== "Registered")) {
         return;
       }
       begin();
@@ -75,7 +71,7 @@ export function useCampaignDialActions({
       if (callState === "dialing" || callState === "connected") return;
 
       send({ type: "START_DIALING" });
-      beginDial();
+      const acceptCustomer = beginDial();
       startCall({
         contact: nextRecipient.contact,
         campaign,
@@ -84,6 +80,8 @@ export function useCampaignDialActions({
         nextRecipient,
         recentAttempt,
         selectedDevice,
+        ...(audioSource ? { audioSource } : {}),
+        ...(acceptCustomer ? { acceptCustomer } : {}),
       });
     }
   }, [
@@ -99,6 +97,8 @@ export function useCampaignDialActions({
     workspaceId,
     recentAttempt,
     selectedDevice,
+    audioReady,
+    audioSource,
     send,
     beginDial,
   ]);

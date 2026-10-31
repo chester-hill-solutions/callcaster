@@ -5,6 +5,7 @@ import { Campaign, Contact, QueueItem, OutreachAttempt, Call   } from "./types";
 import { isRecent } from "./utils";
 import { isObject } from "./type-safety-utils";
 import { logger } from "@/lib/logger.client";
+import { manualDialFields, type StartCallArgs } from "@/lib/manual-dial-client";
 
 const getRecentAttempt = ({
   attempts,
@@ -76,46 +77,11 @@ export const handleConference = ({ begin }:{begin:() => void}) => {
 };
 
 export const handleCall = ({ submit }:{submit:FetcherWithComponents<unknown>["submit"]}) => {
-  const startCall = ({
-    contact,
-    campaign,
-    user,
-    workspaceId,
-    nextRecipient,
-    recentAttempt,
-    selectedDevice,
-  }: {
-    contact: Contact;
-    campaign: Campaign;
-    user: { id: string };
-    workspaceId: string;
-    nextRecipient: QueueItem | null;
-    recentAttempt: OutreachAttempt | null;
-    selectedDevice: string | null;
-  }) => {
-    if (contact.phone) {
+  const startCall = (args: StartCallArgs) => {
+    const fields = manualDialFields(args);
+    if (fields) {
       const data = new FormData();
-      data.append("to_number", contact.phone);
-      data.append("campaign_id", campaign.id.toString());
-      data.append("user_id", user.id);
-      data.append("contact_id", contact.id.toString());
-      data.append("workspace_id", workspaceId);
-      data.append("dial_intent_id", crypto.randomUUID());
-      if (recentAttempt?.id != null) {
-        data.append("outreach_id", recentAttempt.id.toString());
-      }
-      if (nextRecipient?.id != null) {
-        data.append("queue_id", nextRecipient.id.toString());
-      }
-      if (nextRecipient?.dispatch_generation) {
-        data.append("expected_queue_generation", nextRecipient.dispatch_generation);
-      }
-      if (campaign.caller_id) {
-        data.append("caller_id", campaign.caller_id);
-      }
-      if (selectedDevice) {
-        data.append("selected_device", selectedDevice);
-      }
+      for (const [key, value] of Object.entries(fields)) data.append(key, value);
 
       submit(data, {
         action: "/api/dial",

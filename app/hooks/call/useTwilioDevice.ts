@@ -22,6 +22,8 @@ interface TwilioDeviceHook {
   setCallDuration: React.Dispatch<React.SetStateAction<number>>;
   setIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
   deviceIsBusy: boolean;
+  hasOwnedCalls: boolean;
+  hasHeldCalls: boolean;
   /** Manually recover from a terminal Device error — see useTwilioConnection. */
   reconnect: () => void;
 }
@@ -35,6 +37,8 @@ interface UseTwilioDeviceOptions {
   /** Gate device creation/registration behind explicit Join (#1313). Defaults
    * to true so callers that don't opt in keep connecting on mount. */
   enabled?: boolean;
+  /** Agent resource events must not terminate the independent customer owner. */
+  managesCustomerAudio?: () => boolean;
 }
 
 /**
@@ -47,6 +51,7 @@ export function useTwilioDevice({
   send,
   onTokenWillExpire,
   enabled = true,
+  managesCustomerAudio,
 }: UseTwilioDeviceOptions): TwilioDeviceHook {
   if (!token) {
     logger.error("useTwilioDevice: token is required");
@@ -87,12 +92,13 @@ export function useTwilioDevice({
   }, []);
 
   const onCallState = useCallback((newCallState: string) => {
+    if (managesCustomerAudio?.()) return;
     switch (newCallState) {
       case "dialing": send({ type: "START_DIALING" }); break;
       case "completed": send({ type: "HANG_UP" }); break;
       case "failed": send({ type: "FAIL" }); break;
     }
-  }, [send]);
+  }, [send, managesCustomerAudio]);
 
   const ownedCallsRef = useRef<readonly (Call | null)[]>([]);
   const connection = useTwilioConnection({
@@ -116,6 +122,19 @@ export function useTwilioDevice({
     onDeviceBusyChange: onDeviceBusy,
   });
   ownedCallsRef.current = [callHandling.activeCall, callHandling.incomingCall, ...callHandling.heldCalls];
+  const releaseIdleDevice = connection.releaseIdleDevice;
+
+  /**
+   * @effect Release a suspended SDK after its last active, incoming or held call closes.
+   * @effect-deps enabled, releaseIdleDevice, callHandling.activeCall,
+   * callHandling.incomingCall, callHandling.heldCalls (actual SDK ownership).
+   * @effect-side-effects idle Device teardown through the connection owner.
+   * @effect-why-not-loader Provider call-close events can arrive after the phone
+   * handoff. See https://react.dev/learn/synchronizing-with-effects.
+   */
+  useEffect(() => {
+    if (!enabled) releaseIdleDevice();
+  }, [enabled, releaseIdleDevice, callHandling.activeCall, callHandling.incomingCall, callHandling.heldCalls]);
 
   /**
    * @effect Mirror the latest `callHandling.receiveIncoming` handler into a
@@ -183,6 +202,8 @@ export function useTwilioDevice({
     setCallDuration,
     setIsBusy,
     deviceIsBusy,
+    hasOwnedCalls: [callHandling.activeCall, callHandling.incomingCall, ...callHandling.heldCalls].some(call => call && call.status?.() !== "closed"),
+    hasHeldCalls: callHandling.heldCalls.some(call => call.status?.() !== "closed"),
     reconnect: connection.reconnect,
   };
 }

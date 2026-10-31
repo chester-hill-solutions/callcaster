@@ -29,6 +29,8 @@ export function useCallAudioControls({
   const [availableMicrophones, setAvailableMicrophones] = useState<MediaDeviceInfo[]>([]);
   const [availableSpeakers, setAvailableSpeakers] = useState<MediaDeviceInfo[]>([]);
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [inputError, setInputError] = useState<string | null>(null);
+  const [selectedInput, setSelectedInput] = useState<{ device: Device; id: string } | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const microphoneRequestGenerationRef = useRef(0);
   const selectInput = useTwilioAudioInput(enabled ? device : null);
@@ -188,16 +190,23 @@ export function useCallAudioControls({
 
   /**
    * @effect Serialize microphone selection on the current SDK audio helper.
-   * @effect-deps enabled, selectInput, microphone (browser ownership and input).
+   * @effect-deps enabled, device, selectInput, microphone (browser ownership and input).
    * @effect-side-effects media capture through SDK setInputDevice.
    * @effect-why-not-loader Live browser hardware selection follows user input.
    */
   useEffect(() => {
-    if (!enabled || !microphone) return;
-    void selectInput(microphone).catch((error: unknown) => {
+    if (!enabled || !device || !microphone) return;
+    let current = true;
+    setSelectedInput(null);
+    setInputError(null);
+    void selectInput(microphone).then((ready) => {
+      if (current && ready) setSelectedInput({ device, id: microphone });
+    }).catch((error: unknown) => {
+      if (current) setInputError("The microphone could not connect. Select another microphone or check the connection again.");
       logger.error("Error setting microphone:", error);
     });
-  }, [enabled, selectInput, microphone]);
+    return () => { current = false; };
+  }, [enabled, device, selectInput, microphone]);
 
   /**
    * @effect Apply the selected speaker to the current Twilio device.
@@ -238,6 +247,8 @@ export function useCallAudioControls({
     availableMicrophones,
     availableSpeakers,
     permissionError,
+    inputError,
+    inputReady: enabled && Boolean(stream) && selectedInput?.device === device && selectedInput?.id === microphone,
     requestMicrophoneAccess,
     handleMicrophoneChange,
     handleSpeakerChange,

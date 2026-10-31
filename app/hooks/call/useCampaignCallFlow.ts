@@ -265,16 +265,26 @@ export function useCampaignCallFlow({
 
   const resetCustomer = useCallback((previousSourceSid: string | null) => {
     // A new request does not own the previous dial's bootstrap SID.
-    ownerRef.current = { previousSourceSid, customerSid: null };
+    const nextOwner: CustomerOwner = { previousSourceSid, customerSid: null };
+    ownerRef.current = nextOwner;
     setCustomer({ sid: null, status: null });
+    return nextOwner;
   }, []);
 
   // Reset in the click's batch: waiting for the FSM effect repaints the old outcome (#1220).
   const beginDial = useCallback(() => {
-    resetCustomer(callSid);
+    const requestedOwner = resetCustomer(callSid);
     recordFlashBreadcrumb("begin-dial", "lifecycle reset for new dial");
     setLifecycle((prev) => callLifecycleReducer(prev, { type: "START_DIALING" }));
-  }, [callSid, resetCustomer]);
+    return (sid: string) => {
+      if (ownerRef.current !== requestedOwner || !/^CA[0-9a-f]{32}$/i.test(sid) || sid === agentLegSid) return false;
+      if (requestedOwner.customerSid && requestedOwner.customerSid !== sid) return false;
+      if (requestedOwner.customerSid === sid) return true;
+      requestedOwner.customerSid = sid;
+      setCustomer({ sid, status: "queued" });
+      return true;
+    };
+  }, [callSid, resetCustomer, agentLegSid]);
 
   /**
    * @effect Bind the confirmed room customer and bridge legacy FSM transitions into the canonical lifecycle.

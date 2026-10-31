@@ -22,7 +22,7 @@ function matchesRequest(request: VoiceAudioConnectRequest, connection: VoiceAudi
 }
 
 /** A poll/cancel reply cannot adopt a different attempt, generation or physical leg. */
-function matchesConnection(saved: VoiceAudioSnapshot, next: VoiceAudioSnapshot) {
+export function matchesVoiceAudioConnection(saved: VoiceAudioSnapshot, next: VoiceAudioSnapshot) {
   const terminal = ["failed", "canceled", "retired"].includes(saved.connection_state);
   if (terminal && saved.connection_state !== next.connection_state || saved.cancel_requested && !next.cancel_requested) return false;
   return saved.connection_id === next.connection_id && saved.connection_intent_id === next.connection_intent_id && saved.control_intent_id === next.control_intent_id &&
@@ -63,7 +63,7 @@ async function controlVoiceAudio(owner: VoiceAudioOwner, saved: VoiceAudioSnapsh
   const parsed = voiceAudioSnapshotSchema.safeParse(saved);
   if (!parsed.success || !ownsConnection(owner, parsed.data)) return { ok: false, kind: "unverified", status: null };
   const query = new URLSearchParams({ workspaceId: owner.workspaceId, connection_id: parsed.data.connection_id, control_intent_id: parsed.data.control_intent_id });
-  return requestConnection(owner, { method, headers: { Accept: "application/json", [VOICE_AUDIO_ACTOR_HEADER]: owner.userId }, signal }, (connection) => matchesConnection(parsed.data, connection), `?${query}`);
+  return requestConnection(owner, { method, headers: { Accept: "application/json", [VOICE_AUDIO_ACTOR_HEADER]: owner.userId }, signal }, (connection) => matchesVoiceAudioConnection(parsed.data, connection), `?${query}`);
 }
 
 export function readVoiceAudio(owner: VoiceAudioOwner, saved: VoiceAudioSnapshot, signal?: AbortSignal) {

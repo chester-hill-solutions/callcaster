@@ -78,6 +78,37 @@ function baseProps(overrides: Partial<any> = {}) {
 }
 
 describe("app/components/call/CallScreen.CallArea.tsx", () => {
+  test.each([false, true])("audio prerequisites disable Start in predictive mode %s", async predictive => {
+    const { CallArea } = await import("@/components/call/CallScreen.CallArea");
+    const props = baseProps({ predictive, startDisabledReason: "Check audio connection" });
+    render(<CallArea {...props} />);
+    const start = screen.getByRole("button", { name: "Check audio connection" });
+    expect(start).toBeDisabled(); fireEvent.click(start);
+    expect(props.handleDialNext).not.toHaveBeenCalled();
+  });
+
+  test("an uncertain customer receipt cannot expose a working Hang Up or Reset control", async () => {
+    const { CallArea } = await import("@/components/call/CallScreen.CallArea");
+    const props = baseProps({ callState: "dialing", displayState: "dialing", awaitingCustomerReceipt: true, onResetCall: vi.fn() });
+    render(<CallArea {...props} />);
+    const pending = screen.getByRole("button", { name: "Confirming call…" });
+    expect(pending).toBeDisabled(); fireEvent.click(pending);
+    expect(props.hangUp).not.toHaveBeenCalled();
+    expect(screen.queryByText("Reset call")).toBeNull();
+  });
+
+  test.each(["dialing", "connected"])("Save and Next waits for the customer to end from %s", async phase => {
+    const { CallArea } = await import("@/components/call/CallScreen.CallArea");
+    const props = baseProps({ callState: phase, displayState: phase, disposition: "answered", dispositionOptions: [{ value: "answered", label: "Answered" }] });
+    const { rerender } = render(<CallArea {...props} />);
+    const next = screen.getByRole("button", { name: "Save and Next" });
+    expect(next).toBeDisabled(); fireEvent.click(next);
+    expect(props.handleDequeueNext).not.toHaveBeenCalled();
+    rerender(<CallArea {...props} callState="completed" displayState="completed" />);
+    expect(next).toBeEnabled(); fireEvent.click(next);
+    expect(props.handleDequeueNext).toHaveBeenCalledTimes(1);
+  });
+
   test("uses default predictive/conference/voiceDrop values when omitted", async () => {
     const { CallArea } = await import("@/components/call/CallScreen.CallArea");
 

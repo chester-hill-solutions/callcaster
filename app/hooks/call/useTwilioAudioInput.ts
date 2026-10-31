@@ -7,6 +7,7 @@ export function useTwilioAudioInput(device: Device | null) {
   const ownerRef = useRef<{
     audio: NonNullable<Device["audio"]>;
     input: ReturnType<typeof createCallAudioInput>;
+    live: boolean;
   } | null>(null);
 
   /**
@@ -22,17 +23,20 @@ export function useTwilioAudioInput(device: Device | null) {
     // StrictMode can reuse this helper before the prior effect has released it.
     const afterRelease = previous?.audio === audio ? previous.input.dispose() : undefined;
     const input = createCallAudioInput(audio, afterRelease);
-    ownerRef.current = { audio, input };
+    const owner = { audio, input, live: true };
+    ownerRef.current = owner;
     return () => {
+      owner.live = false;
       void input.dispose().catch((error: unknown) => {
         logger.error("Error releasing microphone:", error);
       });
     };
   }, [device]);
 
-  return useCallback((deviceId: string): Promise<void> => {
+  return useCallback(async (deviceId: string): Promise<boolean> => {
     const owner = ownerRef.current;
-    if (!owner || owner.audio !== device?.audio) return Promise.resolve();
-    return owner.input.select(deviceId);
+    if (!owner?.live || owner.audio !== device?.audio) return false;
+    await owner.input.select(deviceId);
+    return owner.live && ownerRef.current === owner && owner.audio === device?.audio;
   }, [device]);
 }

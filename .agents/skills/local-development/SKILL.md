@@ -92,6 +92,8 @@ For a new tenant table, export its schema, register it in
 `workspace-scoped-tables.ts`, and update the explicit table inventory in
 `test/tenant-db.test.ts`. Keep actor isolation in the real-database tests;
 registry completeness alone does not prove row ownership.
+Route a new domain-table re-export through its existing schema module. Keep
+the central schema barrel within its current file-size limit; do not raise it.
 
 The route-membership guard follows local imports one hop. Keep the canonical
 workspace check visible at the HTTP boundary when transaction services place

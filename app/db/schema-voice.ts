@@ -1,5 +1,6 @@
 import { bigint, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 export { workspace_voice_recording_operation } from "./schema-voice-recording";
+export { workspace_voice_audio_intent } from "./schema-voice-audio-intent";
 
 export const workspace_voice_reservation = pgTable("workspace_voice_reservation", {
   id: uuid().primaryKey(),

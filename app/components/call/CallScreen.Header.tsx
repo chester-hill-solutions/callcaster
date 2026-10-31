@@ -7,7 +7,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { DeviceSettingsPanel } from "@/components/call/CallScreen.DeviceSettings";
+import { DeviceSettingsPanel, type CallingDeviceFieldProps } from "@/components/call/CallScreen.DeviceSettings";
 import { cn } from "@/lib/utils";
 import { PhoneOff, AlertTriangle, MoreHorizontal } from "lucide-react";
 import {
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 interface CampaignHeaderProps {
+  audioConnection?: CallingDeviceFieldProps["audioConnection"];
   className?: string;
   settingsOnly?: boolean;
   campaign: {
@@ -74,6 +75,7 @@ const creditLabel: Record<CampaignHeaderProps["creditState"], string> = {
 };
 
 export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
+  audioConnection,
   className,
   settingsOnly = false,
   campaign,
@@ -192,6 +194,7 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
               isSpeakerPlaying={isSpeakerPlaying}
               audioTestError={audioTestError}
               phoneStatus={phoneStatus}
+              audioConnection={audioConnection}
               selectedDevice={selectedDevice}
               onDeviceSelect={onDeviceSelect}
               verifiedNumbers={verifiedNumbers}
