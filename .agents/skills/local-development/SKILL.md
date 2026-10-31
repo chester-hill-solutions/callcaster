@@ -852,6 +852,15 @@ clear a check.
 - Processes: `make app` (dev server on :3000), `make worker` (job worker), `make media-stream`. Run each in its own terminal so its log stays visible.
 - Checks: `npm run typecheck`, `npm run lint`, `npm run check:lint-ratchet`, `npm test`, `make e2e`. Node-tier tests need the node config: `npx --no-install vitest run -c vitest.node.config.ts <file>`; UI tests use `vitest.ui.config.ts`.
 
+## Dependency cache verification
+
+For an installed-dependency cache, include nested vendor `node_modules` and
+verify local package links after restoration. Require an exact lockfile,
+manifest, OS, architecture and Node-version key before skipping `npm ci`.
+Seed the PR base branch as well as PR runs. For local archive benchmarks,
+use `zstd -d` when restoring through tar's external compression program, and
+require successful extraction before accepting a restore time.
+
 ## Tailing logs
 
 - Compose services: `make logs` or `make <service> logs` (follows, last 200 lines). One-shot: `docker compose -f docker-compose.dev.yml logs --tail=100 postgres`.

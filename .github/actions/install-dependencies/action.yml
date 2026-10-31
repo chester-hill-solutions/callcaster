@@ -1,0 +1,21 @@
+name: Install locked npm dependencies
+description: Restore the complete installed tree or install it from the lockfile.
+runs:
+  using: composite
+  steps:
+    - name: Read Node version
+      id: runtime
+      shell: bash
+      run: echo "version=$(node --version)" >> "$GITHUB_OUTPUT"
+    - name: Restore installed dependencies
+      id: dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          node_modules
+          vendor/**/node_modules
+        key: npm-installed-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.runtime.outputs.version }}-${{ hashFiles('package-lock.json', 'package.json', '.npmrc', 'vendor/**/package.json', '.github/actions/install-dependencies/action.yml') }}
+    - name: Install dependencies on cache miss
+      if: steps.dependencies.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm ci

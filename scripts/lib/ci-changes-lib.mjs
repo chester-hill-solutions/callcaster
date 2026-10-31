@@ -27,6 +27,7 @@ export const APP_PATTERNS = [
   "tailwind*",
   "index.html",
   ".github/workflows/ci.yml",
+  ".github/actions/**",
 ];
 
 /** Everything the compose E2E gate boots or builds. Superset of APP_PATTERNS. */
