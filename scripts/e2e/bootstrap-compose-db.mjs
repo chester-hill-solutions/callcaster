@@ -14,11 +14,6 @@ import { applySqlSteps } from "../lib/apply-sql-steps.mjs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
 
-const databaseUrl =
-  process.env.DATABASE_URL ??
-  "postgresql://callcaster:callcaster@127.0.0.1:5433/callcaster";
-assertLocalTarget(databaseUrl, "DATABASE_URL");
-
 const steps = [
   "scripts/e2e/bootstrap-compose-reset.sql",
   "drizzle/0000_baseline.sql",
@@ -113,6 +108,7 @@ const steps = [
   "client/migrations/20261030000006_voice_customer_audio_source.sql",
   "client/migrations/20261030000007_voice_customer_recording_launch.sql",
   "client/migrations/20261030000008_voice_audio_request_controls.sql",
+  "client/migrations/20261031000001_predictive_human_admission.sql",
 ];
 
 /**
@@ -172,6 +168,13 @@ if (unwired.length > 0) {
   process.exit(1);
 }
 
+if (process.argv.includes("--check-only")) {
+  console.log(`[e2e-bootstrap] migration wiring OK: ${allMigrationFiles.length} client migration(s), none unwired.`);
+  process.exit(0);
+}
+
+const databaseUrl = process.env.DATABASE_URL ?? "postgresql://callcaster:callcaster@127.0.0.1:5433/callcaster";
+assertLocalTarget(databaseUrl, "DATABASE_URL");
 console.log(`[e2e-bootstrap] target=${databaseUrl.replace(/:[^:@]+@/, ":***@")}`);
 
 await applySqlSteps({
