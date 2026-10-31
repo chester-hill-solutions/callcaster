@@ -17,13 +17,10 @@ This is for returning developers with `.env.local`, `DEV_NAME`, `ENV`, and an
 already-created named Cloudflare Tunnel configured. For first-time setup, use
 [Environment Setup](#environment-setup).
 
-Verify the setup:
+Check the checkout:
 
 ```bash
-npm run typecheck   # react-router typegen + tsc
-npm run lint
-npm test            # vitest node + UI suites, plus bun server-runtime tests
-make e2e            # full Playwright run against compose Postgres + Stow
+npm run ci:local    # fast type, lint and structural checks
 ```
 
 ## Configuration diagnostics
@@ -67,8 +64,9 @@ local and Railway for deployed environments. GitHub is reserved for CI.
 
 ## Local checks during development
 
-Use a focused test or watch command after each edit. Use the fast gate before
-the full gate to find type, lint and guard failures early.
+Use a focused test or watch command after each edit. Use the fast gate for
+type, lint and guard feedback during development and before a push or PR.
+CI runs the full suites and production checks before merge.
 
 | Need | Command |
 |---|---|
@@ -77,8 +75,9 @@ the full gate to find type, lint and guard failures early.
 | Watch Node tests | `npm run test:watch:node -- test/example.test.ts` |
 | Watch UI tests | `npm run test:watch:ui -- test/ui/example.test.tsx` |
 | Bun runtime tests | `npm run test:node:runtime` |
-| Type, lint and structural checks | `npm run ci:local:fast` |
-| Full check before a push or PR | `npm run ci:local` |
+| All Node, UI and Bun tests | `npm test` |
+| Type, lint and structural checks before a push | `npm run ci:local` |
+| Optional full local diagnostic run | `npm run ci:local:full` |
 
 `test:node` runs both the Node and Bun suites. Use `test:node:vitest` to pass
 a file filter to Vitest. Watch mode reruns tests when their imported files change.
@@ -89,17 +88,27 @@ after route changes to update generated route types.
 TypeScript saves its build cache in `node_modules/.cache/typecheck.tsbuildinfo`.
 Each run checks changed inputs. Delete that file to force a fresh check.
 
-Both gates use `scripts/lib/local-gate-plan.mjs`. They run preparation in
-sequence, then run up to two independent guard checks at once. Tests, builds
-and code generation run in sequence after all fast checks pass. Each check
-prints its time. Full logs are in the printed `node_modules/.cache/local-gates/`
-directory. A failure stops queued checks and prints the end of its log.
+`ci:local` is the fast default. It runs typecheck, cached lint and structural
+checks, with up to two independent guard checks at once. Run focused tests for
+the changed behavior. CI runs the complete Node, UI and Bun suites, production
+build, bundle scan and codegen verification. Require green CI before merge.
+`ci:local:fast` remains an alias for the same local checks.
 
-Use `npm run ci:local -- --jobs=1` for a serial run on a busy machine.
-`--jobs=3` and `--jobs=4` increase guard concurrency. These options do not change
-test worker counts. `VITEST_MAX_WORKERS=2 npm run ci:local` limits test workers.
-Run one full gate per host at a time. The fast gate omits tests and builds;
-the full gate is required before each push or PR.
+`ci:local:full` is an optional local diagnostic command. It adds all tests,
+build, bundle and codegen checks in sequence. Node and UI tests share one process
+worker budget through `vitest.config.ts`: at most four workers, with a lower
+limit on smaller machines. File isolation, test selectors, mocks and setup come
+from the original suite configs. An inventory test checks that every file is
+included exactly once.
+
+Both commands use `scripts/lib/local-gate-plan.mjs` and print each check's time.
+Full logs are in the printed `node_modules/.cache/local-gates/` directory. A
+failure stops queued checks and prints the end of its log.
+
+Use `npm run ci:local -- --jobs=1` to run guards in sequence on a busy machine.
+`--jobs=3` and `--jobs=4` increase guard concurrency. For an optional full run,
+`VITEST_MAX_WORKERS=2 npm run ci:local:full` limits the combined test pool to two
+workers. Run one full local diagnostic gate per host at a time.
 
 ## Environment Setup
 

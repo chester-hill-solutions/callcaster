@@ -62,7 +62,7 @@
     "start": "bun run ./server/bun.ts",
     "worker": "bun run ./worker/index.ts",
     "typecheck": "react-router typegen && tsc",
-    "test": "npm run test:node && npm run test:ui",
+    "test": "npm run test:vitest && npm run test:node:runtime",
     "test:node": "npm run test:node:vitest && npm run test:node:runtime",
     "test:node:vitest": "vitest run -c vitest.node.config.ts",
     "test:node:runtime": "bun test test/server-runtime.test.ts test/twilio-webhook-prehandler.test.ts test/media-upload.runtime.test.ts vendor/scriptkit/scriptkit-call-script-core/src/",
@@ -141,7 +141,9 @@
     "check:ci-local-order": "node scripts/check-ci-local-order.mjs",
     "typecheck:watch": "tsc --watch --tsBuildInfoFile node_modules/.cache/typecheck-watch.tsbuildinfo",
     "test:watch:node": "vitest watch -c vitest.node.config.ts",
-    "test:watch:ui": "vitest watch -c vitest.ui.config.ts"
+    "test:watch:ui": "vitest watch -c vitest.ui.config.ts",
+    "test:vitest": "vitest run -c vitest.config.ts",
+    "ci:local:full": "node scripts/run-local-gate.mjs --full"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1077.0",

@@ -176,7 +176,7 @@ describe("local gate coverage and order", () => {
       check:effects check:type-safety check:pg-errors check:dry check:handlers check:test-mocks check:db-rpcs
       check:queue-rpc-contract check:relative-redirects check:redirect-targets check:sheet-bodies check:no-pii-exports
       db:ledger:check db:bootstrap:check db:enums:check db:orphans:check tools:check-file-size check:test-echo
-      test:node test:ui build check:client-bundle ci:codegen:verify`.split(
+      test:vitest test:node:runtime build check:client-bundle ci:codegen:verify`.split(
         /\s+/,
       );
     expect(gatePhases().flatMap((phase) => phase.steps)).toEqual(required);
@@ -185,15 +185,15 @@ describe("local gate coverage and order", () => {
 
   test("fast mode omits only the five slow checks", () => {
     const fast = gatePhases(true).flatMap((phase) => phase.steps);
-    expect(fast).not.toContain("test:node");
-    expect(fast).not.toContain("test:ui");
+    expect(fast).not.toContain("test:vitest");
+    expect(fast).not.toContain("test:node:runtime");
     expect(
       gatePhases()
         .flatMap((phase) => phase.steps)
         .slice(fast.length),
     ).toEqual([
-      "test:node",
-      "test:ui",
+      "test:vitest",
+      "test:node:runtime",
       "build",
       "check:client-bundle",
       "ci:codegen:verify",
@@ -215,7 +215,60 @@ describe("local gate coverage and order", () => {
     reordered.prepare.reverse();
     reordered.slow.reverse();
     expect(validateGatePlan(scripts, reordered)).toHaveLength(2);
+    expect(
+      validateGatePlan(
+        { ...scripts, "test:vitest": scripts["test:node:vitest"] },
+        plan(),
+      ).join("\n"),
+    ).toContain("shared Node and UI configuration");
   });
+
+  test("the optional full run completes tests before starting the build", async () => {
+    const control = controlledRun();
+    const finished: string[] = [];
+    const task = runGatePhases(gatePhases(), {
+      jobs: 2,
+      run: async (script: string) => {
+        if (["test:vitest", "build"].includes(script))
+          return control.run(script);
+        finished.push(script);
+        return { script, code: 0 };
+      },
+    });
+    await vi.waitFor(() => expect(control.started).toEqual(["test:vitest"]));
+    expect(finished).not.toContain("test:node:runtime");
+    control.finish("test:vitest");
+    await vi.waitFor(() =>
+      expect(control.started).toEqual(["test:vitest", "build"]),
+    );
+    expect(finished).toContain("test:node:runtime");
+    expect(finished).not.toContain("check:client-bundle");
+    control.finish("build");
+    expect(await task).toHaveLength(42);
+    expect(finished.slice(-2)).toEqual([
+      "check:client-bundle",
+      "ci:codegen:verify",
+    ]);
+  });
+
+  test.each(["test:vitest", "build"])(
+    "a failed %s stops bundle and codegen checks",
+    async (broken) => {
+      const started: string[] = [];
+      const results = await runGatePhases(gatePhases(), {
+        jobs: 2,
+        run: async (script: string) => {
+          started.push(script);
+          return { script, code: script === broken ? 9 : 0 };
+        },
+      });
+      expect(results.some((result) => result.code === 9)).toBe(true);
+      if (broken === "test:vitest")
+        expect(started).not.toContain("test:node:runtime");
+      expect(started).not.toContain("check:client-bundle");
+      expect(started).not.toContain("ci:codegen:verify");
+    },
+  );
 });
 
 describe("local gate command", () => {
@@ -234,7 +287,7 @@ describe("local gate command", () => {
     }
     writeFileSync(
       join(dir, "scripts", "lib", "local-gate-plan.mjs"),
-      'export function gatePhases() { return [{ steps: ["first", "second"], parallel: false }]; }',
+      'export function gatePhases(fast) { return [{ steps: fast ? ["first"] : ["first", "second"], parallel: false }]; }',
     );
     writeFileSync(
       join(dir, "package.json"),
@@ -273,21 +326,34 @@ describe("local gate command", () => {
     expect(readFileSync(log, "utf8")).toContain("EXPECTED_FAILURE");
   });
 
-  test("reports a completed gate and keeps fast-mode scope visible", () => {
+  test("defaults to fast checks and states that full validation runs in CI", () => {
     const dir = fixture("node -e \"console.log('FIRST_CHECK')\"");
-    const result = run(dir, ["--fast", "--jobs=1"]);
+    const result = run(dir, ["--jobs=1"]);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("PASSED: 1 checks");
+    expect(result.stdout).toContain("CI runs the full suites");
+    expect(result.stdout).not.toContain("[start] second");
+  });
+
+  test("--full explicitly runs the complete plan", () => {
+    const result = run(fixture('node -e "process.exit(0)"'), ["--full"]);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("PASSED: 2 checks");
-    expect(result.stdout).toContain("Run npm run ci:local before a push or PR");
     expect(result.stdout).toContain("[pass] second");
   });
 
-  test("invalid options fail before starting any check", () => {
-    const result = run(fixture('node -e "process.exit(0)"'), ["--jobs=0"]);
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain("--jobs must be an integer from 1 to 4");
-    expect(result.stdout).not.toContain("[start]");
-  });
+  test.each([
+    { args: ["--jobs=0"], message: "--jobs must be an integer from 1 to 4" },
+    { args: ["--fast", "--full"], message: "Use either --fast or --full" },
+  ])(
+    "invalid options $args fail before starting any check",
+    ({ args, message }) => {
+      const result = run(fixture('node -e "process.exit(0)"'), args);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(message);
+      expect(result.stdout).not.toContain("[start]");
+    },
+  );
 
   test.skipIf(process.platform === "win32")(
     "SIGTERM stops the running process group",

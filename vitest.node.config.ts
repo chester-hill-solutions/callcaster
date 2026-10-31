@@ -26,7 +26,6 @@ export default mergeConfig(
         provider: "istanbul",
         reportsDirectory: "coverage/vitest-node",
         reporter: ["text", "html", "lcov"],
-        all: false,
         include: [
           "app/lib/**/*.{ts,tsx,js,jsx}",
           "app/routes/api*.{ts,tsx,js,jsx}",

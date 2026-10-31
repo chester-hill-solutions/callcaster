@@ -37,7 +37,6 @@ export default mergeConfig(
         provider: "istanbul",
         reportsDirectory: "coverage/vitest-ui",
         reporter: ["text", "html", "lcov"],
-        all: false,
         include: ["app/**/*.{ts,tsx,js,jsx}"],
         exclude: [
           "**/*.d.ts",

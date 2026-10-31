@@ -29,7 +29,7 @@ Observed results:
 - Put reusable decision logic in tested code, not inline workflow shell.
 - Fail closed for uncertain path scope: unresolved scope runs all affected jobs.
 - Keep `quality` unconditional for pull requests.
-- Run full `npm run ci:local` before every push or pull request.
+- Run fast `npm run ci:local` and focused tests before a push or pull request. Require full CI before merge; `npm run ci:local:full` is optional for local diagnosis.
 - Do not merge a change that skips a required check without proving the branch-protection behavior.
 - Preserve the dual lockfile requirement: update both `package-lock.json` and `bun.lock` when dependencies change.
 
@@ -85,8 +85,9 @@ Acceptance:
 **Priority:** P1  
 **Effort:** 2 SP
 
-Add a documented `ci:fast` command for inner-loop work. It should run the
-highest-signal local checks without pretending to replace `ci:local`.
+Use `ci:local` as the documented fast command for inner-loop work and before
+a push. Keep `ci:local:fast` as an alias and `ci:local:full` as an optional
+full local diagnostic command. Full test suites and production checks run in CI.
 
 Suggested scope:
 
@@ -98,8 +99,8 @@ Suggested scope:
 Acceptance:
 
 - The command finishes quickly on a warm workspace.
-- Its output clearly states that full `npm run ci:local` is still required before push.
-- It does not change baselines or generated files.
+- Its output states that CI owns full validation before merge.
+- It does not rewrite debt baselines or hide generated-file drift.
 
 ### 2.2 Add optional pre-push enforcement
 
@@ -107,7 +108,7 @@ Acceptance:
 **Effort:** 3 SP
 
 Provide an explicit installation command for a pre-push hook. The hook should
-run the full gate or refuse to run until the developer chooses the full gate.
+run the fast local gate. Full validation remains in CI.
 Do not install hooks silently during `npm install`.
 
 Acceptance:
@@ -330,7 +331,7 @@ Acceptance:
 ## Definition Of Done
 
 - [ ] Every item has a focused pull request.
-- [ ] Every pull request passes full `npm run ci:local`.
+- [ ] Every pull request passes fast local checks and focused tests before push, then full CI before merge.
 - [ ] New local scripts have focused tests.
 - [ ] CI skips only jobs proven irrelevant by tested path logic.
 - [ ] Unknown path scope runs all affected jobs.

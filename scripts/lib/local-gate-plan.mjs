@@ -43,8 +43,8 @@ export const CHECK_STEPS = [
 ];
 
 export const SLOW_STEPS = [
-  "test:node",
-  "test:ui",
+  "test:vitest",
+  "test:node:runtime",
   "build",
   "check:client-bundle",
   "ci:codegen:verify",

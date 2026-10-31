@@ -76,22 +76,26 @@ async function main() {
   const { values } = parseArgs({
     options: {
       fast: { type: "boolean", default: false },
+      full: { type: "boolean", default: false },
       jobs: { type: "string", default: "2" },
       help: { type: "boolean", default: false },
     },
   });
   if (values.help) {
     console.log(
-      "npm run ci:local [-- --jobs=1..4]\nnpm run ci:local:fast [-- --jobs=1..4]\nOnly independent guard checks run in parallel. Tests and builds run in sequence.",
+      "npm run ci:local [-- --jobs=1..4]\nnpm run ci:local:full [-- --jobs=1..4]\nLocal checks default to fast; CI runs full validation. --full adds tests, build, bundle and codegen checks in sequence.",
     );
     return;
   }
+  if (values.fast && values.full)
+    throw new Error("Use either --fast or --full");
+  const fast = !values.full;
   const jobs = Number(values.jobs);
   if (!/^[1-4]$/.test(values.jobs))
     throw new Error("--jobs must be an integer from 1 to 4");
   if (!process.env.npm_execpath)
     throw new Error(
-      "Start the gate with npm run ci:local or npm run ci:local:fast",
+      "Start the gate with npm run ci:local or npm run ci:local:full",
     );
   const cacheDir = join(ROOT, "node_modules", ".cache", "local-gates");
   mkdirSync(cacheDir, { recursive: true });
@@ -100,13 +104,13 @@ async function main() {
   process.on("SIGTERM", stop);
   const started = performance.now();
   console.log(
-    `Local ${values.fast ? "fast" : "full"} gate; up to ${jobs} guard checks at once.\nLogs: ${logDir}`,
+    `Local ${fast ? "fast" : "full"} gate; up to ${jobs} guard checks at once.\nLogs: ${logDir}`,
   );
-  if (values.fast)
+  if (fast)
     console.log(
-      "Fast feedback only. Run npm run ci:local before a push or PR.",
+      "Local checks before a push. CI runs the full suites, build, bundle and codegen. Optional full local run: npm run ci:local:full.",
     );
-  const results = await runGatePhases(gatePhases(values.fast), {
+  const results = await runGatePhases(gatePhases(fast), {
     jobs,
     run: (script) => runCheck(script, logDir),
     shouldStop: () => interrupted !== 0,

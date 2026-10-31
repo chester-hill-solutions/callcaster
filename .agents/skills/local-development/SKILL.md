@@ -33,7 +33,7 @@ then run the full gate again on the final clean commit.
 
 If guard child processes time out under the default worker count, rerun the
 failed cases first. When they pass alone, rerun the complete gate with command-scoped
-`VITEST_MAX_WORKERS=2 npm run ci:local` before changing tracked worker or time limits.
+`VITEST_MAX_WORKERS=2 npm run ci:local:full` before changing tracked worker or time limits.
 
 Do not run `npm run ci:local` after each edit. During implementation, run the
 smallest check that proves the changed behavior, plus `git diff --check`:
@@ -46,24 +46,35 @@ smallest check that proves the changed behavior, plus `git diff --check`:
 Use `npm run test:node:vitest -- <file>` for a focused Node test, and
 `npm run test:ui -- <file>` for a focused UI test. The `test:watch:node` and
 `test:watch:ui` commands keep the relevant suite open during edits. Use
-`npm run ci:local:fast` for type, lint and guard feedback before the full gate.
+`npm run ci:local` for type, lint and guard feedback before each push or PR.
 Both gates share `scripts/lib/local-gate-plan.mjs`; update that plan when a
-required check changes. Keep generated-file writes and the shared ESLint cache
-in sequence. Only the independent guard phase can run in parallel. For a busy
-host, pass `-- --jobs=1`; inspect the printed per-check logs and times before
-changing concurrency. The fast gate does not replace full `ci:local`.
+required check changes. Keep vendor builds, typegen and the shared ESLint cache
+in sequence. The optional `ci:local:full` run keeps tests and the production
+build in sequence; runtime tests, bundle checks and codegen retain their order.
+`vitest.config.ts` reuses both suite configs with one bounded worker pool and
+file isolation. Its inventory test must preserve the exact suite union.
+For a busy host, pass `-- --jobs=1` and set `VITEST_MAX_WORKERS=2` to bound the
+whole test pool. Inspect per-check logs and times before changing concurrency.
+Benchmark through npm so child CLI fixtures receive the npm execution context.
+Compare normal default runs as well as any explicit worker limits; do not
+attribute a worker-count change to a faster test implementation.
+Check composed Vitest configs against the installed TypeScript and Vitest types;
+the app TypeScript program does not include root configuration files.
+Full test suites and production validation run in CI before merge.
+`ci:local:full` is optional for local diagnosis; do not require it before a push.
 
 Inspect warning counts in focused lint results. ESLint can exit zero while a
 ratchet still rejects new warnings. For nested fields, use the canonical
 `FormFieldControl` contract instead of overriding spacing owned by `FormField`.
 Keep layout-only wrappers outside the control association.
 
-Run the complete `npm run ci:local` once on the final clean commit before a
-push or pull request. The full gate remains required before publication. If a
-later commit changes source, dependencies, configuration, tests, migrations, or
-CI, rerun the full gate. For a documentation-only correction after a passing
-full gate, run `git diff --check` and the relevant link or command check; the
-remote workflow ignores documentation-only pull requests.
+Before a push or pull request, run `npm run ci:local` and the focused tests
+for changed behavior. CI owns the complete Node, UI and Bun suites, production
+build, bundle scan and codegen verification. Require green CI before merge.
+Use `npm run ci:local:full` only when a full local diagnostic run is useful.
+After later source changes, repeat the affected tests and local gate. For a
+documentation-only correction, run `git diff --check` and the relevant link or
+command check. Do not run a full local suite merely to publish documentation.
 
 Before a full gate, confirm the installed dependency tree matches the lockfile
 with `npm ci --ignore-scripts --no-audit --no-fund` when dependencies were
@@ -122,7 +133,7 @@ carry that test URL into ci:local and then claim its ledger failure is code drif
 Keep the full normal-environment CI result and the real database proof separate;
 never mark missing migrations as applied merely to pass the ledger guard.
 
-Full `ci:local` must run where Bun can write its temporary files. A permission
+Bun checks must run where Bun can write its temporary files. A permission
 failure is not lockfile drift: retain the dependency files and rerun the full
 gate with the required permissions. The vendor guard leaves rebuilt output for
 review; it does not reset or clean files. Record a clean starting tree before
@@ -542,13 +553,13 @@ is not an exact traffic switch time. Preserve that limit in historical reports.
 
 For a render timeout during concurrent full gates, wait for the other gate
 to stop, rerun the failing cases for diagnosis, then rerun the complete gate.
-A passing focused rerun does not replace `ci:local`; do not weaken assertions
+A passing focused rerun does not prove a full `ci:local:full` diagnostic run; do not weaken assertions
 or raise a baseline to treat a timeout as green.
 If different router-mount cases time out under memory pressure but pass alone,
 run the full gate with `VITEST_MAX_WORKERS=1`. This Vitest environment setting
 overrides both suites' worker limits. Keep assertions and timeouts unchanged.
 Vitest 4 supports `VITEST_MAX_WORKERS`. On a busy local machine, use a
-command-scoped limit such as `VITEST_MAX_WORKERS=2 npm run ci:local`; retain
+command-scoped limit such as `VITEST_MAX_WORKERS=2 npm run ci:local:full`; retain
 all cases and timeouts. Keep `lint` and `check:lint-ratchet` sequential because
 they write the same ESLint cache.
 
