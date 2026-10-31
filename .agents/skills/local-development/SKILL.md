@@ -128,6 +128,17 @@ credentials with the process command. Stop only a verified owned process tree.
 
 ## Locked project tools
 
+For CI performance work, compare queue, install and execution times separately.
+Use E2E phase summaries to distinguish the database suite from browser tests.
+Run those suites on separate databases when testing job parallelism. Preserve
+the required aggregate check name and make it fail for failed, cancelled or
+unexpectedly skipped child jobs. Vitest phase totals include parallel workers;
+do not add those totals to wall time. Benchmark shared test state and alternate
+linters separately, with the same executed cases and enforced rules.
+The compose bootstrap grants privileges to the `callcaster` role. Create that
+role in an owned native Postgres fixture before applying its reset SQL, even
+when the fixture's initial superuser has a different name.
+
 The compose migration fixture grants its public schema to the `callcaster`
 role. Create disposable Postgres with that role, or create it inside the owned
 database before bootstrapping. Keep both database URLs command-scoped to that
