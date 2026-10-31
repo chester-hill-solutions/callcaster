@@ -68,11 +68,51 @@ function matchesCurrentAudioRole(owner: { workspace_id: string; user_id: string 
 }
 
 /** A server read, never authority to send a customer or change a control owner. */
+const recoveredAttemptSchema = z.object({
+  answered_at: z.string().nullable(), campaign_id: z.number().int().positive(), callback_audit: z.boolean().nullable(),
+  contact_id: z.number().int().positive(), created_at: z.string(), current_step: z.string().nullable(),
+  disposition: z.string().nullable(), ended_at: z.string().nullable(), id: z.number().int().positive(),
+  issue_tags: z.array(z.string()).nullable(), lawn_sign: z.boolean().nullable(), membership_sold: z.boolean().nullable(),
+  result: z.json(), support_level: z.number().int().nullable(), user_id: z.string().min(1),
+  volunteer_interest: z.string().nullable(), vote_by_mail: z.boolean().nullable(), workspace: z.uuid(),
+});
+function matchesRecoveredAttempt(customer: { outreach_attempt_id: number; workspace_id: string; user_id: string; campaign_id: number;
+  contact_id: number; attempt: z.infer<typeof recoveredAttemptSchema> }) {
+  const attempt = customer.attempt;
+  return attempt.id === customer.outreach_attempt_id && attempt.workspace === customer.workspace_id &&
+    attempt.user_id === customer.user_id && attempt.campaign_id === customer.campaign_id && attempt.contact_id === customer.contact_id;
+}
+export const predictiveCustomerRecoverySchema = z.object({
+  revision: z.string().regex(/^(0|[1-9]\d*)$/).max(19),
+  customer: z.object({ workspace_id: z.uuid(), user_id: z.string().min(1), call_sid: callSid,
+    campaign_id: z.number().int().positive(), contact_id: z.number().int().positive(), outreach_attempt_id: z.number().int().positive(),
+    queue_id: z.number().int().positive(), attempt: recoveredAttemptSchema,
+    conference_id: z.string().min(1), conference_sid: z.string().regex(/^CF[0-9a-f]{32}$/i).nullable(),
+    conference_sequence: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable(), human_state: z.enum(["pending", "joined"]),
+  }).nullable(),
+}).superRefine((value, ctx) => {
+  if (value.customer && (value.revision === "0" || value.customer.human_state === "joined" && !value.customer.conference_sid))
+    ctx.addIssue({ code: "custom", message: "Recovered customer has no saved human owner" });
+  const customer = value.customer;
+  if (customer && !matchesRecoveredAttempt(customer))
+    ctx.addIssue({ code: "custom", message: "Recovered outreach attempt does not own this customer" });
+});
+export type PredictiveCustomerRecovery = z.infer<typeof predictiveCustomerRecoverySchema>;
+export type RecoveredPredictiveCustomer = NonNullable<PredictiveCustomerRecovery["customer"]>;
+
+function matchesCurrentPredictiveOwner(value: { workspace_id: string; user_id: string; customer_pending: boolean; predictive: PredictiveCustomerRecovery }) {
+  const customer = value.predictive.customer;
+  return !customer || customer.workspace_id === value.workspace_id && customer.user_id === value.user_id && value.customer_pending;
+}
+
 export const voiceAudioCurrentSnapshotSchema = z.object({
   workspace_id: z.uuid(), user_id: z.string().min(1),
   active: voiceAudioIntentSnapshotSchema.nullable(), pending: voiceAudioIntentSnapshotSchema.nullable(),
   recovery_required: z.boolean(), customer_pending: z.boolean(),
+  predictive: predictiveCustomerRecoverySchema,
 }).superRefine((value, ctx) => {
+  if (!matchesCurrentPredictiveOwner(value))
+    ctx.addIssue({ code: "custom", message: "Recovered customer does not match this current actor", path: ["predictive"] });
   for (const name of ["active", "pending"] as const) {
     const intent = value[name];
     if (!intent) continue;

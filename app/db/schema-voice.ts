@@ -38,6 +38,7 @@ export const workspace_voice_reservation = pgTable("workspace_voice_reservation"
   recipient_refused_at: timestamp({ withTimezone: true, mode: "date" }),
   human_state: text().$type<"pending" | "joined" | "left" | "ended" | "refused">(),
   human_conference_sequence: bigint({ mode: "number" }),
+  human_revision: bigint({ mode: "number" }),
   setup_terminal_at: timestamp({ withTimezone: true, mode: "date" }),
   setup_terminal_status: text(),
   terminal_status: text(),

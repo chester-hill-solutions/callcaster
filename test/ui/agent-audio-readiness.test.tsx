@@ -24,7 +24,7 @@ describe("phone to browser readiness", () => {
     const fetcher = vi.fn(async (url: string, options: RequestInit) => {
       if (url.includes("current=1")) return Response.json({ workspace_id: owner.workspaceId, user_id: owner.userId,
         active: connected && !stopped ? { ...envelope, intent_state: "bound", connection: audio } : null,
-        pending: null, recovery_required: false, customer_pending: false });
+        pending: null, recovery_required: false, customer_pending: false, predictive: { revision: "0", customer: null } });
       if (options.method === "POST") { connected = true; return Response.json({ success: true, ...audio }); }
       if (options.method === "DELETE") stopped = true;
       return Response.json(options.method === "DELETE" ? { ...envelope, intent_state: "canceled", connection: { ...audio, connection_state: "canceled", cancel_requested: true } }

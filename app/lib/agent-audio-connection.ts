@@ -1,7 +1,7 @@
 import { connectVoiceAudio, isVoiceAudioEffective, matchesVoiceAudioConnection, voiceAudioConnectRequestSchema,
   type VoiceAudioConnectRequest, type VoiceAudioOwner } from "@/lib/voice-audio-client";
 import { cancelVoiceAudioIntent, readVoiceAudioIntent } from "@/lib/voice-audio-intent-client";
-import type { VoiceAudioCurrentSnapshot, VoiceAudioIntentSnapshot, VoiceAudioSnapshot } from "@/lib/schemas/api/voice-audio";
+import type { PredictiveCustomerRecovery, VoiceAudioCurrentSnapshot, VoiceAudioIntentSnapshot, VoiceAudioSnapshot } from "@/lib/schemas/api/voice-audio";
 import { currentVoiceAudioRequest, matchesCurrentVoiceAudioRequest, readCurrentVoiceAudio } from "@/lib/voice-audio-current-client";
 import { agentAudioRequestDevice, readAgentAudioJournal, writeAgentAudioJournal,
   type AgentAudioJournal, type AgentAudioStorage } from "@/lib/agent-audio-storage";
@@ -18,12 +18,14 @@ export type AgentAudioState = {
   preparingBrowser: boolean;
   recoveryRequired: boolean;
   customerPending: boolean;
+  predictiveRecovery: PredictiveCustomerRecovery | null;
   currentVerified: boolean;
   error: string | null;
 };
 
 const INITIAL_STATE: AgentAudioState = { restoring: true, selectedDevice: "computer", active: null,
-  pendingDevice: null, cancelRequested: false, preparingBrowser: false, recoveryRequired: false, customerPending: false, currentVerified: false, error: null };
+  pendingDevice: null, cancelRequested: false, preparingBrowser: false, recoveryRequired: false, customerPending: false,
+  predictiveRecovery: null, currentVerified: false, error: null };
 const FINISHED_STATES = new Set(["canceled", "failed", "retired"]);
 
 /** Owns agent audio requests and recovery, never the customer's call lifecycle. */
@@ -213,6 +215,7 @@ export class AgentAudioConnection {
     if (pending) this.pending = this.commitRecovery(pending);
     this.discovering = false;
     this.publish({ currentVerified: true, recoveryRequired: current.recovery_required, customerPending: current.customer_pending,
+      predictiveRecovery: current.predictive,
       selectedDevice, error: this.recoveryError(current, policy) });
     this.save();
     return true;

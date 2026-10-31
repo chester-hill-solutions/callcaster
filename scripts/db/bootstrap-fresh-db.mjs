@@ -156,6 +156,7 @@ const steps = [
   "client/migrations/20261031000000_contact_merge_receipts.sql",
   "client/migrations/20261031000001_predictive_human_admission.sql",
   "client/migrations/20261031000001_workspace_number_release_history.sql",
+  "client/migrations/20261031000002_predictive_customer_recovery.sql",
 ];
 
 /**

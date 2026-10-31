@@ -46,11 +46,33 @@ const intentSnapshot = { type: "object", required: ["workspace_id", "user_id", "
   intent_state: { type: "string", enum: ["bound", "canceled", "superseded"] }, request: { ...requestIdentity, nullable: true },
   connection: { ...snapshot, nullable: true },
 } };
-const currentSnapshot = { type: "object", required: ["workspace_id", "user_id", "active", "pending", "recovery_required", "customer_pending"], properties: {
+const recoveredAttempt = { type: "object", required: ["answered_at", "campaign_id", "callback_audit", "contact_id", "created_at", "current_step", "disposition", "ended_at", "id", "issue_tags", "lawn_sign", "membership_sold", "result", "support_level", "user_id", "volunteer_interest", "vote_by_mail", "workspace"], properties: {
+  answered_at: { type: "string", nullable: true }, campaign_id: { type: "integer" }, callback_audit: { type: "boolean", nullable: true },
+  contact_id: { type: "integer" }, created_at: { type: "string" }, current_step: { type: "string", nullable: true },
+  disposition: { type: "string", nullable: true }, ended_at: { type: "string", nullable: true }, id: { type: "integer" },
+  issue_tags: { type: "array", items: { type: "string" }, nullable: true }, lawn_sign: { type: "boolean", nullable: true },
+  membership_sold: { type: "boolean", nullable: true }, result: {}, support_level: { type: "integer", nullable: true },
+  user_id: { type: "string", minLength: 1 }, volunteer_interest: { type: "string", nullable: true },
+  vote_by_mail: { type: "boolean", nullable: true }, workspace: workspaceId,
+} };
+const predictiveCustomer = { type: "object", required: ["workspace_id", "user_id", "call_sid", "campaign_id", "contact_id", "outreach_attempt_id", "queue_id", "attempt",
+  "conference_id", "conference_sid", "conference_sequence", "human_state"], properties: {
+  workspace_id: workspaceId, user_id: { type: "string", minLength: 1 }, call_sid: callSid,
+  campaign_id: { type: "integer", minimum: 1 }, contact_id: { type: "integer", minimum: 1 }, outreach_attempt_id: { type: "integer", minimum: 1 },
+  queue_id: { type: "integer", minimum: 1 }, attempt: recoveredAttempt,
+  conference_id: { type: "string", minLength: 1 }, conference_sid: { type: "string", nullable: true, pattern: "^CF[0-9a-fA-F]{32}$" },
+  conference_sequence: { type: "integer", minimum: 0, nullable: true }, human_state: { type: "string", enum: ["pending", "joined"] },
+} };
+const predictiveRecovery = { type: "object", required: ["revision", "customer"], properties: {
+  revision: { type: "string", pattern: "^(0|[1-9][0-9]*)$", description: "Monotonic saved human-state version for this actor and workspace. Zero means no saved human state. An empty customer at a newer version ends the previous conversation view; it never ends agent audio. The saved queue ID and exact outreach attempt restore the current contact and answers, including after dequeue." },
+  customer: { ...predictiveCustomer, nullable: true, description: "The one pending or joined funded predictive customer. This is never the phone or SDK agent leg. Pending does not prove that a human joined. Refused, ended, foreign and terminal Calls are excluded." },
+} };
+const currentSnapshot = { type: "object", required: ["workspace_id", "user_id", "active", "pending", "recovery_required", "customer_pending", "predictive"], properties: {
   workspace_id: workspaceId, user_id: { type: "string", minLength: 1 },
   active: { ...intentSnapshot, nullable: true }, pending: { ...intentSnapshot, nullable: true },
   recovery_required: { type: "boolean", description: "Unresolved physical cleanup, room stop or promotion blocks new audio work." },
   customer_pending: { type: "boolean", description: "An unresolved staffed customer reservation blocks another Start until its customer owner is confirmed. This does not prove that a human joined." },
+  predictive: predictiveRecovery,
 } };
 
 /** One owned audio operation covers session control and signed provider callbacks. */
@@ -90,7 +112,7 @@ export const voiceAudioPathOverrides: Record<string, Record<string, unknown>> = 
       operationId: "getAgentAudioConnection", summary: "Read an owned audio connection attempt",
       security: [...sessionCookieSecurity], parameters: [...query,
         { name: "current", in: "query", required: false, schema: { type: "string", enum: ["1"] }, description: "Discover this session actor's current audio. Omit all connection and intent IDs. GET only." }],
-      description: "Choose exactly one connection_id, connection_intent_id or current=1. Reads never send a provider command, claim another customer or change a control owner. Current discovery returns working and pending audio under the workspace/actor fence, plus unresolved cleanup and customer-busy state. It retains original-account resources when credentials change. Intent reads resolve the submitted request even when it reused a connection with an older original intent. A canceled or superseded request cannot adopt another request's controls. DELETE does not accept current or a workspace-only query.",
+      description: "Choose exactly one connection_id, connection_intent_id or current=1. Reads never send a provider command, claim another customer or change a control owner. Current discovery returns working and pending audio under the workspace/actor fence, plus unresolved cleanup, customer-busy state and a versioned predictive customer snapshot. The snapshot recovers missed events or a reloaded screen without starting a call. Older reads cannot replace newer customer state. A new local Start or Stop prevents an old snapshot from restoring its previous room. It retains original-account resources when credentials change. Intent reads resolve the submitted request even when it reused a connection with an older original intent. A canceled or superseded request cannot adopt another request's controls. DELETE does not accept current or a workspace-only query.",
       responses: { "200": { description: "Operation state; active requires a verified conference join and completed transport commit.",
         content: { "application/json": { schema: { oneOf: [snapshot, intentSnapshot, currentSnapshot] } } } }, "400": errorResponse("Invalid query"),
         "401": errorResponse("Unauthorized"), "404": errorResponse("Connection or submitted intent not found"), "409": errorResponse("The control owner changed") },

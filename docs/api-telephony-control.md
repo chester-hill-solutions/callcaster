@@ -171,13 +171,28 @@ query without a control intent retains the legacy explicit control behavior.
 Use `GET /api/connect-phone-device?workspaceId=…&current=1` to recover without
 a usable browser journal. Omit all connection and intent IDs. The response
 contains `workspace_id`, `user_id`, `active`, `pending`, `recovery_required`
-and `customer_pending`. The audio roles contain the current submitted intent
+and `customer_pending`, plus `predictive: { revision, customer }`. The audio roles contain the current submitted intent
 and its connection, or null. Discovery reads under the workspace/actor lock;
 it sends no provider command and does not change control ownership. It keeps
 old-account resources visible if credentials or phone verification change.
 Unfinished physical cleanup, room stops and promotions block new audio work.
 An unresolved staffed reservation blocks another Start until the screen has
 the real customer owner; it does not prove that a human joined a conference.
+The predictive snapshot names the one pending or joined funded customer, with
+its workspace, actor, campaign, contact, outreach, Call SID and conference.
+It includes the exact saved outreach attempt and its result, plus `queue_id`.
+Read that queue item with its contact even after dequeue. Check all saved
+identity fields before displaying the contact or saving answers. Do not put
+this active contact back into the waiting queue. Keep its form unavailable
+until the contact is confirmed; a new call attempt must not inherit old drafts.
+It never names the agent audio leg. `revision` is a saved monotonic decimal
+string for this actor and workspace; zero means no saved human state exists.
+An ended or refused customer is absent. A newer empty snapshot ends only the
+previous customer view and preserves agent audio. Clients compare versions
+before applying snapshots or signed-event projections. A reloaded screen can
+restore its room from this read. A local Start or Stop retires that automatic
+room recovery, so a late read cannot undo the user's command. Discovery never
+sends a provider command or makes another customer call.
 An empty read cannot discard a saved request whose POST outcome is unknown.
 Keep that nonce for explicit Check or Cancel. A saved cancel belongs only to
 that submitted intent and cannot transfer to a newer discovered request.

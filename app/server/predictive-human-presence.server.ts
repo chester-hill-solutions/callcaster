@@ -25,10 +25,14 @@ export async function observePredictiveHumanPresence(tx: CreditTransaction, owne
     (participation.sequence < owner.human_conference_sequence || !joining && participation.sequence === owner.human_conference_sequence)) return false;
   if (joining && await findBusyPredictiveHuman(tx, owner.workspace, owner.user_id, owner.id)) return false;
   if (!joining && !["pending", "joined"].includes(owner.human_state ?? "")) return false;
-  await tx.update(reservations).set({ human_state: joining ? "joined" : "left",
+  const [saved] = await tx.update(reservations).set({ human_state: joining ? "joined" : "left",
     human_conference_sequence: participation?.sequence ?? null, conference_sid: event.conferenceSid, updated_at: new Date(),
-  }).where(eq(reservations.id, owner.id));
-  return true;
+  }).where(eq(reservations.id, owner.id)).returning({ revision: reservations.human_revision });
+  return savedRevision(saved);
+}
+
+function savedRevision(saved: { revision: number | null } | undefined) {
+  return saved?.revision == null ? null : String(saved.revision);
 }
 
 /** A rejected or old customer's leave cannot release the current human or end the room. */
@@ -39,6 +43,7 @@ export async function recordFundedPredictiveLeave(owner: VoiceReservation, event
     if (!current || ["released", "settled"].includes(current.state) || current.terminal_status || !current.provider_sid) return null;
     const [customer] = await tx.select().from(call).where(and(eq(call.workspace, owner.workspace), eq(call.sid, current.provider_sid))).for("update");
     if (!customer || !matchesFundedHumanCall(customer, current) || isTerminalStatus(normalizeProviderStatus(customer.status))) return null;
-    return await observePredictiveHumanPresence(tx, current, event) ? customer : null;
+    const humanRevision = await observePredictiveHumanPresence(tx, current, event);
+    return humanRevision ? { ...customer, humanRevision } : null;
   });
 }
