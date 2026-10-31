@@ -1,21 +1,30 @@
 import type { Tables } from "@/lib/db-types";
 import type { ParticipantJoinEvent } from "@/lib/twilio/voice-callback";
 import { findOutreachAttemptById, updateCallBySid, updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
-import { updateCampaignQueueByContactAndCampaign } from "@/lib/campaign-queue-updates.server";
-import { buildProviderStatusQueueUpdate } from "@/lib/queue-status";
 import { logger } from "@/lib/logger.server";
 import { emitPredictiveBroadcast } from "@/lib/workspace-events.server";
 import { predictiveCustomerBroadcast, predictiveCustomerParticipation } from "@/lib/predictive-customer-broadcast.server";
 import { findVoiceReservationForCall } from "@/server/voice-bridge-reservation.server";
 import { isTerminalStatus, normalizeProviderStatus } from "@/lib/call-status";
+import { recordFundedPredictiveJoin } from "@/server/funded-predictive-join.server";
+
+async function publishJoin(event: ParticipantJoinEvent, call: Parameters<typeof predictiveCustomerBroadcast>[0]) {
+  const participation = predictiveCustomerParticipation(event);
+  const broadcast = participation ? predictiveCustomerBroadcast(call, "in-progress", participation) : null;
+  if (broadcast && call.workspace) await emitPredictiveBroadcast(call.workspace, broadcast);
+}
 
 /** Both legacy and first-phone callbacks use the same predictive join effects. */
 export async function handlePredictiveParticipantJoin(event: ParticipantJoinEvent, call: Tables<"call">) {
   try {
     if (!call.workspace) throw new Error("Missing required field: workspace");
     const reservation = await findVoiceReservationForCall(call.workspace, call.sid);
-    if (isTerminalStatus(normalizeProviderStatus(call.status)) ||
-      isTerminalStatus(normalizeProviderStatus(reservation?.terminal_status))) return;
+    if (reservation) {
+      const current = await recordFundedPredictiveJoin(reservation, event);
+      if (current) await publishJoin(event, current);
+      return;
+    }
+    if (isTerminalStatus(normalizeProviderStatus(call.status))) return;
     let current = call;
     if (!call.conference_id) {
       if (!event.callSid || !event.conferenceRef || !event.timestamp) throw new Error("Missing predictive participant identity");
@@ -33,12 +42,8 @@ export async function handlePredictiveParticipantJoin(event: ParticipantJoinEven
         answered_at: new Date().toISOString(),
       });
       if (attempt instanceof Response) return;
-      await updateCampaignQueueByContactAndCampaign({ contactId: attempt.contact_id, campaignId: call.campaign_id,
-        update: { ...buildProviderStatusQueueUpdate("in-progress") } });
     }
-    const participation = predictiveCustomerParticipation(event);
-    const broadcast = participation ? predictiveCustomerBroadcast(current, "in-progress", participation) : null;
-    if (broadcast) await emitPredictiveBroadcast(call.workspace, broadcast);
+    await publishJoin(event, current);
   } catch (error) {
     logger.error("Error in handleParticipantJoin:", error);
     throw error;
