@@ -65,6 +65,7 @@ type Connection = Awaited<ReturnType<typeof journal.findVoiceAudioConnection>> &
 
 export async function clearFault() {
   await sql.unsafe(`drop trigger if exists ${fault} on public.call`);
+  await sql.unsafe(`drop trigger if exists ${fault} on public.campaign_queue`);
   await sql.unsafe(`drop trigger if exists ${fault} on public.workspace_voice_audio_connection`);
   await sql.unsafe(`drop trigger if exists ${fault} on public.workspace_voice_recording_operation`);
   await sql.unsafe(`drop function if exists public.${fault}()`);

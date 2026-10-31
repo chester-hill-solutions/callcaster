@@ -155,6 +155,12 @@ combined executed case names and count with the original suite after splitting.
 
 Keep funded settlement in admission's workspace-before-reservation lock order;
 continuation and source-generation checks need that same workspace fence.
+Predictive join writes must match both the queue generation and reservation ID,
+plus workspace, campaign and contact. Keep Call, answer and queue writes in one
+transaction, then publish events after commit. A saved answer timestamp must
+not prevent a queue retry. An unfunded historical Call cannot prove queue
+ownership; retain its call facts without changing a matching contact's queue.
+Re-read terminal Call and reservation state under their locks before writing.
 Recording nonce preparation needs only the reservation lock. Prove
 cross-service races at the real ledger boundary and wait for `pg_blocking_pids`
 before releasing the barrier; a timing-only overlap can miss a deadlock.

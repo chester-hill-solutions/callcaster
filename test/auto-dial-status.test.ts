@@ -38,7 +38,8 @@ vi.mock("@/lib/logger.server", () => ({
   logger: loggerMocks,
 }));
 const dequeueQueueEntryMock = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/campaign-queue-db.server", () => ({
+vi.mock("@/lib/campaign-queue-db.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/campaign-queue-db.server")>(),
   dequeueQueueEntry: (...args: unknown[]) => dequeueQueueEntryMock(...args),
 }));
 // Spreads the real module, for the same reason: only the keyed write is
@@ -570,7 +571,7 @@ describe("api.auto-dial.status", () => {
     expect(res.status).toBe(200);
   });
 
-  test("participant-join updates call, queue, and answered_at without provider disposition", async () => {
+  test("an unfunded participant join saves call and answer facts without changing queue ownership", async () => {
     postgresStub = await usePostgresStub({
       dbCall: {
         sid: "CA1",
@@ -603,9 +604,7 @@ describe("api.auto-dial.status", () => {
       expect.objectContaining({ answered_at: expect.any(String) }),
     ]);
     expect(telephonyStubState.outreachUpdateCalls[0]).not.toHaveProperty("disposition");
-    expect(campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign).toHaveBeenCalledWith(
-      expect.objectContaining({ contactId: 1, campaignId: 1 }),
-    );
+    expect(campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign).not.toHaveBeenCalled();
   });
 
   test("participant-leave completes conferences and sets completed status", async () => {
@@ -1229,7 +1228,7 @@ describe("api.auto-dial.status", () => {
     await expect(res.json()).resolves.toMatchObject({ error: expect.stringContaining("Unknown error") });
   });
 
-  test("participant-join queue failure returns an error and is logged at the join boundary", async () => {
+  test("an unfunded participant join cannot reach a failing queue writer", async () => {
     postgresStub = await usePostgresStub({ campaignQueueUpdateError: new Error("cq") } as any);
 
     const mod = await import("../app/routes/api+/auto-dial/status.route");
@@ -1247,8 +1246,9 @@ describe("api.auto-dial.status", () => {
         body: fd,
       }),
     } as any));
-    expect(res.status).toBe(500);
-    expect(loggerMocks.error).toHaveBeenCalledWith(
+    expect(res.status).toBe(200);
+    expect(campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign).not.toHaveBeenCalled();
+    expect(loggerMocks.error).not.toHaveBeenCalledWith(
       "Error in handleParticipantJoin:",
       expect.any(Error),
     );
