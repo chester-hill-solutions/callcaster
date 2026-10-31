@@ -448,9 +448,9 @@
       "app/lib/schemas/api/voice-audio.ts",
       "app/lib/openapi-voice-audio.ts",
       "test/voice-audio-client.test.ts",
-      "app/lib/agent-audio-connection.client.ts",
-      "app/lib/agent-audio-storage.client.ts",
-      "app/lib/manual-audio-dial.client.ts",
+      "app/lib/agent-audio-connection.ts",
+      "app/lib/agent-audio-storage.ts",
+      "app/lib/manual-audio-dial.ts",
       "app/hooks/call/useCallScreenAudio.ts",
       "test/ui/agent-audio-readiness.test.tsx"
     ],

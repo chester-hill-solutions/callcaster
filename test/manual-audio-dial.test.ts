@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ManualAudioDial } from "@/lib/manual-audio-dial.client";
+import { ManualAudioDial } from "@/lib/manual-audio-dial";
 import type { StartCallArgs } from "@/lib/manual-dial-client";
 
 const owner = { workspaceId: "10000000-0000-4000-8000-000000000001", userId: "agent", campaignId: 1 };

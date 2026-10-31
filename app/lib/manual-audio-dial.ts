@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { dialBodySchema } from "@/lib/schemas/api/actions";
 import { manualDialFields, sendManualAudioDial, type StartCallArgs } from "@/lib/manual-dial-client";
-import type { AgentAudioStorage } from "@/lib/agent-audio-storage.client";
+import type { AgentAudioStorage } from "@/lib/agent-audio-storage";
 
 const savedFieldsSchema = z.record(z.string(), z.string()).refine(fields => dialBodySchema.safeParse(fields).success && Boolean(fields.audio_connection_id));
 const INITIAL: { pending: boolean; sending: boolean; error: string | null } = { pending: false, sending: false, error: null };
