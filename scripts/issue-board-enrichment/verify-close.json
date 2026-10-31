@@ -1,5 +1,106 @@
 [
   {
+    "issueNumber": 2992,
+    "verdict": "verify-close",
+    "summary": "Admin restore is merged into dev in PR #3094. Operators can identify archived workspaces and confirm a restore that preserves released-number state.",
+    "currentBehavior": "PR #3094 merged at f979d25a with a tree equal to tested 095c21a7. All 17 applicable GitHub checks pass, including 1,306 PostgreSQL 18.6 cases and all 11 restore cases. Both dev app and worker are online at the exact merge.",
+    "rootCause": "Archive has no operator restore action or visible archive marker. The owner picker also omitted the archive filter assumed by the original follow-up.",
+    "resolution": "Verify the operator flow in an approved dev test workspace, then follow release acceptance. The issues remain open; restore does not re-rent released numbers.",
+    "lookIn": [
+      "app/server/workspace-restore.server.ts",
+      "app/routes/admin+/panels/AdminWorkspacesPanel.tsx",
+      "app/routes/admin+/panels/WorkspaceRestoreDialog.tsx",
+      "app/lib/workspace-members-db.server.ts"
+    ],
+    "existingTests": [
+      "All 37 fast local checks, 11 real-session PostgreSQL cases, 38 affected Node cases and 17 UI cases pass on committed head 095c21a7. The original source fails seven database regressions and all three new UI cases while access-denial controls pass.",
+      "The real archive/release service releases a fixture number through a fake provider. Restore preserves the completed release receipt, restores the owner picker and does not rent the number again.",
+      "The dev app and worker both have one running replica, no issues and successful deployments at f979d25a. No deployed archive or restore was performed."
+    ],
+    "acceptanceCriteria": [
+      "Only sudo operators with the existing MFA gate can restore; explicit confirmation is required.",
+      "Restore and its audit event are atomic and idempotent. Released numbers remain released.",
+      "Admin rows show an archive marker and date and expose the confirmed restore action."
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Native Task, assigned @wra-sol, parent #2732 verified. Priority, Effort and Enviornment are unset. Actual Project Status on-dev was verified in both authenticated issue sidebars after merge. There are no open PRs."
+  },
+  {
+    "issueNumber": 2993,
+    "verdict": "verify-close",
+    "summary": "Admin archive visibility is merged into dev in PR #3094. Operators can identify archived workspaces and confirm a restore that preserves released-number state.",
+    "currentBehavior": "PR #3094 merged at f979d25a with a tree equal to tested 095c21a7. All 17 applicable GitHub checks pass, including 1,306 PostgreSQL 18.6 cases and all 11 restore cases. Both dev app and worker are online at the exact merge.",
+    "rootCause": "Archive has no operator restore action or visible archive marker. The owner picker also omitted the archive filter assumed by the original follow-up.",
+    "resolution": "Verify the operator flow in an approved dev test workspace, then follow release acceptance. The issues remain open; restore does not re-rent released numbers.",
+    "lookIn": [
+      "app/server/workspace-restore.server.ts",
+      "app/routes/admin+/panels/AdminWorkspacesPanel.tsx",
+      "app/routes/admin+/panels/WorkspaceRestoreDialog.tsx",
+      "app/lib/workspace-members-db.server.ts"
+    ],
+    "existingTests": [
+      "All 37 fast local checks, 11 real-session PostgreSQL cases, 38 affected Node cases and 17 UI cases pass on committed head 095c21a7. The original source fails seven database regressions and all three new UI cases while access-denial controls pass.",
+      "The real archive/release service releases a fixture number through a fake provider. Restore preserves the completed release receipt, restores the owner picker and does not rent the number again.",
+      "The dev app and worker both have one running replica, no issues and successful deployments at f979d25a. No deployed archive or restore was performed."
+    ],
+    "acceptanceCriteria": [
+      "Only sudo operators with the existing MFA gate can restore; explicit confirmation is required.",
+      "Restore and its audit event are atomic and idempotent. Released numbers remain released.",
+      "Admin rows show an archive marker and date and expose the confirmed restore action."
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Native Task, assigned @wra-sol, parent #2732 verified. Priority, Effort and Enviornment are unset. Actual Project Status on-dev was verified in both authenticated issue sidebars after merge. There are no open PRs."
+  },
+  {
+    "issueNumber": 2943,
+    "verdict": "verify-close",
+    "summary": "High-priority email styling fix is on dev in PR #2954. The recorded 2026-10-24 decision keeps the postal address; no footer-content decision remains.",
+    "currentBehavior": "The shared email shell uses the repaired font attributes and retains the postal footer as explicitly requested.",
+    "rootCause": "The original layout defect needs real mail-client acceptance; the old planning record missed the later keep-address decision.",
+    "resolution": "Verify password-reset alignment in real mail clients and compare other transactional emails that use the same shell. Keep the postal address. Follow the release acceptance path.",
+    "lookIn": [
+      "app/lib/email-layout.server.ts",
+      "test/email-layout.server.test.ts"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Native Task, Priority High, Effort nothing-burger, Enviornment dev. Actual Project Status on-dev was read in the authenticated issue sidebar on 2026-10-31. PR #2954 / 25fa571c is merged. The human keep-address decision is in issuecomment-6385832543."
+  },
+  {
+    "issueNumber": 3091,
+    "verdict": "verify-close",
+    "summary": "Reviewed repair from High-priority parent #2546 is merged into dev. Operators can merge confirmed copies of one person without merging different people who share a phone.",
+    "currentBehavior": "PR #3093 is merged into dev at f5bbbfe5. The tested merge preserves source profiles, history, call lists, queue completion, restrictive opt-outs and continuation links. Both dev deployments are successful, and a read-only query confirms the receipt table and recorded migration.",
+    "rootCause": "Legacy duplicate-person rows leave the strict manual-SMS identity guard ambiguous. Direct deletion would cascade through history and queue links.",
+    "resolution": "Verify the deployed operator flow with approved data and follow release acceptance. Keep the issue open and do not add further code without a failing requirement.",
+    "lookIn": [
+      "app/server/contact-merge.server.ts",
+      "app/server/contact-merge-relations.server.ts",
+      "app/components/contact/ContactMergePanel.tsx",
+      "test/integration-db/contact-merge.test.ts"
+    ],
+    "existingTests": [
+      "All 37 local gate checks pass on clean cb175e79. Focused validation passes 116 database/schema cases, 78 Node cases and 37 UI cases. Fresh database setup and both migration-list guards pass.",
+      "All 19 applicable exact-head GitHub checks pass. PostgreSQL 18.6 runs all 30 repair cases within 1,295 passing database cases. Full Node/UI, browser, build, bundle, codegen and schema gates pass.",
+      "The original merge regressions fail while valid controls pass. The import lock-order regression and saved list-total regression fail before their fixes. Rollback includes profile, membership, history, queue, continuation and list-total state.",
+      "The dev merge tree equals tested cb175e79. App and worker are online at f5bbbfe5, readiness passes, and the receipt table plus migration ledger were verified with transaction_read_only enabled."
+    ],
+    "missingTests": [
+      "Deployed operator acceptance with approved contacts and release acceptance."
+    ],
+    "acceptanceCriteria": [
+      "Do not merge distinct external or voter identities or bypass ambiguous-recipient protection.",
+      "Retain the chosen profile, source snapshots, history and completed queue state. Any saved opt-out remains effective.",
+      "Keep import receipts immutable and serialize imports with repair. Reject active work and stale reviews; roll back failures; repeat requests apply once."
+    ],
+    "blockedBy": [],
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Native Bug, Priority High, Effort High, assigned @wra-sol, parent #2546. Actual Project Status on-dev was verified in the authenticated issue sidebar and timeline. PR #3093 is merged; no PR is open. PRs #3081, #3086 and #3092 remain parked with their branches preserved."
+  },
+  {
     "issueNumber": 3088,
     "verdict": "verify-close",
     "summary": "High-priority consent requirement from #2546. A saved opt-out on any workspace copy must block campaign SMS to that normalized phone.",

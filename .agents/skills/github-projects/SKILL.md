@@ -130,3 +130,11 @@ not refreshed. This fallback does not verify or change Project Status.
 
 Use `--help` for current flags. Do not copy this list as a substitute for the
 manual.
+
+## Selected source-board updates
+
+For a selected enrichment refresh, preserve unrelated record text and Unicode
+formatting. When removing a JSON array record, handle its adjacent comma,
+including the last record. Parse the edited JSON before saving it, then run
+`loadEnrichment` and `git diff --check`. Keep base snapshot dates distinct from
+selected live Issue and Project checks; do not imply a complete board refresh.
