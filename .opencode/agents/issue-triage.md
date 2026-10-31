@@ -1,7 +1,7 @@
 ---
 description: Triages a new GitHub issue, finds the code it touches, and picks a Priority
 mode: primary
-steps: 30
+steps: 20
 permissions:
   - action: edit
     resource: "*"

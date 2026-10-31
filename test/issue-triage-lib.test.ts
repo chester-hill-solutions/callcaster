@@ -216,8 +216,8 @@ describe("buildPriorityMutation", () => {
       rationale: "Breaks campaign creation.",
       suggest: false,
     });
-    expect(payload.query).toContain("setIssueFieldValue");
-    expect(payload.variables.input.issueFields[0]).toEqual({
+    expect(payload.query).toContain("updateIssueFieldValue");
+    expect(payload.variables.input.issueField).toEqual({
       fieldId: "IFSS_1",
       singleSelectOptionId: "IFSSO_2",
       confidence: "MEDIUM",
@@ -235,6 +235,6 @@ describe("buildPriorityMutation", () => {
       rationale: "Close call between High and Medium.",
       suggest: true,
     });
-    expect(payload.variables.input.issueFields[0].suggest).toBe(true);
+    expect(payload.variables.input.issueField.suggest).toBe(true);
   });
 });

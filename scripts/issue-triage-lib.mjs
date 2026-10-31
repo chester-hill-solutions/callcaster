@@ -218,26 +218,27 @@ export function renderComment(triage, { repoUrl, ref = "dev", priorityOutcome = 
 /**
  * GraphQL payload that writes the organization Issue field `Priority`.
  * GitHub records the agent's confidence and rationale on the value itself.
+ *
+ * Use `updateIssueFieldValue`: `setIssueFieldValue` accepts the same input and
+ * returns success, but stores nothing (verified 2026-10-31 on #100).
  */
 export function buildPriorityMutation({ issueId, fieldId, optionId, priorityConfidence, rationale, suggest }) {
   return {
-    query: `mutation ($input: SetIssueFieldValueInput!) {
-  setIssueFieldValue(input: $input) {
+    query: `mutation ($input: UpdateIssueFieldValueInput!) {
+  updateIssueFieldValue(input: $input) {
     issue { number }
   }
 }`,
     variables: {
       input: {
         issueId,
-        issueFields: [
-          {
-            fieldId,
-            singleSelectOptionId: optionId,
-            confidence: priorityConfidence.toUpperCase(),
-            rationale,
-            suggest: Boolean(suggest),
-          },
-        ],
+        issueField: {
+          fieldId,
+          singleSelectOptionId: optionId,
+          confidence: priorityConfidence.toUpperCase(),
+          rationale,
+          suggest: Boolean(suggest),
+        },
       },
     },
   };
