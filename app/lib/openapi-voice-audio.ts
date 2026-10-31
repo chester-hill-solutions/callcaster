@@ -64,7 +64,7 @@ const predictiveCustomer = { type: "object", required: ["workspace_id", "user_id
   conference_sequence: { type: "integer", minimum: 0, nullable: true }, human_state: { type: "string", enum: ["pending", "joined"] },
 } };
 const predictiveRecovery = { type: "object", required: ["revision", "customer"], properties: {
-  revision: { type: "string", pattern: "^(0|[1-9][0-9]*)$", description: "Monotonic saved human-state version for this actor and workspace. Zero means no saved human state. An empty customer at a newer version ends the previous conversation view; it never ends agent audio. The saved queue ID and exact outreach attempt restore the current contact and answers, including after dequeue." },
+  revision: { type: "string", pattern: "^(0|[1-9][0-9]*)$", maxLength: 19, description: "Monotonic saved human-state version for this actor and workspace. Zero means no saved human state. An empty customer at a newer version ends the previous conversation view; it never ends agent audio. The saved queue ID and exact outreach attempt restore the current contact and answers, including after dequeue." },
   customer: { ...predictiveCustomer, nullable: true, description: "The one pending or joined funded predictive customer. This is never the phone or SDK agent leg. Pending does not prove that a human joined. Refused, ended, foreign and terminal Calls are excluded." },
 } };
 const currentSnapshot = { type: "object", required: ["workspace_id", "user_id", "active", "pending", "recovery_required", "customer_pending", "predictive"], properties: {
