@@ -179,20 +179,6 @@
     "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
-    "issueNumber": 1724,
-    "verdict": "needs-decision",
-    "summary": "Current behavior: missing contact fields render empty string or the fallback (code answers the question). Product decides the desired UX (placeholder/flagging).",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
     "issueNumber": 1729,
     "verdict": "needs-decision",
     "summary": "Auto-disposition mapping needs a spec (which outcome → which disposition, when overridable). Relevant machinery already exists (#1458 hold-screen, debounced auto-save).",
@@ -1072,10 +1058,10 @@
   {
     "issueNumber": 2546,
     "verdict": "needs-decision",
-    "summary": "High-priority user requirement. Import reuse #3085 and campaign consent #3088 are merged into dev. Reviewed legacy repair is active under child #3091. The parent stays open for remaining identity rollout and acceptance.",
-    "currentBehavior": "Dev includes PR #3087 contact reuse and PR #3090 cross-contact opt-out protection. The #2089 manual-SMS guard still blocks ambiguous recipients. The #3091 repair is tested locally and not yet published.",
+    "summary": "High-priority user requirement. Import reuse #3085, campaign consent #3088 and reviewed legacy repair #3091 are merged into dev. Keep the parent open for deployed operator checks and release acceptance.",
+    "currentBehavior": "Dev includes PR #3087 contact reuse, PR #3090 cross-contact opt-out protection and PR #3093 reviewed duplicate-person repair. The #2089 manual-SMS ambiguity guard remains intact. The #3091 app/worker deployments and receipt migration are verified.",
     "rootCause": "Contact identity is deduplicated inside one audience, while SMS recipient identity is workspace-wide.",
-    "resolution": "Complete #3091 as one atomic app feature and verify deployed #3085/#3088 behavior. Keep #2679 person identity: external IDs can differ for people with the same phone. Audit identity duplicates before any partial unique external-ID rollout; never add a unique-phone rule.",
+    "resolution": "Verify deployed operator behavior for #3085, #3088 and #3091, then complete release acceptance. Preserve the #2089 ambiguous-recipient guard. CMS re-sync and external-ID upsert work are outside current delivery under the newer #2677 scope decision; #2679 is historical decision evidence, not an implementation commitment.",
     "lookIn": [
       "app/lib/audience-import-map.server.ts",
       "app/server/audience-import-effects.server.ts",
@@ -1088,12 +1074,13 @@
     ],
     "size": "L",
     "risk": "high",
-    "trackerRecommendation": "Native Bug, Priority High, Effort Medium. Actual Project Status remains In progress. Children #3085 and #3088 are on-dev; child #3091 is In progress. Keep the parent open for its remaining requirements.",
+    "trackerRecommendation": "Native Bug, Priority High, Effort Medium. Project Status remains In progress. Children #3085, #3088 and #3091 are on-dev. Keep this parent open for its remaining requirements.",
     "existingTests": [
       "The #3085 focused real-database run passes 50 cases, including cross-audience reuse, concurrent imports, formatted phones, opt-out preservation, workspace isolation, replay/recovery, manual-SMS identity and download messages. The original implementation fails four regression cases.",
       "Full npm run ci:local passes on clean 030d8bd45cec1ab46243489322ce0306f4181d9a in 698.38 seconds: 6,153 Node tests with three existing skips, 34 Bun tests and 1,568 UI tests. All guards, typecheck, lint, build, bundle and codegen checks pass. Start/end commit and source hashes match.",
       "The #3088 old coordinator fails both HTTP and worker consent regressions while 17 controls pass. Draft PR #3090 passes 37 local checks, 136 affected Node cases and 36 real-database cases after rebasing onto merged CI PR #3089. Full local CI passed before that tooling-only rebase; application and affected test sources are unchanged.",
-      "PR #3090 is merged at 71ecaadd with an identical tested tree, green applicable GitHub checks and successful dev app/worker deployments. Child #3091 has real database red/green evidence for reviewed repair."
+      "PR #3090 is merged at 71ecaadd with an identical tested tree, green applicable GitHub checks and successful dev app/worker deployments. Child #3091 has real database red/green evidence for reviewed repair.",
+      "PR #3093 passes all applicable exact-head CI, including 1,295 PostgreSQL 18.6 database cases and all 30 repair cases. Both dev services are online at the source-equivalent merge; a read-only schema check confirms its migration."
     ]
   },
   {
@@ -1114,20 +1101,5 @@
     "size": "M",
     "risk": "high",
     "trackerRecommendation": "Native Feature, Priority High, Effort Medium, Project Status Backlog. Preserve the native #2216 dependency until its required verification is done."
-  },
-  {
-    "issueNumber": 2943,
-    "verdict": "needs-decision",
-    "summary": "High priority. PR #2954 fixes the inline font attributes, but the requested postal-address removal remains unresolved.",
-    "currentBehavior": "email-layout.server.ts uses safe single-quoted font names and still renders the hard-coded postal footer.",
-    "rootCause": "The font rendering defect is fixed; the issue also asks whether transactional emails should retain the address.",
-    "resolution": "Verify the font fix in real mail clients and resolve the remaining footer requirement as a separate atomic concern. Do not claim the whole issue is complete while the address remains.",
-    "lookIn": [
-      "app/lib/email-layout.server.ts",
-      "test/email-layout.server.test.ts"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Native Task, Priority High, Effort nothing-burger, Project Status on-dev. PR #2954 / 25fa571c fixes styling. The footer question has no recorded answer in the issue."
   }
 ]

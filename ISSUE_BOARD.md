@@ -1,14 +1,18 @@
 # CallCaster — Open Issue Board for Agents
 
-Base inventory: complete native Issue and Project snapshots from 2026-10-29 UTC, 401 open issues. Selected refresh: #2546, #3085, #3088 and new child #3091 on 2026-10-31. Refresh the full board with npm run tools:issues:board.
+Base inventory: complete native Issue and Project snapshots from 2026-10-29 UTC, 401 open issues. Selected refresh: #1724, #2546, #2943, #2992, #2993, #3085, #3088 and new child #3091 on 2026-10-31. Refresh the full board with npm run tools:issues:board.
 
 Live native Issue metadata covers all 401 open issues. Type, Priority, Effort and Environment come from those Issue fields. The complete authenticated Project export has 398 unique issue URLs, matching the visible filtered count after hierarchy was turned off and all rows loaded. #100, #2902 and #2906 are absent from that complete Project view and retain unknown Project Status. No status is inferred from a PR, label or issue state.
 
 Current dev includes the merged SMS export and credential-log fixes plus auth isolation #3074, compiler #3075 and credential limits #3079. The current Project export confirms their linked auth, compiler and credential-limit issues are on-dev. Keep issues open for deployed verification and release acceptance.
 
-The approved merge batch #3070 and CI changes #3082–#3084 are merged into dev. PR #3087 is now also merged at 6f940f35; its tree matches tested e93fb40a and both dev app/worker deployments pass. PRs #3081 and #3086 remain parked with both original branches saved. PR #3092 is parked unmerged and its branch is preserved. The active repair is #3091; publication and full remote validation follow its local checks.
+The approved merge batch #3070 and CI changes #3082–#3084 are merged into dev. PR #3087 is now also merged at 6f940f35; its tree matches tested e93fb40a and both dev app/worker deployments pass. PRs #3081 and #3086 remain parked with both original branches saved. PR #3092 is parked unmerged and its branch is preserved. PR #3093 for #3091 is merged into dev. Both deployments and its receipt migration are verified; operator and release acceptance remain.
 
-Priority correction, 2026-10-31: take existing urgent and high-priority app requirements first. #3085 and #3088 are on-dev. Parent #2546 and reviewed-repair child #3091 are In progress in the authenticated board. PR #3090 is merged with green CI and successful dev app/worker deployments. Draft PR #3093 is the only open PR for the #3091 repair; full GitHub CI is running. Keep #2679 person identity and the #2089 ambiguous-recipient guard. Other sections retain their prior snapshot evidence.
+Priority correction, 2026-10-31: take existing urgent and high-priority app requirements first. #3085 and #3088 are on-dev. Parent #2546 remains In progress; its three implemented children are on-dev in the authenticated board. PR #3090 is merged with green CI and successful dev app/worker deployments. PR #3093 is merged into dev at f5bbbfe5 with green CI and successful app/worker deployments. #3091 is on-dev; there is no open PR. Preserve the #2089 ambiguous-recipient guard. The newer #2677 decision defers CMS re-sync and external-ID upserts; do not schedule that historical #2679 work. Other sections retain their prior snapshot evidence.
+
+Question #1724 is answered and closed as completed on 2026-10-31. The real renderer passes 27 existing tests and 11 direct missing/null/empty/fallback output checks. It is identical in master and dev. The live Project Status was still Backlog after closure; no closed-item move was made.
+
+Restore slice #3094 is merged and deployed to dev. #2992 and #2993 are on-dev, assigned @wra-sol and linked as children of High-priority #2732. Their own Priority, Effort and Enviornment fields remain unset. The keep-address decision for #2943 is recorded; that styling fix is on-dev for mail-client acceptance.
 
 ## How to use this board
 
@@ -37,22 +41,9 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 25
+## Fix now — 24
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
-
-### [#3091](https://github.com/chester-hill-solutions/callcaster/issues/3091) Provide a reviewed repair for duplicate workspace contacts
-- **IN PROGRESS** · Verdict: **Fix now** · Type: Bug · Priority: High · Effort: High · Environment: unset · Size: L · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
-- High-priority reviewed repair from #2546 for legacy copies of the same person. Shared-phone different people stay separate.
-- Current behavior: Draft PR #3093 provides review, retained-profile choice, explicit confirmation and an atomic merge. Local checks pass; full GitHub CI and dev merge remain.
-- Root cause: Legacy duplicate-person rows leave the strict manual-SMS identity guard ambiguous. Direct deletion would cascade through history and queue links.
-- Resolution: Structural review, focused checks and all 37 fast local checks pass. Require full exact-head CI on draft PR #3093 before the standing-authorized dev merge, then verify deployment and the native board.
-- Look in: `app/server/contact-merge.server.ts`, `app/server/contact-merge-relations.server.ts`, `app/components/contact/ContactMergePanel.tsx`, `test/integration-db/contact-merge.test.ts`
-- Existing tests: 30 real database repair and authenticated-route cases pass. They cover history, queues, rollback, opt-outs, identity conflicts, roles, stale reviews, concurrent imports, repeat confirmations and the manual SMS route with its provider send stubbed.; 116 affected database/schema cases and 37 affected UI cases pass. The original apply regressions fail while 11 controls pass. The import/repair lock-order regression failed before the shared lock fix.
-- Missing tests: Full exact-head GitHub CI and deployed acceptance.
-- Done when: Do not merge distinct external or voter identities or bypass ambiguous-recipient protection.; Retain the chosen profile, source snapshots, history and completed queue state. Any saved opt-out remains effective.; Keep import receipts immutable and serialize imports with repair. Reject active work and stale reviews; roll back failures; repeat requests apply once.
-- Tracker: Native Bug, Priority High, Effort High, assigned @wra-sol, native parent #2546. Actual Project Status In progress was verified in the authenticated board. Draft PR #3093 is the only open PR and has the native Development link to #3091. PR #3092 is parked unmerged with its branch preserved.
-
 
 ### [#3073](https://github.com/chester-hill-solutions/callcaster/issues/3073) Align the patched Twilio redirect dependency
 - **IN PROGRESS** · Verdict: **Fix now** · Type: Task · Priority: High · Effort: Low · Environment: unset · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-29
@@ -333,9 +324,46 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 55
+## Verify and close — 59
+
+### [#2992](https://github.com/chester-hill-solutions/callcaster/issues/2992) Task: restore an archived workspace
+- Verdict: **Verify and close** · Status: on-dev · Type: Task · Priority: unset · Effort: unset · Environment: unset · Size: M · Risk: medium · Assignee: @wra-sol · Updated: 2026-10-31
+- Admin restore is merged into dev in PR #3094. Operators can identify archived workspaces and confirm a restore that preserves released-number state.
+- Current behavior: PR #3094 merged at f979d25a with a tree equal to tested 095c21a7. All 17 applicable GitHub checks pass, including 1,306 PostgreSQL 18.6 cases and all 11 restore cases. Both dev app and worker are online at the exact merge.
+- Resolution: Verify the operator flow in an approved dev test workspace, then follow release acceptance. The issues remain open; restore does not re-rent released numbers.
+- Tracker: Native Task, assigned @wra-sol, parent #2732 verified. Priority, Effort and Enviornment are unset. Actual Project Status on-dev was verified in both authenticated issue sidebars after merge. There are no open PRs.
+
+### [#2993](https://github.com/chester-hill-solutions/callcaster/issues/2993) Task: show archived workspaces in the admin console
+- Verdict: **Verify and close** · Status: on-dev · Type: Task · Priority: unset · Effort: unset · Environment: unset · Size: M · Risk: medium · Assignee: @wra-sol · Updated: 2026-10-31
+- Admin archive visibility is merged into dev in PR #3094. Operators can identify archived workspaces and confirm a restore that preserves released-number state.
+- Current behavior: PR #3094 merged at f979d25a with a tree equal to tested 095c21a7. All 17 applicable GitHub checks pass, including 1,306 PostgreSQL 18.6 cases and all 11 restore cases. Both dev app and worker are online at the exact merge.
+- Resolution: Verify the operator flow in an approved dev test workspace, then follow release acceptance. The issues remain open; restore does not re-rent released numbers.
+- Tracker: Native Task, assigned @wra-sol, parent #2732 verified. Priority, Effort and Enviornment are unset. Actual Project Status on-dev was verified in both authenticated issue sidebars after merge. There are no open PRs.
+
+
+### [#2943](https://github.com/chester-hill-solutions/callcaster/issues/2943) Reset password email styling is off
+- Verdict: **Verify and close** · Type: Task · Priority: High · Effort: nothing-burger · Environment: dev · Size: S · Risk: low · Labels: design · Assignee: none · Updated: 2026-10-24
+- High-priority email styling fix is on dev in PR #2954. The recorded 2026-10-24 decision keeps the postal address; no footer-content decision remains.
+- Current behavior: The shared email shell uses the repaired font attributes and retains the postal footer as explicitly requested.
+- Root cause: The original layout defect needs real mail-client acceptance; the old planning record missed the later keep-address decision.
+- Resolution: Verify password-reset alignment in real mail clients and compare other transactional emails that use the same shell. Keep the postal address. Follow the release acceptance path.
+- Look in: `app/lib/email-layout.server.ts`, `test/email-layout.server.test.ts`
+- Tracker: Native Task, Priority High, Effort nothing-burger, Enviornment dev. Actual Project Status on-dev was read in the authenticated issue sidebar on 2026-10-31. PR #2954 / 25fa571c is merged. The human keep-address decision is in issuecomment-6385832543.
+
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#3091](https://github.com/chester-hill-solutions/callcaster/issues/3091) Provide a reviewed repair for duplicate workspace contacts
+- Verdict: **Verify and close** · Type: Bug · Priority: High · Effort: High · Environment: unset · Size: L · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
+- Reviewed repair from High-priority parent #2546 is merged into dev. Operators can merge confirmed copies of one person without merging different people who share a phone.
+- Current behavior: PR #3093 is merged into dev at f5bbbfe5. The tested merge preserves source profiles, history, call lists, queue completion, restrictive opt-outs and continuation links. Both dev deployments are successful, and a read-only query confirms the receipt table and recorded migration.
+- Root cause: Legacy duplicate-person rows leave the strict manual-SMS identity guard ambiguous. Direct deletion would cascade through history and queue links.
+- Resolution: Verify the deployed operator flow with approved data and follow release acceptance. Keep the issue open and do not add further code without a failing requirement.
+- Look in: `app/server/contact-merge.server.ts`, `app/server/contact-merge-relations.server.ts`, `app/components/contact/ContactMergePanel.tsx`, `test/integration-db/contact-merge.test.ts`
+- Existing tests: All 37 local gate checks pass on clean cb175e79. Focused validation passes 116 database/schema cases, 78 Node cases and 37 UI cases. Fresh database setup and both migration-list guards pass.; All 19 applicable exact-head GitHub checks pass. PostgreSQL 18.6 runs all 30 repair cases within 1,295 passing database cases. Full Node/UI, browser, build, bundle, codegen and schema gates pass.; The original merge regressions fail while valid controls pass. The import lock-order regression and saved list-total regression fail before their fixes. Rollback includes profile, membership, history, queue, continuation and list-total state.; The dev merge tree equals tested cb175e79. App and worker are online at f5bbbfe5, readiness passes, and the receipt table plus migration ledger were verified with transaction_read_only enabled.
+- Missing tests: Deployed operator acceptance with approved contacts and release acceptance.
+- Done when: Do not merge distinct external or voter identities or bypass ambiguous-recipient protection.; Retain the chosen profile, source snapshots, history and completed queue state. Any saved opt-out remains effective.; Keep import receipts immutable and serialize imports with repair. Reject active work and stale reviews; roll back failures; repeat requests apply once.
+- Tracker: Native Bug, Priority High, Effort High, assigned @wra-sol, parent #2546. Actual Project Status on-dev was verified in the authenticated issue sidebar and timeline. PR #3093 is merged; no PR is open. PRs #3081, #3086 and #3092 remain parked with their branches preserved.
 
 ### [#3088](https://github.com/chester-hill-solutions/callcaster/issues/3088) Honor opt-outs across duplicate workspace contacts in campaign SMS
 - Verdict: **Verify and close** · Type: Bug · Priority: High · Effort: Medium · Environment: unset · Size: S · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
@@ -1102,7 +1130,7 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 
 ---
 
-## Needs decision — 45
+## Needs decision — 43
 
 Product, security, or operations decision required before implementation can be scoped.
 
@@ -1129,15 +1157,6 @@ Product, security, or operations decision required before implementation can be 
 - Done when: Ownership confirmed before transfer; Voice/SMS/callbacks work in new workspace; Single owner after migration
 - Tracker: Ops task with a rollback plan. The possible dependency on #1329 was dropped when #1329 closed as not planned on 2026-10-17; re-check current account ownership before the transfer.
 
-### [#2943](https://github.com/chester-hill-solutions/callcaster/issues/2943) Reset password email styling is off
-- Verdict: **Needs decision** · Type: Task · Priority: High · Effort: nothing-burger · Environment: dev · Size: S · Risk: low · Labels: design · Assignee: none · Updated: 2026-10-24
-- High priority. PR #2954 fixes the inline font attributes, but the requested postal-address removal remains unresolved.
-- Current behavior: email-layout.server.ts uses safe single-quoted font names and still renders the hard-coded postal footer.
-- Root cause: The font rendering defect is fixed; the issue also asks whether transactional emails should retain the address.
-- Resolution: Verify the font fix in real mail clients and resolve the remaining footer requirement as a separate atomic concern. Do not claim the whole issue is complete while the address remains.
-- Look in: `app/lib/email-layout.server.ts`, `test/email-layout.server.test.ts`
-- Tracker: Native Task, Priority High, Effort nothing-burger, Project Status on-dev. PR #2954 / 25fa571c fixes styling. The footer question has no recorded answer in the issue.
-
 ### [#2941](https://github.com/chester-hill-solutions/callcaster/issues/2941) Enable self-serve signup in production deliberately
 - Verdict: **Needs decision** · Type: Feature · Priority: High · Effort: Medium · Environment: prod · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-23
 - High priority. Mandatory email verification has landed; self-serve signup still needs an abuse bound, welcome-credit policy and rollout decision.
@@ -1148,11 +1167,6 @@ Product, security, or operations decision required before implementation can be 
 - Blocked by: [#2216](https://github.com/chester-hill-solutions/callcaster/issues/2216)
 - Tracker: Native Feature, Priority High, Effort Medium, Project Status Backlog. Preserve the native #2216 dependency until its required verification is done.
 
-### [#1724](https://github.com/chester-hill-solutions/callcaster/issues/1724) What happens if we use template tags on a contact that doesn't have that piece of information?
-- Verdict: **Needs decision** · Type: Task · Priority: High · Effort: unset · Environment: unset · Size: S · Risk: medium · Labels: question · Assignee: none · Updated: 2026-10-19
-- Current behavior: missing contact fields render empty string or the fallback (code answers the question). Product decides the desired UX (placeholder/flagging).
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1983](https://github.com/chester-hill-solutions/callcaster/issues/1983) Receipts and charges should include tax
 - Verdict: **Needs decision** · Type: Change Request · Priority: High · Effort: Medium · Environment: unset · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-15
@@ -1164,14 +1178,14 @@ Product, security, or operations decision required before implementation can be 
 
 ### [#2546](https://github.com/chester-hill-solutions/callcaster/issues/2546) Audience imports create duplicate workspace contacts and block or duplicate SMS
 - **IN PROGRESS** · Verdict: **Needs decision** · Type: Bug · Priority: High · Effort: Medium · Environment: unset · Size: L · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
-- High-priority user requirement. Import reuse #3085 and campaign consent #3088 are merged into dev. Reviewed legacy repair is active under child #3091. The parent stays open for remaining identity rollout and acceptance.
-- Current behavior: Dev includes PR #3087 contact reuse and PR #3090 cross-contact opt-out protection. The #2089 manual-SMS guard still blocks ambiguous recipients. The #3091 repair is tested locally and not yet published.
+- High-priority user requirement. Import reuse #3085, campaign consent #3088 and reviewed legacy repair #3091 are merged into dev. Keep the parent open for deployed operator checks and release acceptance.
+- Current behavior: Dev includes PR #3087 contact reuse, PR #3090 cross-contact opt-out protection and PR #3093 reviewed duplicate-person repair. The #2089 manual-SMS ambiguity guard remains intact. The #3091 app/worker deployments and receipt migration are verified.
 - Root cause: Contact identity is deduplicated inside one audience, while SMS recipient identity is workspace-wide.
-- Resolution: Complete #3091 as one atomic app feature and verify deployed #3085/#3088 behavior. Keep #2679 person identity: external IDs can differ for people with the same phone. Audit identity duplicates before any partial unique external-ID rollout; never add a unique-phone rule.
+- Resolution: Verify deployed operator behavior for #3085, #3088 and #3091, then complete release acceptance. Preserve the #2089 ambiguous-recipient guard. CMS re-sync and external-ID upsert work are outside current delivery under the newer #2677 scope decision; #2679 is historical decision evidence, not an implementation commitment.
 - Look in: `app/lib/audience-import-map.server.ts`, `app/server/audience-import-effects.server.ts`, `app/lib/chat-sms-guards.server.ts`
-- Existing tests: The #3085 focused real-database run passes 50 cases, including cross-audience reuse, concurrent imports, formatted phones, opt-out preservation, workspace isolation, replay/recovery, manual-SMS identity and download messages. The original implementation fails four regression cases.; Full npm run ci:local passes on clean 030d8bd45cec1ab46243489322ce0306f4181d9a in 698.38 seconds: 6,153 Node tests with three existing skips, 34 Bun tests and 1,568 UI tests. All guards, typecheck, lint, build, bundle and codegen checks pass. Start/end commit and source hashes match.; The #3088 old coordinator fails both HTTP and worker consent regressions while 17 controls pass. Draft PR #3090 passes 37 local checks, 136 affected Node cases and 36 real-database cases after rebasing onto merged CI PR #3089. Full local CI passed before that tooling-only rebase; application and affected test sources are unchanged.; PR #3090 is merged at 71ecaadd with an identical tested tree, green applicable GitHub checks and successful dev app/worker deployments. Child #3091 has real database red/green evidence for reviewed repair.
+- Existing tests: The #3085 focused real-database run passes 50 cases, including cross-audience reuse, concurrent imports, formatted phones, opt-out preservation, workspace isolation, replay/recovery, manual-SMS identity and download messages. The original implementation fails four regression cases.; Full npm run ci:local passes on clean 030d8bd45cec1ab46243489322ce0306f4181d9a in 698.38 seconds: 6,153 Node tests with three existing skips, 34 Bun tests and 1,568 UI tests. All guards, typecheck, lint, build, bundle and codegen checks pass. Start/end commit and source hashes match.; The #3088 old coordinator fails both HTTP and worker consent regressions while 17 controls pass. Draft PR #3090 passes 37 local checks, 136 affected Node cases and 36 real-database cases after rebasing onto merged CI PR #3089. Full local CI passed before that tooling-only rebase; application and affected test sources are unchanged.; PR #3090 is merged at 71ecaadd with an identical tested tree, green applicable GitHub checks and successful dev app/worker deployments. Child #3091 has real database red/green evidence for reviewed repair.; PR #3093 passes all applicable exact-head CI, including 1,295 PostgreSQL 18.6 database cases and all 30 repair cases. Both dev services are online at the source-equivalent merge; a read-only schema check confirms its migration.
 - Done when: Never pick an arbitrary duplicate or loosen opt-out checks.; The data repair must preserve history and apply the most restrictive consent state.; Reusing a canonical contact must add a conflict-safe audience membership.
-- Tracker: Native Bug, Priority High, Effort Medium. Actual Project Status remains In progress. Children #3085 and #3088 are on-dev; child #3091 is In progress. Keep the parent open for its remaining requirements.
+- Tracker: Native Bug, Priority High, Effort Medium. Project Status remains In progress. Children #3085, #3088 and #3091 are on-dev. Keep this parent open for its remaining requirements.
 
 ### [#1709](https://github.com/chester-hill-solutions/callcaster/issues/1709) Workspace Sidebar
 - Verdict: **Needs decision** · Type: Change Request · Priority: Medium · Effort: Medium · Environment: unset · Size: S · Risk: medium · Labels: design, ux · Assignee: @sai-sy · Updated: 2026-10-21
@@ -1938,7 +1952,7 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 229
+## Needs triage — 227
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
 
@@ -2266,13 +2280,6 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 - Status: Backlog · Type: Task · Priority: unset · Effort: unset · Environment: unset · Labels: none · Assignee: none · Updated: 2026-10-25
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
-### [#2993](https://github.com/chester-hill-solutions/callcaster/issues/2993) Task: show archived workspaces in the admin console
-- Status: Backlog · Type: Task · Priority: unset · Effort: unset · Environment: unset · Labels: none · Assignee: none · Updated: 2026-10-25
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2992](https://github.com/chester-hill-solutions/callcaster/issues/2992) Task: restore an archived workspace
-- Status: Backlog · Type: Task · Priority: unset · Effort: unset · Environment: unset · Labels: none · Assignee: none · Updated: 2026-10-25
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2816](https://github.com/chester-hill-solutions/callcaster/issues/2816) Feature: SIM task protocol and SMS flows
 - Status: Backlog · Type: Feature · Priority: unset · Effort: unset · Environment: unset · Labels: none · Assignee: none · Updated: 2026-10-24

@@ -1,35 +1,5 @@
 [
   {
-    "issueNumber": 3091,
-    "verdict": "fix-now",
-    "summary": "High-priority reviewed repair from #2546 for legacy copies of the same person. Shared-phone different people stay separate.",
-    "currentBehavior": "Draft PR #3093 provides review, retained-profile choice, explicit confirmation and an atomic merge. Local checks pass; full GitHub CI and dev merge remain.",
-    "rootCause": "Legacy duplicate-person rows leave the strict manual-SMS identity guard ambiguous. Direct deletion would cascade through history and queue links.",
-    "resolution": "Structural review, focused checks and all 37 fast local checks pass. Require full exact-head CI on draft PR #3093 before the standing-authorized dev merge, then verify deployment and the native board.",
-    "lookIn": [
-      "app/server/contact-merge.server.ts",
-      "app/server/contact-merge-relations.server.ts",
-      "app/components/contact/ContactMergePanel.tsx",
-      "test/integration-db/contact-merge.test.ts"
-    ],
-    "existingTests": [
-      "30 real database repair and authenticated-route cases pass. They cover history, queues, rollback, opt-outs, identity conflicts, roles, stale reviews, concurrent imports, repeat confirmations and the manual SMS route with its provider send stubbed.",
-      "116 affected database/schema cases and 37 affected UI cases pass. The original apply regressions fail while 11 controls pass. The import/repair lock-order regression failed before the shared lock fix."
-    ],
-    "missingTests": [
-      "Full exact-head GitHub CI and deployed acceptance."
-    ],
-    "acceptanceCriteria": [
-      "Do not merge distinct external or voter identities or bypass ambiguous-recipient protection.",
-      "Retain the chosen profile, source snapshots, history and completed queue state. Any saved opt-out remains effective.",
-      "Keep import receipts immutable and serialize imports with repair. Reject active work and stale reviews; roll back failures; repeat requests apply once."
-    ],
-    "blockedBy": [],
-    "size": "L",
-    "risk": "high",
-    "trackerRecommendation": "Native Bug, Priority High, Effort High, assigned @wra-sol, native parent #2546. Actual Project Status In progress was verified in the authenticated board. Draft PR #3093 is the only open PR and has the native Development link to #3091. PR #3092 is parked unmerged with its branch preserved."
-  },
-  {
     "issueNumber": 2638,
     "verdict": "fix-now",
     "summary": "PR #3023 names the Call list selection controls and reuses one named Rows per page control. Review, merge and deployed acceptance remain.",
