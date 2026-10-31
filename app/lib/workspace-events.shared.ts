@@ -13,6 +13,7 @@ export type PredictiveBroadcastPayload = {
   conference_sid?: string;
   conference_sequence?: number;
   customer_event?: "joined" | "left";
+  human_revision?: string;
 };
 
 export const PredictiveCustomerBroadcast = z.object({
@@ -22,6 +23,7 @@ export const PredictiveCustomerBroadcast = z.object({
   conference_id: z.string().min(1), conference_sid: z.string().regex(/^CF[0-9a-f]{32}$/i).optional(),
   conference_sequence: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
   customer_event: z.enum(["joined", "left"]).optional(),
+  human_revision: z.string().regex(/^[1-9]\d*$/).max(19).optional(),
 }).superRefine((value, context) => {
   if (value.customer_event && (!value.conference_sid || value.conference_sequence === undefined)) {
     context.addIssue({ code: "custom", message: "Customer participation requires its conference and sequence" });

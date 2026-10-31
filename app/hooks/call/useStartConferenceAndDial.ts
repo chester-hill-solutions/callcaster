@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { ConferenceStartRefusedError, hangupCall, startConferenceAndDial, type StartConferenceParams } from "@/lib/services/hooks-api";
 import { logger } from "@/lib/logger.client";
 import type { VoiceAudioSourceIdentity } from "@/lib/voice-audio-connection";
+import type { PredictiveCustomerRecovery } from "@/lib/schemas/api/voice-audio";
 
 type StartConferenceOptions = {
   userId: string;
@@ -11,6 +12,7 @@ type StartConferenceOptions = {
   selectedDevice: string;
   audioSource?: VoiceAudioSourceIdentity;
   showError?: (message: string, creditsError: boolean) => void;
+  recovery?: PredictiveCustomerRecovery | null;
 };
 
 type StartSnapshot = {
@@ -18,7 +20,7 @@ type StartSnapshot = {
   creditsError: boolean; error: string | null; isLoading: boolean; awaitingReceipt: boolean; pendingStartIntentId: string | null;
 };
 type StartIntent = { context: string; request: StartConferenceParams & { dial_intent_id: string }; uncertain: boolean };
-type StartOwner = { scope: string; active: boolean; pending: symbol | null; intent: StartIntent | null };
+type StartOwner = { scope: string; active: boolean; pending: symbol | null; intent: StartIntent | null; recoveryAllowed: boolean; generation: number };
 function initialStart(scope: string): StartSnapshot {
   return { scope, conference: null, customerCallSid: null, creditsError: false, error: null, isLoading: false, awaitingReceipt: false, pendingStartIntentId: null };
 }
@@ -47,6 +49,7 @@ export function useStartConferenceAndDial({
   selectedDevice,
   audioSource,
   showError,
+  recovery,
 }: StartConferenceOptions) {
   const scope = JSON.stringify([userId, workspaceId, campaignId]);
   const [snapshot, setSnapshot] = useState(() => initialStart(scope));
@@ -67,7 +70,7 @@ export function useStartConferenceAndDial({
    * @effect-why-not-loader A user-started request can finish after this screen leaves; https://react.dev/learn/you-might-not-need-an-effect#fetching-data
    */
   useEffect(() => {
-    const owner: StartOwner = { scope, active: true, pending: null, intent: null };
+    const owner: StartOwner = { scope, active: true, pending: null, intent: null, recoveryAllowed: true, generation: 0 };
     ownerRef.current = owner;
     return () => { owner.active = false; };
   }, [scope]);
@@ -75,15 +78,42 @@ export function useStartConferenceAndDial({
   const setConference = useCallback((conference: string | null) => {
     const owner = ownerRef.current;
     if (!owner?.active || owner.scope !== scope) return;
+    owner.recoveryAllowed = false; owner.generation++;
     setSnapshot(previous => {
+      if (!owner.active || ownerRef.current !== owner) return previous;
       const saved = previous.scope === scope ? previous : initialStart(scope);
       return { ...saved, conference, customerCallSid: conference === saved.conference ? saved.customerCallSid : null };
     });
   }, [scope]);
 
+  const restoreConference = useCallback((conference: string) => {
+    const owner = ownerRef.current;
+    if (!owner?.active || owner.scope !== scope || !owner.recoveryAllowed || owner.pending || owner.intent) return;
+    owner.recoveryAllowed = false;
+    const generation = owner.generation;
+    setSnapshot(previous => {
+      if (!owner.active || ownerRef.current !== owner || owner.generation !== generation) return previous;
+      const saved = previous.scope === scope ? previous : initialStart(scope);
+      return saved.conference ? saved : { ...saved, conference };
+    });
+  }, [scope]);
+
+  /**
+   * @effect Adopt the saved room once for this committed screen owner.
+   * @effect-deps recovery, userId, workspaceId, campaignId, restoreConference (owned read and local command fence).
+   * @effect-side-effects state (retains the room after its customer ends; sends no call).
+   * @effect-why-not-loader Current audio refreshes after mount; Start and Stop must permanently retire old room adoption.
+   */
+  useEffect(() => {
+    const customer = recovery?.customer;
+    if (customer?.workspace_id === workspaceId && customer.user_id === userId && String(customer.campaign_id) === campaignId)
+      restoreConference(customer.conference_id);
+  }, [recovery, userId, workspaceId, campaignId, restoreConference]);
+
   const confirmStartStopped = useCallback((intentId: string) => {
     const owner = ownerRef.current;
     if (!owner?.active || owner.scope !== scope || owner.intent?.request.dial_intent_id !== intentId) return false;
+    owner.recoveryAllowed = false; owner.generation++;
     owner.pending = null; owner.intent = null;
     setSnapshot(previous => ({ ...(previous.scope === scope ? previous : initialStart(scope)),
       isLoading: false, awaitingReceipt: false, pendingStartIntentId: null }));
@@ -112,6 +142,8 @@ export function useStartConferenceAndDial({
       return;
     }
 
+    owner.recoveryAllowed = false; owner.generation++;
+
     const intent = startIntent(owner, { caller_id: callerId, workspace_id: workspaceId,
       campaign_id: campaignId, selected_device: selectedDevice, ...(audioSource ? { audioSource } : {}) });
     intent.uncertain = true;
@@ -138,7 +170,7 @@ export function useStartConferenceAndDial({
     }
   }, [scope, campaignId, workspaceId, callerId, selectedDevice, audioSource, disabledReason, showError]);
 
-  return { begin, conference: current.conference, customerCallSid: current.customerCallSid, setConference, confirmStartStopped,
+  return { begin, conference: current.conference, customerCallSid: current.customerCallSid, setConference, restoreConference, confirmStartStopped,
     creditsError: current.creditsError, error: current.error, isLoading: current.isLoading,
     awaitingReceipt: current.awaitingReceipt, pendingStartIntentId: current.pendingStartIntentId, disabledReason };
 }

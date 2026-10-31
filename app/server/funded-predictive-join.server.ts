@@ -32,7 +32,8 @@ export async function recordFundedPredictiveJoin(owner: VoiceReservation, event:
     const joined = await lockJoin(tx, owner, event);
     if (!joined) return null;
     const { reservation, current } = joined;
-    if (!await observePredictiveHumanPresence(tx, reservation, event)) return null;
+    const humanRevision = await observePredictiveHumanPresence(tx, reservation, event);
+    if (!humanRevision) return null;
     if (!current.outreach_attempt_id || !current.campaign_id || !current.contact_id) return null;
     const [attempt] = await tx.select().from(outreach_attempt).where(and(
       eq(outreach_attempt.workspace, owner.workspace), eq(outreach_attempt.id, current.outreach_attempt_id),
@@ -53,7 +54,7 @@ export async function recordFundedPredictiveJoin(owner: VoiceReservation, event:
       set: buildProviderStatusQueueUpdate("in-progress"), workspaceId: owner.workspace, exec: tx,
       deferEmit: emit => publish.push(emit),
     });
-    return { ...current, conference_id: reservation.conference_id };
+    return { ...current, conference_id: reservation.conference_id, humanRevision };
   });
   for (const emit of publish) await emit();
   return current;

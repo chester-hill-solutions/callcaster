@@ -31,7 +31,7 @@ function audioResponse(body: unknown, init?: ResponseInit) {
       if (pendingIntent?.connection_intent_id === value.connection_intent_id) pendingIntent = null;
     }
     discovery.read.mockResolvedValue({ workspace_id: owner.workspaceId, user_id: owner.userId, active: activeIntent, pending: pendingIntent,
-      recovery_required: Boolean(activeIntent?.connection?.cancel_requested || pendingIntent?.connection?.cancel_requested), customer_pending: false });
+      recovery_required: Boolean(activeIntent?.connection?.cancel_requested || pendingIntent?.connection?.cancel_requested), customer_pending: false, predictive: { revision: "0", customer: null } });
   }
   return Response.json(body, init);
 }
@@ -61,7 +61,7 @@ describe("agent audio request owner", () => {
   beforeEach(async () => {
     activeIntent = null; pendingIntent = null;
     discovery.read.mockReset().mockResolvedValue({ workspace_id: owner.workspaceId, user_id: owner.userId, active: null, pending: null,
-      recovery_required: false, customer_pending: false });
+      recovery_required: false, customer_pending: false, predictive: { revision: "0", customer: null } });
     vi.useFakeTimers(); storage = memoryStorage(); resource = new AgentAudioConnection(owner, storage); close = resource.mount();
     await resource.refresh();
   });
