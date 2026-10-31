@@ -27,7 +27,7 @@
     "blockedBy": [],
     "size": "L",
     "risk": "high",
-    "trackerRecommendation": "Native Bug, Priority High, Effort High, assigned @wra-sol, native parent #2546. Actual Project Status In progress was verified in the authenticated board. Branch bug/3091-review-duplicate-contacts is local; PR #3092 currently occupies the one open PR slot."
+    "trackerRecommendation": "Native Bug, Priority High, Effort High, assigned @wra-sol, native parent #2546. Actual Project Status In progress was verified in the authenticated board. Branch bug/3091-review-duplicate-contacts is local; PR #3092 is parked unmerged with its branch preserved. This is the active working feature."
   },
   {
     "issueNumber": 2638,

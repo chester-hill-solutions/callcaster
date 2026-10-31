@@ -6,7 +6,7 @@ Live native Issue metadata covers all 401 open issues. Type, Priority, Effort an
 
 Current dev includes the merged SMS export and credential-log fixes plus auth isolation #3074, compiler #3075 and credential limits #3079. The current Project export confirms their linked auth, compiler and credential-limit issues are on-dev. Keep issues open for deployed verification and release acceptance.
 
-The approved merge batch #3070 and CI changes #3082–#3084 are merged into dev. PR #3087 is now also merged at 6f940f35; its tree matches tested e93fb40a and both dev app/worker deployments pass. PRs #3081 and #3086 remain parked with both original branches saved. PR #3092 is the current open PR at this selected refresh; #3091 stays local until that slot is free.
+The approved merge batch #3070 and CI changes #3082–#3084 are merged into dev. PR #3087 is now also merged at 6f940f35; its tree matches tested e93fb40a and both dev app/worker deployments pass. PRs #3081 and #3086 remain parked with both original branches saved. PR #3092 is parked unmerged and its branch is preserved. The active repair is #3091; publication and full remote validation follow its local checks.
 
 Priority correction, 2026-10-31: take existing urgent and high-priority app requirements first. #3085 and #3088 are on-dev. Parent #2546 and reviewed-repair child #3091 are In progress in the authenticated board. PR #3090 is merged with green CI and successful dev app/worker deployments. The #3091 repair is local and has no PR yet. Keep #2679 person identity and the #2089 ambiguous-recipient guard. Other sections retain their prior snapshot evidence.
 
@@ -51,7 +51,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: 28 real database repair and authenticated-route cases pass. They cover history, queues, rollback, opt-outs, identity conflicts, roles, stale reviews, concurrent imports, repeat confirmations and the manual SMS route with its provider send stubbed.; 99 affected database cases passed before the final route additions; 36 affected UI cases pass. The original apply regressions fail while 11 controls pass. The import/repair lock-order regression failed before the shared lock fix.
 - Missing tests: Final focused UI/Node/DB checks, fast local gate, full exact-head GitHub CI and deployed acceptance.
 - Done when: Do not merge distinct external or voter identities or bypass ambiguous-recipient protection.; Retain the chosen profile, source snapshots, history and completed queue state. Any saved opt-out remains effective.; Keep import receipts immutable and serialize imports with repair. Reject active work and stale reviews; roll back failures; repeat requests apply once.
-- Tracker: Native Bug, Priority High, Effort High, assigned @wra-sol, native parent #2546. Actual Project Status In progress was verified in the authenticated board. Branch bug/3091-review-duplicate-contacts is local; PR #3092 currently occupies the one open PR slot.
+- Tracker: Native Bug, Priority High, Effort High, assigned @wra-sol, native parent #2546. Actual Project Status In progress was verified in the authenticated board. Branch bug/3091-review-duplicate-contacts is local; PR #3092 is parked unmerged with its branch preserved. This is the active working feature.
 
 
 ### [#3073](https://github.com/chester-hill-solutions/callcaster/issues/3073) Align the patched Twilio redirect dependency
