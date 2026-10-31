@@ -17,6 +17,8 @@ import { dequeueQueueEntry, recordQueueAttemptFailure } from "@/lib/campaign-que
 import { claimQueueEntryForSms } from "@/lib/campaign-queue-claim.server";
 import { loadCampaignSmsDispatchData } from "@/lib/sms-campaign-db.server";
 import { getCampaignQueueById } from "@/lib/database/campaign.server";
+import { findSmsOptOutPhoneKeys } from "@/lib/database/contact.server";
+import { getConversationPhoneKey } from "@/lib/chat-conversation-sort";
 import { getWorkspaceTwilioPortalConfig } from "@/lib/database/workspace.server";
 import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
 import {
@@ -185,6 +187,10 @@ export async function dispatchCampaignSmsBatch(args: {
   const allQueued = [...(audience ?? [])].sort((left, right) => left.id - right.id);
   const queueSelection = selectEligibleCampaignQueueMembers(allQueued, maxContacts);
   const queueMembers = queueSelection.selected;
+  const optedOutPhoneKeys = await findSmsOptOutPhoneKeys(
+    workspaceId,
+    queueMembers.flatMap(member => member.contact?.phone ? [member.contact.phone] : []),
+  );
 
   const responses: ContactDispatchResult[] = [];
   const counts = {
@@ -231,6 +237,7 @@ export async function dispatchCampaignSmsBatch(args: {
     campaign,
     counts,
     claimedNumbers,
+    optedOutPhoneKeys,
     budget,
     sendPolicy,
     startPacer,
@@ -386,6 +393,7 @@ type HandleMemberCtx = {
   campaign: CampaignData;
   counts: DispatchCounts;
   claimedNumbers: Map<string, SmsPhoneClaim>;
+  optedOutPhoneKeys: Set<string>;
   budget: DispatchCreditBudget;
   sendPolicy: ReturnType<typeof smsSendPolicy>;
   startPacer: StartPacer;
@@ -502,7 +510,7 @@ async function handleMemberInner(
     });
   }
 
-  if (member.contact?.opt_out) {
+  if (member.contact?.opt_out || ctx.optedOutPhoneKeys.has(getConversationPhoneKey(normalizedPhone) ?? "")) {
     await withPrepPermit(ctx, () =>
       dequeueQueueEntry({
         by: { id: member.id },

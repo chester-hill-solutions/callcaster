@@ -93,13 +93,15 @@ vi.mock("@/lib/db-rpc.server", async (importOriginal) => ({
   rpcFailExhaustedCampaignQueueContacts: (...args: unknown[]) =>
     mocks.rpcFailExhausted(...args),
 }));
-vi.mock("@/server/tenant-db", () => ({
+vi.mock("@/server/tenant-db", async importOriginal => ({
+  ...await importOriginal<typeof import("@/server/tenant-db")>(),
   // `workspace_number` is a fixture, not an assertion: ownership of the sending
   // number is not what this file tests, but `dispatchCampaignSmsBatch` now
   // resolves it before the readiness gate under test, so the row has to say the
   // number is usable or the gate is never reached. Ownership itself is proved in
   // test/integration-db/caller-id-usability.test.ts, against a real database.
   createTenantDb: () => ({
+    contact: { findMany: async () => [] },
     workspace_number: {
       findFirst: async () => ({ id: 1, suspended_at: null }),
     },

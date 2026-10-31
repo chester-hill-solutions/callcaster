@@ -14,6 +14,7 @@ export const tenantDbMocks = {
   messageUpdate: vi.fn(),
   messageDelete: vi.fn(),
   contactUpdate: vi.fn(),
+  contactFindMany: vi.fn(),
   callInsert: vi.fn(),
   callDelete: vi.fn(),
   callUpdate: vi.fn(),
@@ -21,6 +22,7 @@ export const tenantDbMocks = {
 };
 
 function applyTenantDbMockImplementations() {
+  tenantDbMocks.contactFindMany.mockResolvedValue([]);
   tenantDbMocks.messageInsert.mockImplementation(async (payload: unknown) => {
     tenantDbStubState.messageInsertCalls.push(payload);
     if (tenantDbStubState.messageInsertError) {
@@ -89,7 +91,7 @@ export function createTenantDbMock() {
       update: tenantDbMocks.messageUpdate,
       delete: tenantDbMocks.messageDelete,
     },
-    contact: { update: tenantDbMocks.contactUpdate },
+    contact: { update: tenantDbMocks.contactUpdate, findMany: tenantDbMocks.contactFindMany },
     call: {
       insert: tenantDbMocks.callInsert,
       delete: tenantDbMocks.callDelete,

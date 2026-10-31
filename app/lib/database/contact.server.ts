@@ -103,6 +103,23 @@ export async function findSmsRecipientContactsForPhones(workspaceId: string, pho
   return (tdb ?? createTenantDb(workspaceId)).contact.findMany({ where: inArray(normalizedContactPhoneSql(), keys) });
 }
 
+/** A saved opt-out applies to every copy of the same workspace phone. */
+export async function findSmsOptOutPhoneKeys(workspaceId: string, phoneNumbers: string[]): Promise<Set<string>> {
+  const optedOut = new Set<string>();
+  const phones = [...new Set(phoneNumbers)];
+  // The legacy HTTP adapter can select a large audience. Bound query parameters
+  // while keeping the same canonical identity used by SMS recipient checks.
+  for (let offset = 0; offset < phones.length; offset += 500) {
+    const contacts = await findSmsRecipientContactsForPhones(workspaceId, phones.slice(offset, offset + 500));
+    for (const contact of contacts) {
+      if (!contact.opt_out) continue;
+      const key = getConversationPhoneKey(contact.phone);
+      if (key) optedOut.add(key);
+    }
+  }
+  return optedOut;
+}
+
 export async function findSmsRecipientContacts(
   workspaceId: string,
   phoneNumber: string,

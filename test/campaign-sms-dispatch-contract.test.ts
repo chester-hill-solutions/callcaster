@@ -44,6 +44,8 @@ const mocks = vi.hoisted(() => ({
   getWorkspaceCreditsBalance: vi.fn(async () => 100),
   loadCampaignSmsDispatchData: vi.fn(),
   getCampaignQueueById: vi.fn(),
+  workspaceContacts: new Array<{ phone: string; opt_out: boolean }>(),
+  readWorkspaceContacts: vi.fn<(...args: unknown[]) => Promise<Array<{ phone: string; opt_out: boolean }>>>(),
   getWorkspaceTwilioPortalConfig: vi.fn(),
   createWorkspaceTwilioInstance: vi.fn(),
   dequeueQueueEntry: vi.fn(async () => undefined),
@@ -62,6 +64,7 @@ const mocks = vi.hoisted(() => ({
   recordQueueAttemptFailure: vi.fn(async () => undefined),
   createTenantDb: vi.fn(() => ({
     tenant: true,
+    contact: { findMany: (...args: unknown[]) => mocks.readWorkspaceContacts(...args) },
     workspace_number: { findFirst: async () => ({ id: 1, suspended_at: null }) },
     message: { update: async () => [{ outreach_attempt_id: 1 }] },
   })),
@@ -264,10 +267,50 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
+    name: "another workspace contact with the same phone is opted out (#3088)",
+    queue: [
+      {
+        id: 503,
+        contact_id: 11,
+        contact: { id: 11, phone: "+15557654321", firstname: "Queued copy", opt_out: false },
+      },
+    ],
+    seed: () => {
+      mocks.workspaceContacts.push(
+        { phone: "+15557654321", opt_out: false },
+        { phone: "(555) 765-4321", opt_out: true },
+      );
+    },
+    expect: { dequeueReasons: ["Contact opted out"], sendsAttempted: 0 },
+  },
+  {
+    name: "a different opted-out phone does not stop this recipient (#3088)",
+    queue: [
+      {
+        id: 504,
+        contact_id: 12,
+        contact: { id: 12, phone: "+15557654321", firstname: "Eligible", opt_out: false },
+      },
+    ],
+    seed: () => {
+      mocks.workspaceContacts.push(
+        { phone: "+15557654321", opt_out: false },
+        { phone: "+15550001111", opt_out: true },
+      );
+    },
+    expect: { dequeueReasons: ["SMS message sent"], sendsAttempted: 1 },
+  },
+  {
     // In-batch dedup: two queue rows for two different contact IDs sharing
     // one normalized phone. Persistent duplicate check cannot see the sibling
     // still executing in the same call — the in-memory reservation must.
     name: "two rows sharing one normalized phone: first sends, second dequeues as duplicate",
+    seed: () => {
+      mocks.workspaceContacts.push(
+        { phone: "+15556667777", opt_out: false },
+        { phone: "(555) 666-7777", opt_out: false },
+      );
+    },
     queue: [
       {
         id: 601,
@@ -291,6 +334,7 @@ const SCENARIOS: Scenario[] = [
 ];
 
 function seedCommonMocks() {
+  mocks.workspaceContacts.length = 0;
   for (const fn of Object.values(mocks)) {
     if (typeof fn === "function" && "mockReset" in fn) {
       (fn as any).mockReset?.();
@@ -303,6 +347,7 @@ function seedCommonMocks() {
   });
   mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
   mocks.getWorkspaceCreditsBalance.mockResolvedValue(100);
+  mocks.readWorkspaceContacts.mockImplementation(async () => mocks.workspaceContacts);
   mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue({
     ...basePortal,
     parallelDispatchEnabled: false,
@@ -331,7 +376,7 @@ function seedCommonMocks() {
   mocks.logger.error.mockClear();
 }
 
-async function runHttpAdapter() {
+async function runHttpAdapter(expectedStatus = 200) {
   mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
     campaign_id: String(CAMPAIGN_ID),
     workspace_id: TEST_WORKSPACE_ID,
@@ -341,7 +386,7 @@ async function runHttpAdapter() {
   const res = await asRouteResponse(
     mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
   );
-  expect(res.status).toBe(200);
+  expect(res.status).toBe(expectedStatus);
   return res;
 }
 
@@ -401,6 +446,36 @@ describe.each(SCENARIOS)("SMS dispatch contract — $name", (scenario) => {
     assertSendContract(scenario.expect.sendsAttempted);
     // Worker exposes the coordinator's counts; verify they match the fixture.
     expect(result.sent).toBe(scenario.expect.sendsAttempted);
+  });
+});
+
+describe("SMS dispatch contract — failed workspace opt-out read (#3088)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    seedCommonMocks();
+    mocks.loadCampaignSmsDispatchData.mockResolvedValue(baseCampaignData());
+    mocks.getCampaignQueueById.mockResolvedValue([{
+      id: 505,
+      contact_id: 13,
+      contact: { id: 13, phone: "+15557654321", firstname: "Queued", opt_out: false },
+    }]);
+    mocks.readWorkspaceContacts.mockRejectedValue(new Error("Consent lookup unavailable"));
+  });
+
+  test("HTTP reports the failure without sending or consuming queued work", async () => {
+    await runHttpAdapter(500);
+    assertSendContract(0);
+    assertDequeueContract([]);
+    expect(mocks.persistMessageRecord).not.toHaveBeenCalled();
+    expect(mocks.recordQueueAttemptFailure).not.toHaveBeenCalled();
+  });
+
+  test("worker reports the failure without sending or consuming queued work", async () => {
+    await expect(runWorkerAdapter()).rejects.toThrow("Consent lookup unavailable");
+    assertSendContract(0);
+    assertDequeueContract([]);
+    expect(mocks.persistMessageRecord).not.toHaveBeenCalled();
+    expect(mocks.recordQueueAttemptFailure).not.toHaveBeenCalled();
   });
 });
 

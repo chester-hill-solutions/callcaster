@@ -88,8 +88,9 @@ vi.mock("@/lib/db-rpc.server", async (importOriginal) => ({
   rpcFailExhaustedCampaignQueueContacts: (...args: unknown[]) =>
     mocks.rpcFailExhaustedCampaignQueueContacts(...args),
 }));
-vi.mock("@/server/tenant-db", () => ({
-  createTenantDb: vi.fn(() => ({ tenant: true })),
+vi.mock("@/server/tenant-db", async importOriginal => ({
+  ...await importOriginal<typeof import("@/server/tenant-db")>(),
+  createTenantDb: vi.fn(() => ({ tenant: true, contact: { findMany: async () => [] } })),
 }));
 vi.mock("@/lib/campaign-sms-send.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/campaign-sms-send.server")>()),

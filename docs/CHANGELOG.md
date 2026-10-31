@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Campaign SMS respects an opt-out saved on any matching workspace contact, including copies outside the selected audience ([#3088](https://github.com/chester-hill-solutions/callcaster/issues/3088)).
+
 - Fixed: Importing a phone into another audience reuses its workspace contact and preserves its saved details and opt-out state. The row report identifies reused contacts and ambiguous duplicate records ([PR #3087](https://github.com/chester-hill-solutions/callcaster/pull/3087), [#3085](https://github.com/chester-hill-solutions/callcaster/issues/3085)).
 
 - Changed: Campaign calling hours and SMS send windows use a compact summary that groups matching days and keeps exceptions, inactive days and all time intervals visible ([PR #3034](https://github.com/chester-hill-solutions/callcaster/pull/3034), [#2626](https://github.com/chester-hill-solutions/callcaster/issues/2626)).
