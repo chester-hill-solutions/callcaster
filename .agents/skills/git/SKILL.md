@@ -30,8 +30,9 @@ existing PR, and preserve every selected original head as an ancestor. Keep
 failed and unpublished work out. Use a merge commit only when the repository
 and base rules allow it; never weaken branch protection. If the trunk moves,
 merge it into the batch to keep original ancestry, then retest the new head.
-Run full `npm run ci:local` and the applicable real-DB tier at the combined
-head before the single push. Require exact-head remote gates before merging,
+Run `npm run ci:local` and focused tests for affected behavior at the combined
+head before the single push. Full suites and production checks run in CI.
+Require exact-head remote gates, including the applicable real-DB tier, before merging,
 then read back each original PR state. Keep ordinary PRs atomic.
 
 ## Required Checks
@@ -59,7 +60,7 @@ proof that a commit is absent from a branch.
 Git cannot rebase a dirty worktree. Do not discard tested changes to satisfy the
 rebase step. Fetch and check whether `origin/dev` changed, commit the scoped work,
 then rebase the clean branch before pushing. If the rebase changes the tested
-source or its base, run full `npm run ci:local` again before the push.
+source or its base, rerun `npm run ci:local` and affected focused tests before the push.
 
 Never use destructive reset or checkout commands to discard work unless the
 user explicitly requests it.
