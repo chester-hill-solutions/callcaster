@@ -13,8 +13,8 @@
       "test/integration-db/contact-merge.test.ts"
     ],
     "existingTests": [
-      "28 real database repair and authenticated-route cases pass. They cover history, queues, rollback, opt-outs, identity conflicts, roles, stale reviews, concurrent imports, repeat confirmations and the manual SMS route with its provider send stubbed.",
-      "99 affected database cases passed before the final route additions; 36 affected UI cases pass. The original apply regressions fail while 11 controls pass. The import/repair lock-order regression failed before the shared lock fix."
+      "30 real database repair and authenticated-route cases pass. They cover history, queues, rollback, opt-outs, identity conflicts, roles, stale reviews, concurrent imports, repeat confirmations and the manual SMS route with its provider send stubbed.",
+      "116 affected database/schema cases and 37 affected UI cases pass. The original apply regressions fail while 11 controls pass. The import/repair lock-order regression failed before the shared lock fix."
     ],
     "missingTests": [
       "Final focused UI/Node/DB checks, fast local gate, full exact-head GitHub CI and deployed acceptance."

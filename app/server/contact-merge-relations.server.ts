@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 import {
   audience,
   call,
@@ -252,6 +252,13 @@ export async function moveMergeRelations(
         contact_id: retainedId,
       })),
     );
+  if (union.size)
+    await tdb.audience.update({
+      where: inArray(audience.id, [...union.keys()]),
+      set: {
+        total_contacts: sql`(select count(*) from contact_audience where contact_audience.audience_id = ${audience.id})`,
+      },
+    });
   const removedIds = ids.filter((id) => id !== retainedId);
   await tdb.call.update({
     set: { contact_id: retainedId },

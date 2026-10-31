@@ -107,9 +107,11 @@ async function history() {
     await sql`insert into survey (workspace, survey_id, title) values (${workspace}, ${randomUUID()}, 'Owned survey') returning id`;
   await sql`insert into survey_response (survey_id, result_id, contact_id) values (${survey.id}, ${randomUUID()}, ${duplicateId})`;
   const lists =
-    await sql`insert into audience (workspace, name) values (${workspace}, 'First list'), (${workspace}, 'Second list') returning id`;
+    await sql`insert into audience (workspace, name, total_contacts) values (${workspace}, 'First list', 2), (${workspace}, 'Second list', 1) returning id`;
   await sql`insert into contact_audience (contact_id, audience_id) values
     (${retainedId}, ${lists[0].id}), (${duplicateId}, ${lists[0].id}), (${duplicateId}, ${lists[1].id})`;
+  await sql`insert into predictive_machine_operation (id, workspace, call_sid, outreach_attempt_id, campaign_id, conference_id, user_id, ack_url, state, lease_token, lease_until, successor_contact_id, successor_queue_id, send_started_at, successor_attempt_id)
+    values (${randomUUID()}, ${workspace}, ${"CA-operation-" + randomUUID()}, ${attempt.id}, ${campaign.id}, 'Owned completed conference', ${actor("member").id}, 'https://example.test/ack', 'continued', ${randomUUID()}, now(), ${duplicateId}, ${queues[1].id}, now(), ${attempt.id})`;
   return {
     campaignId: campaign.id,
     queues: queues.map((row) => Number(row.id)),
@@ -132,6 +134,10 @@ async function savedState() {
       await sql`select * from contact_audience where contact_id in (${retainedId}, ${duplicateId}) order by contact_id, audience_id`,
     responses:
       await sql`select * from survey_response where contact_id in (${retainedId}, ${duplicateId}) order by id`,
+    lists:
+      await sql`select * from audience where workspace = ${workspace} order by id`,
+    operations:
+      await sql`select * from predictive_machine_operation where workspace = ${workspace} order by id`,
     receipts:
       await sql`select * from contact_merge_receipt where workspace = ${workspace} order by id`,
   };
@@ -334,7 +340,7 @@ describe.skipIf(!databaseUrl)(
 
     test("the review reports the union of audience memberships, including overlapping lists", async () => {
       const lists =
-        await sql`insert into audience (workspace, name) values (${workspace}, 'First list'), (${workspace}, 'Second list') returning id`;
+        await sql`insert into audience (workspace, name, total_contacts) values (${workspace}, 'First list', 2), (${workspace}, 'Second list', 1) returning id`;
       await sql`insert into contact_audience (contact_id, audience_id) values
       (${retainedId}, ${lists[0].id}), (${duplicateId}, ${lists[0].id}), (${duplicateId}, ${lists[1].id})`;
       const response = await post({
@@ -419,6 +425,16 @@ describe.skipIf(!databaseUrl)(
         await sql`select audience_id from contact_audience where contact_id = ${retainedId} order by audience_id`;
       expect(memberships.map((row) => Number(row.audience_id))).toEqual(
         fixture.audienceIds,
+      );
+      const totals =
+        await sql`select total_contacts from audience where workspace = ${workspace} order by id`;
+      expect(totals.map((row) => Number(row.total_contacts))).toEqual([1, 1]);
+      const operations =
+        await sql`select successor_contact_id, successor_queue_id from predictive_machine_operation where workspace = ${workspace}`;
+      expect(operations).toHaveLength(1);
+      expect(Number(operations[0].successor_contact_id)).toBe(retainedId);
+      expect(Number(operations[0].successor_queue_id)).toBe(
+        Number(queues[0].id),
       );
       const receipts =
         await sql`select source_profiles, actor_id from contact_merge_receipt where workspace = ${workspace}`;
@@ -776,6 +792,30 @@ describe.skipIf(!databaseUrl)(
         send.mockRestore();
         config.mockRestore();
       }
+    });
+
+    test("a queue claim after review refuses confirmation while its campaign is paused", async () => {
+      const fixture = await history();
+      const fields = await confirmation();
+      await sql`update campaign_queue set assigned_to_user_id = ${actor("member").id}, claimed_at = now(), queue_state = 'assigned' where id = ${fixture.queues[0]}`;
+      const before = await savedState();
+      expect((await post(fields)).status).toBe(409);
+      expect(await savedState()).toEqual(before);
+    });
+
+    test("an unfinished continuation prevents merge even after the original call ended", async () => {
+      await history();
+      await sql`update predictive_machine_operation set state = 'continuing' where workspace = ${workspace}`;
+      const before = await savedState();
+      expect(
+        (
+          await post({
+            intent: "preview-contact-merge",
+            merge_contact_ids: JSON.stringify([retainedId, duplicateId]),
+          })
+        ).status,
+      ).toBe(409);
+      expect(await savedState()).toEqual(before);
     });
 
     test("an ordinary contact edit still persists only the selected profile", async () => {
