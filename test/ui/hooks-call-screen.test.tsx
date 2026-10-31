@@ -69,14 +69,22 @@ let dialType = "call";
 let callerId = "+15550000001";
 let verifiedNumbers: string[] = [];
 let audioWorkspaceId = "10000000-0000-4000-8000-000000000001";
+let screenUserId = "user-1";
+let screenCampaignId = 1;
 let workspaceAccess = true;
 let queueItems = [queueItem];
 let roomState: { status: string; contact_id: number | null } = { status: "idle", contact_id: null };
 let joinedRoot: string | null = null;
+function replaceControlScope(scope: string) {
+  if (scope === "actor") screenUserId = "user-2";
+  else if (scope === "workspace") audioWorkspaceId = "10000000-0000-4000-8000-000000000002";
+  else if (scope === "campaign") screenCampaignId = 2;
+  else throw new Error("Unknown control scope fixture");
+}
 function screenAudioIntent() {
   const saved = recoveredIntent();
-  return { ...saved, workspace_id: audioWorkspaceId, user_id: "user-1",
-    connection: { ...saved.connection, workspace_id: audioWorkspaceId, user_id: "user-1" } };
+  return { ...saved, workspace_id: audioWorkspaceId, user_id: screenUserId,
+    connection: { ...saved.connection, workspace_id: audioWorkspaceId, user_id: screenUserId } };
 }
 let initialCall: { sid: string; status: string; user_id: string; campaign_id: number } | null = null;
 let initialAttempt: {
@@ -109,13 +117,13 @@ vi.mock("react-router", async () => {
     },
     useLoaderData: () => ({
       campaign: {
-        id: 1,
+        id: screenCampaignId,
         dial_type: dialType,
         caller_id: callerId,
         group_household_queue: false,
       },
       attempts: initialAttempt ? [initialAttempt] : [],
-      user: { id: "user-1" },
+      user: { id: screenUserId },
       workspaceId: audioWorkspaceId,
       campaignDetails: { script_id: 1 },
       credits: 100,
@@ -142,6 +150,8 @@ describe("useCallScreen", () => {
     callerId = "+15550000001";
     verifiedNumbers = [];
     audioWorkspaceId = "10000000-0000-4000-8000-000000000001";
+    screenUserId = "user-1";
+    screenCampaignId = 1;
     localStorage.clear();
     workspaceAccess = true;
     queueItems = [queueItem];
@@ -158,7 +168,7 @@ describe("useCallScreen", () => {
       vi.fn((input: RequestInfo | URL) => {
         const url = String(input);
         if (url.startsWith("/api/connect-phone-device?") && url.includes("current=1")) {
-          return Promise.resolve(Response.json({ workspace_id: audioWorkspaceId, user_id: "user-1", active: null, pending: null,
+          return Promise.resolve(Response.json({ workspace_id: audioWorkspaceId, user_id: screenUserId, active: null, pending: null,
             recovery_required: false, customer_pending: false }));
         }
         if (url.includes("/call-session/release")) {
@@ -795,4 +805,114 @@ describe("useCallScreen", () => {
     const { result } = renderHook(() => useCallScreen());
     expect(result.current.formState.update).toBeNull();
   });
+  test.each(["actor", "workspace", "campaign"])("retired customer controls: captured commands cannot cross a changed %s", async scope => {
+    dialType = "predictive"; joinedRoot = "CA22222222222222222222222222222222";
+    roomState = { status: "connected", contact_id: 7 };
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const api = await import("@/lib/services/hooks-api");
+    const { result, rerender } = renderHook(() => useCallScreen());
+    const oldHangUp = result.current.callControls.hangUp;
+    const oldVoiceDrop = result.current.callControls.handleVoiceDrop;
+    replaceControlScope(scope); rerender();
+    await act(async () => { await oldHangUp(); oldVoiceDrop(); });
+    expect(api.hangupCall).not.toHaveBeenCalled();
+    expect(fetcher.submit).not.toHaveBeenCalled();
+  });
+  test.each(["actor", "workspace", "campaign"])("retired customer controls: pending failure cannot cross a changed %s", async scope => {
+    dialType = "predictive"; joinedRoot = "CA22222222222222222222222222222222";
+    roomState = { status: "connected", contact_id: 7 };
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const api = await import("@/lib/services/hooks-api");
+    const { toast } = await import("sonner");
+    let rejectOld!: (error: Error) => void;
+    vi.mocked(api.hangupCall).mockReturnValueOnce(new Promise((_resolve, reject) => { rejectOld = reject; }));
+    const { result, rerender } = renderHook(() => useCallScreen());
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.callControls.hangUp(); });
+    expect(api.hangupCall).toHaveBeenCalledOnce();
+    replaceControlScope(scope); rerender();
+    await act(async () => { rejectOld(new Error("Previous page failure")); await pending; });
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(result.current.callControls.displayState).toBe("connected");
+  });
+  test("retired customer controls: Hang Up captured before unmount cannot send", async () => {
+    dialType = "predictive"; joinedRoot = "CA22222222222222222222222222222222";
+    roomState = { status: "connected", contact_id: 7 };
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const api = await import("@/lib/services/hooks-api");
+    const { result, unmount } = renderHook(() => useCallScreen());
+    const stale = result.current.callControls.hangUp;
+    unmount();
+    await act(async () => { await stale(); });
+    expect(api.hangupCall).not.toHaveBeenCalled();
+  });
+  test("retired customer controls: Voice Drop captured before unmount cannot send", async () => {
+    dialType = "predictive"; joinedRoot = "CA22222222222222222222222222222222";
+    roomState = { status: "connected", contact_id: 7 };
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const { result, unmount } = renderHook(() => useCallScreen());
+    const stale = result.current.callControls.handleVoiceDrop;
+    unmount();
+    act(() => stale());
+    expect(fetcher.submit).not.toHaveBeenCalled();
+  });
+  test.each([false, true])("retired customer controls: late Hang Up failure after unmount is silent (%s)", async rejected => {
+    dialType = "predictive"; joinedRoot = "CA22222222222222222222222222222222";
+    roomState = { status: "connected", contact_id: 7 };
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const api = await import("@/lib/services/hooks-api");
+    const { toast } = await import("sonner");
+    let settle!: () => void;
+    vi.mocked(api.hangupCall).mockReturnValueOnce(new Promise((resolve, reject) => {
+      settle = () => rejected ? reject(new Error("Retired route account failure")) : resolve({ success: false });
+    }));
+    const { result, unmount } = renderHook(() => useCallScreen());
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.callControls.hangUp(); });
+    expect(api.hangupCall).toHaveBeenCalledOnce();
+    unmount();
+    await act(async () => { settle(); await pending; });
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+  test("retired customer controls: late old-customer failure does not report against the next human", async () => {
+    dialType = "predictive"; joinedRoot = "CA22222222222222222222222222222222";
+    roomState = { status: "connected", contact_id: 7 };
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const api = await import("@/lib/services/hooks-api");
+    const { toast } = await import("sonner");
+    let rejectOld!: (error: Error) => void;
+    vi.mocked(api.hangupCall).mockReturnValueOnce(new Promise((_resolve, reject) => { rejectOld = reject; }));
+    const { result, rerender } = renderHook(() => useCallScreen());
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.callControls.hangUp(); });
+    joinedRoot = "CA33333333333333333333333333333333"; roomState = { status: "connected", contact_id: 8 }; rerender();
+    await act(async () => { rejectOld(new Error("Previous customer failure")); await pending; });
+    expect(result.current.callSid).toBe("CA33333333333333333333333333333333");
+    expect(result.current.callControls.displayState).toBe("connected");
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+  test("retired customer controls: stale Hang Up cannot send for the previous human", async () => {
+    dialType = "predictive"; joinedRoot = "CA22222222222222222222222222222222";
+    roomState = { status: "connected", contact_id: 7 };
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const api = await import("@/lib/services/hooks-api");
+    const { result, rerender } = renderHook(() => useCallScreen());
+    const stale = result.current.callControls.hangUp;
+    joinedRoot = "CA33333333333333333333333333333333"; roomState = { status: "connected", contact_id: 8 }; rerender();
+    await act(async () => { await stale(); });
+    expect(api.hangupCall).not.toHaveBeenCalled();
+    expect(result.current.callControls.displayState).toBe("connected");
+  });
+  test("retired customer controls: stale Voice Drop cannot send for the previous human", async () => {
+    dialType = "predictive"; joinedRoot = "CA22222222222222222222222222222222";
+    roomState = { status: "connected", contact_id: 7 };
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const { result, rerender } = renderHook(() => useCallScreen());
+    const stale = result.current.callControls.handleVoiceDrop;
+    joinedRoot = "CA33333333333333333333333333333333"; roomState = { status: "connected", contact_id: 8 }; rerender();
+    act(() => stale());
+    expect(fetcher.submit).not.toHaveBeenCalled();
+    expect(result.current.callControls.displayState).toBe("connected");
+  });
+
 });

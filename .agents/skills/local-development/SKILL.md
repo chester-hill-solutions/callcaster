@@ -227,6 +227,39 @@ retain known terminal intents so a later read cannot revive them.
 Admission fences block new operations. Keep an explicit Check for an already
 submitted Start on its captured request even when the server reports busy.
 
+Customer controls also need their committed page lifetime. Reuse the canonical
+customer owner, and check it before a provider command or Voice Drop submit,
+after an awaited reply, and before a global failure toast or SDK cleanup. Retire
+captured controls on actor, workspace or campaign changes and route disposal.
+Test retained callbacks and delayed success/refusal/rejection after unmount or
+customer replacement, plus matching current controls. An audio-resource fence
+alone does not retire every page callback. Disposing a customer-command adapter
+must not send a new Hang Up. SDK resource teardown remains with its owner.
+Keep wrapper method types tied to the underlying handler so an asynchronous
+acknowledgement cannot be erased by a `void` interface.
+
+For SDK Hang Up, retain the workspace lifetime, request generation and physical
+active-call identity through the provider reply. Retire old callbacks before
+send and ignore late feedback or cleanup after a new active call, scope change
+or unmount. Read the current held and incoming calls after the reply. A saved
+held-call list can revive a closed call; `disconnectAll` can end a new incoming
+call. Preserve matching current cleanup and the original SDK resource owner.
+Keep the physical call's original workspace with resource cleanup. A workspace
+change cannot rebind that call or send its cleanup through the new workspace.
+Provider teardown by the resource owner has no page or customer continuation.
+For explicit held-call commands, check live ownership before consuming a request
+generation and again after the reply. A closed-held callback cannot retire a
+valid active Hang Up. If the original held target becomes active, end that same
+physical call and restore the current held successor. Default active-call
+commands retain their render's physical target instead of reading a newer one.
+
+Check available disk space before long test runs and generated-inventory writes
+on a nearly full host. Keep several GB of working headroom. Preserve an ENOSPC
+run as an infrastructure failure, not an executed behavior baseline. Reclaim
+only proven task-owned disposable files or verified redundant evidence. Check
+affected generated files and regenerate them after space is available before
+starting source-hashed readers again.
+
 Discover uncertain module paths with `rg --files` before reading them. An ADR's
 planned layout can differ from the active source. A referenced skill can also
 exist only as a user file in the shared checkout; read it there without copying

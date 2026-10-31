@@ -3,6 +3,7 @@ import type { Call, Device } from "@twilio/voice-sdk";
 import { useCallDuration } from "./useCallDuration";
 import { useTwilioConnection } from "./useTwilioConnection";
 import { useCallHandling } from "./useCallHandling";
+import { useOwnedSdkCallCleanup } from "./useOwnedSdkCallCleanup";
 import { logger } from "@/lib/logger.client";
 
 interface TwilioDeviceHook {
@@ -14,7 +15,7 @@ interface TwilioDeviceHook {
   isMicMuted: boolean;
   setMicMuted: (muted: boolean) => void;
   makeCall: ReturnType<typeof useCallHandling>["makeCall"];
-  hangUp: () => void;
+  hangUp: ReturnType<typeof useCallHandling>["hangUp"];
   answer: () => void;
   holdAndAnswer: () => void;
   callState: string;
@@ -153,37 +154,7 @@ export function useTwilioDevice({
 
   const { callDuration, setCallDuration } = useCallDuration(callHandling.callState);
 
-  const activeCallRef = useRef(callHandling.activeCall);
-  const hangUpRef = useRef(callHandling.hangUp);
-  const callStateRef = useRef(callHandling.callState);
-
-  activeCallRef.current = callHandling.activeCall;
-  hangUpRef.current = callHandling.hangUp;
-  callStateRef.current = callHandling.callState;
-
-  /**
-   * @effect End the active call through the provider when
-   * the component unmounts, so calls do not stay live and consume credits
-   * after the agent navigates away.
-   * @effect-deps [] — mount-once cleanup-only; reads latest values via refs
-   * kept fresh on every render so the unmount teardown always acts on the
-   * current call regardless of stale closures. Device cleanup belongs to
-   * useTwilioConnection.
-   * @effect-side-effects hangUp calls the provider hangup API.
-   * @effect-why-not-loader Teardown of imperative SDK resources on unmount.
-   */
-  useEffect(() => {
-    return () => {
-      const hasActiveCall = Boolean(activeCallRef.current);
-      const isActive =
-        callStateRef.current === "connected" || callStateRef.current === "dialing";
-      if (hasActiveCall || isActive) {
-        hangUpRef.current?.().catch(() => {
-          logger.debug("Call hung up during unmount cleanup");
-        });
-      }
-    };
-  }, []);
+  useOwnedSdkCallCleanup(callHandling.activeCall, workspaceId);
 
   return {
     device: connection.device,

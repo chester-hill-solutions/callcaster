@@ -25,6 +25,7 @@ import { useCallScreenDialogs } from "@/hooks/call/useCallScreenDialogs";
 import { usePhoneVerification } from "@/hooks/call/usePhoneVerification";
 import { useAgentAudioConnection, useAgentBrowserReadiness } from "@/hooks/call/useAgentAudioConnection";
 import { useManualAudioDial } from "@/hooks/call/useManualAudioDial";
+import { useCustomerCallControls } from "@/hooks/call/useCustomerCallControls";
 import { agentAudioStartReason, useCallScreenAudio } from "@/hooks/call/useCallScreenAudio";
 import type { StartCallArgs } from "@/lib/manual-dial-client";
 import { useCallAudioControls } from "@/hooks/call/useCallAudioControls";
@@ -72,7 +73,6 @@ import { useCreditReconciliation } from "@/hooks/billing/useCreditReconciliation
 import { getCallSid } from "@/lib/twilio/twilio-call-params";
 import { KEYPAD_KEYS } from "@/lib/dtmf";
 import { isObject } from "@/lib/type-safety-utils";
-import { hangupCall } from "@/lib/services/hooks-api";
 import type {
   AppUser,
   LoaderData,
@@ -306,7 +306,7 @@ export function useCallScreen() {
 
   const agentLegSid = getCallSid(activeCall) ?? null;
 
-  const { displayState, displayColor, beginDial, terminalCallSid, customerCallSid, confirmCustomerEnded } = useCampaignCallFlow({
+  const { displayState, displayColor, beginDial, terminalCallSid, customerCallSid, isCurrentCustomer, confirmCustomerEnded } = useCampaignCallFlow({
     callSid: campaign?.dial_type === "predictive" ? joinedCustomerSid : agentAudio.resource.managesCustomerAudio() ? null : agentLegSid,
     confirmedCustomerSid: campaign?.dial_type === "predictive" ? joinedCustomerSid : null,
     agentLegSid: agentAudio.state.active?.callSid ?? agentLegSid,
@@ -328,22 +328,11 @@ export function useCallScreen() {
     roomPending: Boolean(conference) && agentAudio.state.customerPending && !callSid,
     selectedDevice, deviceStatus, hasPhoneSource: Boolean(phoneSource) });
 
-  const hangUp = useCallback(async () => {
-    try {
-      if (!callSid) {
-        if (campaign?.dial_type === "predictive" || agentAudio.resource.managesCustomerAudio()) return;
-        await sdkHangUp();
-        send({ type: "HANG_UP" });
-        return;
-      }
-      const result = await hangupCall({ callSid, workspaceId });
-      if (result?.success !== true) throw new Error("Could not confirm that the customer call ended. Try again.");
-      if (!confirmCustomerEnded()) return;
-      if (campaign?.dial_type !== "predictive" && !agentAudio.resource.managesCustomerAudio()) activeCall?.disconnect();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not end the customer call. Try again.");
-    }
-  }, [callSid, workspaceId, campaign?.dial_type, sdkHangUp, send, confirmCustomerEnded, activeCall, agentAudio.resource]);
+  const { hangUp, canControlCustomer } = useCustomerCallControls({
+    userId: user.id, workspaceId, campaignId: campaign?.id, callSid,
+    isPredictive: campaign?.dial_type === "predictive", activeCall, sdkHangUp, send,
+    isCurrentCustomer, confirmCustomerEnded, managesCustomerAudio: agentAudio.resource.managesCustomerAudio,
+  });
 
   // Two short busy-style bursts when the call ends — either side hanging up —
   // so the agent gets audible confirmation, not just the status text (#1363).
@@ -473,7 +462,7 @@ export function useCallScreen() {
   });
 
   const handleVoiceDrop = () => {
-    if (!callSid) return;
+    if (!callSid || !canControlCustomer()) return;
     const formData = new FormData();
     formData.append("callId", callSid);
     formData.append("workspaceId", workspaceId);
