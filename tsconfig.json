@@ -59,6 +59,8 @@
     "allowImportingTsExtensions": true,
 
     // Enhanced type safety options
+    "incremental": true,
+    "tsBuildInfoFile": "./node_modules/.cache/typecheck.tsbuildinfo",
     "noImplicitAny": true,
     "noImplicitReturns": true,
     "noImplicitThis": true,

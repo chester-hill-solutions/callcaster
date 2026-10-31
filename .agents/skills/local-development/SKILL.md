@@ -43,6 +43,16 @@ smallest check that proves the changed behavior, plus `git diff --check`:
 - TypeScript or Vite config: focused lint and `npm run typecheck`;
 - route or service behavior: the affected focused Vitest file.
 
+Use `npm run test:node:vitest -- <file>` for a focused Node test, and
+`npm run test:ui -- <file>` for a focused UI test. The `test:watch:node` and
+`test:watch:ui` commands keep the relevant suite open during edits. Use
+`npm run ci:local:fast` for type, lint and guard feedback before the full gate.
+Both gates share `scripts/lib/local-gate-plan.mjs`; update that plan when a
+required check changes. Keep generated-file writes and the shared ESLint cache
+in sequence. Only the independent guard phase can run in parallel. For a busy
+host, pass `-- --jobs=1`; inspect the printed per-check logs and times before
+changing concurrency. The fast gate does not replace full `ci:local`.
+
 Inspect warning counts in focused lint results. ESLint can exit zero while a
 ratchet still rejects new warnings. For nested fields, use the canonical
 `FormFieldControl` contract instead of overriding spacing owned by `FormField`.
