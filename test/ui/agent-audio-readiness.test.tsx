@@ -20,15 +20,20 @@ describe("phone to browser readiness", () => {
       callSid: `CA${"1".repeat(32)}`, requested_call_sid: null, source_agent_sid: null, campaign_id: null, destination: request.phoneNumber, transport: "phone", cancel_requested: false };
     const envelope = { workspace_id: owner.workspaceId, user_id: owner.userId, connection_intent_id: request.connection_intent_id,
       request: { transport: "phone", destination: request.phoneNumber, callSid: null, expectedAgentSid: null, campaignId: null } };
-    const fetcher = vi.fn(async (_url: string, options: RequestInit) => {
-      if (options.method === "POST") return Response.json({ success: true, ...audio });
+    let connected = false, stopped = false;
+    const fetcher = vi.fn(async (url: string, options: RequestInit) => {
+      if (url.includes("current=1")) return Response.json({ workspace_id: owner.workspaceId, user_id: owner.userId,
+        active: connected && !stopped ? { ...envelope, intent_state: "bound", connection: audio } : null,
+        pending: null, recovery_required: false, customer_pending: false });
+      if (options.method === "POST") { connected = true; return Response.json({ success: true, ...audio }); }
+      if (options.method === "DELETE") stopped = true;
       return Response.json(options.method === "DELETE" ? { ...envelope, intent_state: "canceled", connection: { ...audio, connection_state: "canceled", cancel_requested: true } }
         : { ...envelope, intent_state: "bound", connection: audio });
     });
     vi.stubGlobal("fetch", fetcher);
     const storage = new Map<string, string>();
     const resource = new AgentAudioConnection(owner, { getItem: key => storage.get(key) ?? null, setItem: (key, value) => { storage.set(key, value); } });
-    const dispose = resource.mount(); await resource.begin(request); resource.prepareBrowser();
+    const dispose = resource.mount(); await resource.refresh(); await resource.begin(request); resource.prepareBrowser();
     let resolve: () => void = () => undefined, reject: (error: Error) => void = () => undefined;
     const input = new Promise<void>((done, fail) => { resolve = done; reject = fail; });
     const setInputDevice = vi.fn(() => input);

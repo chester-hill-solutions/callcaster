@@ -10,10 +10,11 @@ type AudioScreenOptions = {
   requestMicrophone: () => Promise<void>; reconnect: () => void;
 };
 
-export function agentAudioStartReason({ joined, ready, pendingCustomer, selectedDevice, deviceStatus, hasPhoneSource }: {
-  joined: boolean; ready: boolean; pendingCustomer: boolean; selectedDevice: string; deviceStatus: string; hasPhoneSource: boolean;
+export function agentAudioStartReason({ joined, ready, pendingCustomer, roomPending, selectedDevice, deviceStatus, hasPhoneSource }: {
+  joined: boolean; ready: boolean; pendingCustomer: boolean; roomPending?: boolean; selectedDevice: string; deviceStatus: string; hasPhoneSource: boolean;
 }) {
   if (!joined) return "Join this campaign";
+  if (roomPending) return "Dialer running";
   if (pendingCustomer) return "Check call request";
   if (!ready) return "Check audio connection";
   if (selectedDevice === "computer" && deviceStatus !== "Registered") return "Connect computer audio";

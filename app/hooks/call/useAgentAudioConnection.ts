@@ -25,7 +25,7 @@ export function useAgentAudioConnection(workspaceId: string, userId: string) {
   const phoneSource = state.active?.transport === "phone" && isVoiceAudioEffective(state.active) && !state.active.requested_call_sid
     ? { connectionId: state.active.connection_id, generation: state.active.generation } : undefined;
   const wantsBrowser = !state.restoring && (state.selectedDevice === "computer" || state.preparingBrowser || state.pendingDevice === "computer");
-  const ready = !state.restoring && !state.pendingDevice && !state.preparingBrowser && !state.error;
+  const ready = state.currentVerified && !state.restoring && !state.recoveryRequired && !state.pendingDevice && !state.preparingBrowser && !state.error;
   return { resource, state, phoneSource, wantsBrowser, ready };
 }
 

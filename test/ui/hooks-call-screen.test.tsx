@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { intent as recoveredIntent } from "../helpers/voice-audio-current-fixture";
 import {
   createMockFetcher,
   createWorkspaceRealtimeMock,
@@ -67,11 +68,16 @@ const queueItem = {
 let dialType = "call";
 let callerId = "+15550000001";
 let verifiedNumbers: string[] = [];
-let audioWorkspaceId = "ws";
+let audioWorkspaceId = "10000000-0000-4000-8000-000000000001";
 let workspaceAccess = true;
 let queueItems = [queueItem];
 let roomState: { status: string; contact_id: number | null } = { status: "idle", contact_id: null };
 let joinedRoot: string | null = null;
+function screenAudioIntent() {
+  const saved = recoveredIntent();
+  return { ...saved, workspace_id: audioWorkspaceId, user_id: "user-1",
+    connection: { ...saved.connection, workspace_id: audioWorkspaceId, user_id: "user-1" } };
+}
 let initialCall: { sid: string; status: string; user_id: string; campaign_id: number } | null = null;
 let initialAttempt: {
   id: number;
@@ -135,7 +141,7 @@ describe("useCallScreen", () => {
     dialType = "call";
     callerId = "+15550000001";
     verifiedNumbers = [];
-    audioWorkspaceId = "ws";
+    audioWorkspaceId = "10000000-0000-4000-8000-000000000001";
     localStorage.clear();
     workspaceAccess = true;
     queueItems = [queueItem];
@@ -151,6 +157,10 @@ describe("useCallScreen", () => {
       "fetch",
       vi.fn((input: RequestInfo | URL) => {
         const url = String(input);
+        if (url.startsWith("/api/connect-phone-device?") && url.includes("current=1")) {
+          return Promise.resolve(Response.json({ workspace_id: audioWorkspaceId, user_id: "user-1", active: null, pending: null,
+            recovery_required: false, customer_pending: false }));
+        }
         if (url.includes("/call-session/release")) {
           return Promise.resolve(Response.json({ released: 0 }));
         }
@@ -259,6 +269,92 @@ describe("useCallScreen", () => {
     },
   );
 
+  test("recovers phone audio without a journal and blocks Start and Next while a customer is unresolved", async () => {
+    verifiedNumbers = ["+16135550123"];
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const { mockTwilioDevice } = await import("../mocks/twilio-voice-sdk");
+    const { CallScreenLayout } = await import("@/components/call/CallScreen.Layout");
+    const { MemoryRouter } = await import("react-router");
+    const root = `CA${"2".repeat(32)}`, active = screenAudioIntent();
+    let customerPending = true;
+    const network = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/connect-phone-device")) return Response.json(url.includes("current=1")
+        ? { workspace_id: audioWorkspaceId, user_id: "user-1", active, pending: null, recovery_required: false, customer_pending: customerPending } : active);
+      if (url === "/api/dial") return Response.json({ success: true, callSid: root });
+      return Response.json({ success: true });
+    });
+    vi.stubGlobal("fetch", network); vi.useFakeTimers();
+    const { result, unmount } = renderHook(() => useCallScreen());
+    let view: ReturnType<typeof render> | undefined;
+    try {
+      await vi.waitFor(() => expect(result.current.phoneVerification.selectedDevice).toBe("+16135550123"));
+      act(() => { result.current.dialogControls.onJoin(); result.current.callControls.setDisposition("not_home"); });
+      expect(result.current.callSid).toBeNull();
+      expect(result.current.callControls.awaitingCustomerReceipt).toBe(true);
+      expect(result.current.callControls.startDisabledReason).toBe("Check call request");
+      view = render(<MemoryRouter><CallScreenLayout {...result.current}
+        dialogControls={{ ...result.current.dialogControls, isDialogOpen: false, isErrorDialogOpen: false }}
+      /></MemoryRouter>);
+      expect(screen.getByRole("button", { name: "Save and Next" })).toBeDisabled();
+      expect(screen.queryByRole("button", { name: "Hang Up", exact: true })).toBeNull();
+      act(() => { result.current.callControls.handleDialButton(); result.current.callControls.handleDequeueNext(); });
+      expect(network.mock.calls.some(call => String(call[0]) === "/api/dial")).toBe(false);
+      expect(queueFetcher.submit).not.toHaveBeenCalled();
+      expect(mockTwilioDevice.register).not.toHaveBeenCalled();
+      expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
+      customerPending = false;
+      const check = screen.getAllByRole("button", { name: "Check call request" }).find(button => !button.hasAttribute("disabled"));
+      if (!check) throw new Error("Owned call check required");
+      fireEvent.click(check);
+      await vi.waitFor(() => expect(result.current.callControls.awaitingCustomerReceipt).toBe(false));
+      act(() => result.current.callControls.handleDialButton());
+      await vi.waitFor(() => expect(result.current.callSid).toBe(root));
+      expect(network.mock.calls.filter(call => String(call[0]) === "/api/dial")).toHaveLength(1);
+      expect(mockTwilioDevice.register).not.toHaveBeenCalled();
+      expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
+    } finally { view?.unmount(); unmount(); vi.useRealTimers(); }
+  });
+
+  test("a predictive Check retains its captured Start while server busy blocks new sessions", async () => {
+    dialType = "predictive"; verifiedNumbers = ["+16135550123"];
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const { CallScreenLayout } = await import("@/components/call/CallScreen.Layout");
+    const { MemoryRouter } = await import("react-router");
+    const api = await import("@/lib/services/hooks-api"), active = screenAudioIntent();
+    let customerPending = false;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => Response.json(String(input).includes("current=1")
+      ? { workspace_id: audioWorkspaceId, user_id: "user-1", active, pending: null, recovery_required: false, customer_pending: customerPending } : active)));
+    vi.mocked(api.startConferenceAndDial).mockReset().mockRejectedValueOnce(new TypeError("Lost Start reply"))
+      .mockResolvedValueOnce({ success: true, conferenceName: "owned-predictive-room", callSid: `CA${"2".repeat(32)}` });
+    vi.useFakeTimers();
+    const { result, unmount } = renderHook(() => useCallScreen());
+    let view: ReturnType<typeof render> | undefined;
+    try {
+      await vi.waitFor(() => expect(result.current.phoneVerification.selectedDevice).toBe("+16135550123"));
+      act(() => result.current.dialogControls.onJoin());
+      await act(async () => result.current.callControls.handleDialButton());
+      await vi.waitFor(() => expect(result.current.callControls.isStartingConference).toBe(false));
+      expect(api.startConferenceAndDial).toHaveBeenCalledTimes(1);
+      customerPending = true; await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      act(() => result.current.callControls.handleDialButton());
+      expect(api.startConferenceAndDial).toHaveBeenCalledTimes(1);
+      view = render(<MemoryRouter><CallScreenLayout {...result.current}
+        dialogControls={{ ...result.current.dialogControls, isDialogOpen: false, isErrorDialogOpen: false }}
+      /></MemoryRouter>);
+      const check = screen.getAllByRole("button", { name: "Check call request" }).find(button => !button.hasAttribute("disabled"));
+      expect(check).toBeDefined();
+      if (!check) throw new Error("Captured Start check required");
+      fireEvent.click(check);
+      await vi.waitFor(() => expect(result.current.callControls.conference).toBe("owned-predictive-room"));
+      expect(api.startConferenceAndDial).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(api.startConferenceAndDial).mock.calls[1]?.[0]).toEqual(vi.mocked(api.startConferenceAndDial).mock.calls[0]?.[0]);
+      expect(result.current.callSid).toBeNull();
+      expect(result.current.callControls.manualDialError).toBeNull();
+      expect(result.current.callControls.startDisabledReason).toBe("Dialer running");
+    } finally { view?.unmount(); unmount(); vi.useRealTimers(); }
+  });
+
   test("confirmed phone audio replaces browser capture and manual Start controls the returned customer", async () => {
     audioWorkspaceId = "10000000-0000-4000-8000-000000000001";
     verifiedNumbers = ["+16135550123"];
@@ -271,14 +367,19 @@ describe("useCallScreen", () => {
     let phase = "joining", submitted: Record<string, string> = {};
     const snapshot = () => ({ connection_id: "30000000-0000-4000-8000-000000000001", connection_state: phase,
       workspace_id: audioWorkspaceId, user_id: "user-1", connection_intent_id: submitted.connection_intent_id,
-      control_intent_id: submitted.connection_intent_id, destination: verifiedNumbers[0], transport: "phone", generation: 1,
+      control_intent_id: submitted.connection_intent_id, destination: "+16135550123", transport: "phone", generation: 1,
       callSid: audioSid, requested_call_sid: null, source_agent_sid: null, campaign_id: null, cancel_requested: false });
+    const savedIntent = () => ({ workspace_id: audioWorkspaceId, user_id: "user-1", connection_intent_id: submitted.connection_intent_id,
+      intent_state: "bound", request: { transport: "phone", destination: "+16135550123", callSid: null, expectedAgentSid: null, campaignId: null }, connection: snapshot() });
     const fetcher = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
       const url = String(input);
       if (url.startsWith("/api/connect-phone-device")) {
+        if (url.includes("current=1")) return Response.json({ workspace_id: audioWorkspaceId, user_id: "user-1",
+          active: submitted.connection_intent_id && phase === "active" ? savedIntent() : null,
+          pending: submitted.connection_intent_id && phase !== "active" ? savedIntent() : null,
+          recovery_required: false, customer_pending: false });
         if (options?.method === "POST") { submitted = JSON.parse(String(options.body)); return Response.json({ success: true, ...snapshot() }); }
-        return Response.json({ workspace_id: audioWorkspaceId, user_id: "user-1", connection_intent_id: submitted.connection_intent_id,
-          intent_state: "bound", request: { transport: "phone", destination: verifiedNumbers[0], callSid: null, expectedAgentSid: null, campaignId: null }, connection: snapshot() });
+        return Response.json(savedIntent());
       }
       if (url === "/api/dial") return Response.json({ success: true, callSid: root });
       if (url.startsWith("/api/call-status-poll")) return Response.json({ status: "in-progress", callSid: root });
@@ -340,7 +441,7 @@ describe("useCallScreen", () => {
     const { useCallScreen } = await import("@/hooks/call/useCallScreen");
     const { result } = renderHook(() => useCallScreen());
 
-    expect(result.current.workspaceId).toBe("ws");
+    expect(result.current.workspaceId).toBe("10000000-0000-4000-8000-000000000001");
     expect(result.current.callControls.creditState).toBe("GOOD");
 
     act(() => result.current.formState.handleResponse({ blockId: "q1", value: "yes" }));
@@ -413,7 +514,7 @@ describe("useCallScreen", () => {
     if (!(form instanceof FormData)) throw new Error("Voice drop request is missing");
     expect(form.get("callId")).toBe(joinedRoot);
     await act(async () => { await result.current.callControls.hangUp(); });
-    expect(api.hangupCall).toHaveBeenCalledExactlyOnceWith({ callSid: joinedRoot, workspaceId: "ws" });
+    expect(api.hangupCall).toHaveBeenCalledExactlyOnceWith({ callSid: joinedRoot, workspaceId: "10000000-0000-4000-8000-000000000001" });
     expect(result.current.callControls.displayState).toBe("completed");
     expect(result.current.callControls.conference).toBe("user-1~owned");
   });
@@ -442,7 +543,7 @@ describe("useCallScreen", () => {
     const { result, rerender } = renderHook(() => useCallScreen());
     let pending: Promise<void>;
     act(() => { pending = result.current.callControls.hangUp(); });
-    expect(api.hangupCall).toHaveBeenCalledWith({ callSid: "CA22222222222222222222222222222222", workspaceId: "ws" });
+    expect(api.hangupCall).toHaveBeenCalledWith({ callSid: "CA22222222222222222222222222222222", workspaceId: "10000000-0000-4000-8000-000000000001" });
     joinedRoot = "CA33333333333333333333333333333333";
     roomState = { status: "connected", contact_id: 8 }; rerender();
     await act(async () => { respond({ success: true }); await pending; });
@@ -492,7 +593,7 @@ describe("useCallScreen", () => {
       expect(message).toBe("Add credits to start dialing, then try again.");
       expect(options?.action).toMatchObject({ label: "Add credits" });
       act(() => (options?.action as { onClick: () => void }).onClick());
-      expect(navigate).toHaveBeenCalledWith("/workspaces/ws/billing");
+      expect(navigate).toHaveBeenCalledWith("/workspaces/10000000-0000-4000-8000-000000000001/billing");
     } else {
       expect(message).toBe("Contact a workspace administrator to add credits, then try again.");
       expect(options?.action).toBeUndefined();
@@ -543,6 +644,7 @@ describe("useCallScreen", () => {
     const { playTone } = await import("@/lib/utils");
     const { result } = renderHook(() => useCallScreen());
     act(() => result.current.dialogControls.onJoin());
+    await waitFor(() => expect(result.current.currentState.deviceStatus).toBe("Registered"));
 
     const input = document.createElement("input");
     document.body.appendChild(input);
@@ -562,7 +664,7 @@ describe("useCallScreen", () => {
     dialType = mode;
     workspaceAccess = false;
     initialAttempt = {
-      id: 31, contact_id: 1, campaign_id: 1, workspace: "ws", user_id: "user-1",
+      id: 31, contact_id: 1, campaign_id: 1, workspace: "10000000-0000-4000-8000-000000000001", user_id: "user-1",
       created_at: new Date().toISOString(), disposition: "answered",
       result: { q1: "yes", notes: "Call after 6 pm" },
     };
@@ -580,7 +682,7 @@ describe("useCallScreen", () => {
     fireEvent.change(notes, { target: { value: "Call after 7 pm\nAsk for Alex" } });
     fireEvent.click(screen.getByRole("button", { name: "Save", exact: true }));
     expect(saveFetcher.submit).toHaveBeenLastCalledWith(
-      expect.objectContaining({ contact_id: 1, campaign_id: 1, workspace: "ws", callId: 31, update: { q1: "yes", notes: "Call after 7 pm\nAsk for Alex" } }),
+      expect.objectContaining({ contact_id: 1, campaign_id: 1, workspace: "10000000-0000-4000-8000-000000000001", callId: 31, update: { q1: "yes", notes: "Call after 7 pm\nAsk for Alex" } }),
       { method: "PATCH", action: "/api/questions", encType: "application/json" },
     );
     fireEvent.change(notes, { target: { value: "" } });
@@ -593,7 +695,7 @@ describe("useCallScreen", () => {
 
   test("a disposition save preserves loaded notes and switching contacts clears them", async () => {
     initialAttempt = {
-      id: 31, contact_id: 1, campaign_id: 1, workspace: "ws", user_id: "user-1",
+      id: 31, contact_id: 1, campaign_id: 1, workspace: "10000000-0000-4000-8000-000000000001", user_id: "user-1",
       created_at: new Date().toISOString(), disposition: "answered",
       result: { q1: "yes", notes: "Call after 6 pm" },
     };
@@ -685,7 +787,7 @@ describe("useCallScreen", () => {
 
   test.each([{ contact_id: 2 }, { campaign_id: 2 }, { workspace: "other" }])("does not hydrate notes from an unrelated attempt: %j", async (mismatch) => {
     initialAttempt = {
-      id: 31, contact_id: 1, campaign_id: 1, workspace: "ws", user_id: "user-1",
+      id: 31, contact_id: 1, campaign_id: 1, workspace: "10000000-0000-4000-8000-000000000001", user_id: "user-1",
       created_at: new Date().toISOString(), disposition: "answered",
       result: { notes: "Another call's notes" }, ...mismatch,
     };

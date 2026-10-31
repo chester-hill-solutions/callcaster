@@ -77,6 +77,12 @@ export const voiceAudioConnectionQuerySchema = z.union([
   z.strictObject({ workspaceId: workspaceIdSchema, connection_intent_id: z.uuid() }),
 ]);
 
+// Current discovery is GET-only. Cancellation still requires a captured owner.
+export const voiceAudioReadQuerySchema = z.union([
+  voiceAudioConnectionQuerySchema,
+  z.strictObject({ workspaceId: workspaceIdSchema, current: z.literal("1") }),
+]);
+
 export const testWebhookBodySchema = z.object({
   workspace_id: workspaceIdSchema.optional(),
   event: z.string().min(1),

@@ -168,6 +168,23 @@ intent cancels only that request and keeps a connection adopted by a newer
 request. Cancel never ends or advances a live customer. The connection-ID
 query without a control intent retains the legacy explicit control behavior.
 
+Use `GET /api/connect-phone-device?workspaceId=…&current=1` to recover without
+a usable browser journal. Omit all connection and intent IDs. The response
+contains `workspace_id`, `user_id`, `active`, `pending`, `recovery_required`
+and `customer_pending`. The audio roles contain the current submitted intent
+and its connection, or null. Discovery reads under the workspace/actor lock;
+it sends no provider command and does not change control ownership. It keeps
+old-account resources visible if credentials or phone verification change.
+Unfinished physical cleanup, room stops and promotions block new audio work.
+An unresolved staffed reservation blocks another Start until the screen has
+the real customer owner; it does not prove that a human joined a conference.
+An empty read cannot discard a saved request whose POST outcome is unknown.
+Keep that nonce for explicit Check or Cancel. A saved cancel belongs only to
+that submitted intent and cannot transfer to a newer discovered request.
+Busy state blocks new dispatches; explicit Check for an already submitted
+manual call or predictive Start retains its original complete request.
+`current` is GET-only; DELETE still needs a captured connection or intent.
+
 New clients send `X-Callcaster-Audio-Actor` on POST, GET and DELETE. It must
 match the authenticated session user. A mismatch returns `409` before any
 audio operation. This prevents a late request from the previous screen from

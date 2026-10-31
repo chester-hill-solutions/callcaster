@@ -215,8 +215,6 @@ export function useCallScreen() {
   });
 
   const browserAudioEnabled = hasJoined && (wantsBrowser || hasOwnedCalls);
-  const audioStartDisabledReason = agentAudioStartReason({ joined: hasJoined, ready: agentAudio.ready,
-    pendingCustomer: manualAudioDial.state.pending || Boolean(manualAudioDial.state.error), selectedDevice, deviceStatus, hasPhoneSource: Boolean(phoneSource) });
   const audioControls = useCallAudioControls({
     enabled: browserAudioEnabled,
     device,
@@ -245,7 +243,8 @@ export function useCallScreen() {
     toast.error(message);
   }, [hasAccess, navigate, workspaceId]);
 
-  const { begin, conference, setConference, isLoading: isStartingConference, disabledReason: startDisabledReason } = useStartConferenceAndDial(
+  const { begin, conference, setConference, isLoading: isStartingConference, disabledReason: startDisabledReason,
+    awaitingReceipt: awaitingStartReceipt, pendingStartIntentId } = useStartConferenceAndDial(
     {
       userId: user.id,
       campaignId: campaign?.id?.toString() || "",
@@ -321,6 +320,13 @@ export function useCallScreen() {
   });
   const callSid = customerCallSid;
   const logicalDuration = useCallDuration(displayState);
+  const liveCustomer = displayState === "dialing" || displayState === "connected";
+  const pendingCallRequest = Boolean(pendingStartIntentId) || manualAudioDial.state.pending;
+  const customerRecoveryPending = agentAudio.state.customerPending && !callSid && !conference && !pendingCallRequest;
+  const audioStartDisabledReason = agentAudioStartReason({ joined: hasJoined, ready: agentAudio.ready,
+    pendingCustomer: agentAudio.state.customerPending || pendingCallRequest || Boolean(manualAudioDial.state.error),
+    roomPending: Boolean(conference) && agentAudio.state.customerPending && !callSid,
+    selectedDevice, deviceStatus, hasPhoneSource: Boolean(phoneSource) });
 
   const hangUp = useCallback(async () => {
     try {
@@ -445,7 +451,7 @@ export function useCallScreen() {
     recentAttempt,
     selectedDevice,
     audioSource: phoneSource,
-    audioReady: agentAudio.ready && !manualAudioDial.state.pending && !manualAudioDial.state.error &&
+    audioReady: agentAudio.ready && !agentAudio.state.customerPending && !pendingCallRequest && !manualAudioDial.state.error &&
       (selectedDevice === "computer" ? deviceStatus === "Registered" : Boolean(phoneSource)),
     send: send as unknown as (action: { type: string }) => void,
     beginDial,
@@ -545,10 +551,9 @@ export function useCallScreen() {
     setConference,
   });
 
-  const liveCustomer = displayState === "dialing" || displayState === "connected";
   const screenAudio = useCallScreenAudio({ audio: agentAudio, hasJoined, workspaceId, verifiedNumbers,
     customerSid: liveCustomer ? callSid : null, agentSid: agentLegSid,
-    customerPending: manualAudioDial.state.pending || (liveCustomer && !callSid), browserEnabled: wantsBrowser,
+    customerPending: pendingCallRequest || (agentAudio.state.customerPending && !liveCustomer) || (liveCustomer && !callSid), browserEnabled: wantsBrowser,
     browserError: audioControls.permissionError ?? audioControls.inputError ?? deviceError?.message ?? null,
     requestMicrophone: audioControls.requestMicrophoneAccess, reconnect: () => { if (!hasOwnedCalls) reconnectDevice(); } });
 
@@ -574,10 +579,15 @@ export function useCallScreen() {
   }, [hangUp, send, reconnectDevice]);
 
   const callControls = {
-    awaitingCustomerReceipt: manualAudioDial.state.pending && !callSid,
-    manualDialError: manualAudioDial.state.error,
-    isCheckingManualDial: manualAudioDial.state.sending,
-    onCheckManualDial: () => { void manualAudioDial.resource.retry(beginDial); },
+    awaitingCustomerReceipt: (manualAudioDial.state.pending && !callSid) || Boolean(pendingStartIntentId) || customerRecoveryPending,
+    manualDialError: manualAudioDial.state.error ?? (awaitingStartReceipt ? "The dialer request is not confirmed. Check this request before starting another session."
+      : customerRecoveryPending ? "An existing call needs confirmation. Check the call before dialing another contact." : null),
+    isCheckingManualDial: manualAudioDial.state.sending || isStartingConference,
+    onCheckManualDial: () => {
+      if (manualAudioDial.state.pending) void manualAudioDial.resource.retry(beginDial);
+      else if (awaitingStartReceipt) void begin();
+      else void agentAudio.resource.refresh();
+    },
     hangUp,
     answer,
     holdAndAnswer,
@@ -589,7 +599,7 @@ export function useCallScreen() {
     isStartingConference,
     startDisabledReason: startDisabledReason ?? audioStartDisabledReason,
     handleDialButton,
-    handleDequeueNext: () => { if (!manualAudioDial.state.pending && !liveCustomer) handleDequeueNext(); },
+    handleDequeueNext: () => { if (!pendingCallRequest && !liveCustomer && !customerRecoveryPending) handleDequeueNext(); },
     handleVoiceDrop,
     handleConferenceEnd,
     displayState,

@@ -4546,9 +4546,21 @@
               "minLength": 1
             },
             "description": "New clients send their signed-in actor. A mismatch with the authenticated session returns 409 before any audio operation. It is a precondition, not caller-supplied authority."
+          },
+          {
+            "name": "current",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Discover this session actor's current audio. Omit all connection and intent IDs. GET only."
           }
         ],
-        "description": "Exactly one connection_id or connection_intent_id is required. Intent reads never create a provider call. They resolve the submitted request even when it reused a connection with an older original intent. A canceled or superseded request cannot adopt another request's controls.",
+        "description": "Choose exactly one connection_id, connection_intent_id or current=1. Reads never send a provider command, claim another customer or change a control owner. Current discovery returns working and pending audio under the workspace/actor fence, plus unresolved cleanup and customer-busy state. It retains original-account resources when credentials change. Intent reads resolve the submitted request even when it reused a connection with an older original intent. A canceled or superseded request cannot adopt another request's controls. DELETE does not accept current or a workspace-only query.",
         "responses": {
           "200": {
             "description": "Operation state; active requires a verified conference join and completed transport commit.",
@@ -4819,6 +4831,377 @@
                             }
                           },
                           "nullable": true
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "workspace_id",
+                        "user_id",
+                        "active",
+                        "pending",
+                        "recovery_required",
+                        "customer_pending"
+                      ],
+                      "properties": {
+                        "workspace_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "user_id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "active": {
+                          "type": "object",
+                          "required": [
+                            "workspace_id",
+                            "user_id",
+                            "connection_intent_id",
+                            "intent_state",
+                            "request",
+                            "connection"
+                          ],
+                          "properties": {
+                            "workspace_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "user_id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "connection_intent_id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "Keep this UUID for retries of the same audio change."
+                            },
+                            "intent_state": {
+                              "type": "string",
+                              "enum": [
+                                "bound",
+                                "canceled",
+                                "superseded"
+                              ]
+                            },
+                            "request": {
+                              "type": "object",
+                              "required": [
+                                "transport",
+                                "destination",
+                                "callSid",
+                                "expectedAgentSid",
+                                "campaignId"
+                              ],
+                              "properties": {
+                                "transport": {
+                                  "type": "string",
+                                  "enum": [
+                                    "phone",
+                                    "computer"
+                                  ]
+                                },
+                                "destination": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "callSid": {
+                                  "type": "string",
+                                  "pattern": "^CA[0-9a-fA-F]{32}$",
+                                  "nullable": true
+                                },
+                                "expectedAgentSid": {
+                                  "type": "string",
+                                  "pattern": "^CA[0-9a-fA-F]{32}$",
+                                  "nullable": true
+                                },
+                                "campaignId": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "nullable": true
+                                }
+                              },
+                              "nullable": true
+                            },
+                            "connection": {
+                              "type": "object",
+                              "required": [
+                                "connection_id",
+                                "connection_state",
+                                "workspace_id",
+                                "user_id",
+                                "connection_intent_id",
+                                "destination",
+                                "control_intent_id",
+                                "requested_call_sid",
+                                "campaign_id",
+                                "callSid",
+                                "source_agent_sid",
+                                "generation",
+                                "transport",
+                                "cancel_requested"
+                              ],
+                              "properties": {
+                                "connection_id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "connection_state": {
+                                  "type": "string",
+                                  "enum": [
+                                    "prepared",
+                                    "creating",
+                                    "joining",
+                                    "ready",
+                                    "switching",
+                                    "active",
+                                    "retired",
+                                    "failed",
+                                    "canceled"
+                                  ]
+                                },
+                                "workspace_id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "user_id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "connection_intent_id": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "description": "Stored intent of this connection. Reusing an existing connection retains its original intent UUID."
+                                },
+                                "control_intent_id": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "description": "Current request that owns connection controls. A reused connection can have a different original intent."
+                                },
+                                "destination": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "description": "Saved verified E.164 phone number or server-resolved client identity."
+                                },
+                                "requested_call_sid": {
+                                  "type": "string",
+                                  "pattern": "^CA[0-9a-fA-F]{32}$",
+                                  "nullable": true
+                                },
+                                "campaign_id": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "nullable": true
+                                },
+                                "callSid": {
+                                  "type": "string",
+                                  "pattern": "^CA[0-9a-fA-F]{32}$",
+                                  "nullable": true
+                                },
+                                "source_agent_sid": {
+                                  "type": "string",
+                                  "pattern": "^CA[0-9a-fA-F]{32}$",
+                                  "nullable": true
+                                },
+                                "generation": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                "transport": {
+                                  "type": "string",
+                                  "enum": [
+                                    "phone",
+                                    "computer"
+                                  ]
+                                },
+                                "cancel_requested": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "nullable": true
+                            }
+                          },
+                          "nullable": true
+                        },
+                        "pending": {
+                          "type": "object",
+                          "required": [
+                            "workspace_id",
+                            "user_id",
+                            "connection_intent_id",
+                            "intent_state",
+                            "request",
+                            "connection"
+                          ],
+                          "properties": {
+                            "workspace_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "user_id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "connection_intent_id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "Keep this UUID for retries of the same audio change."
+                            },
+                            "intent_state": {
+                              "type": "string",
+                              "enum": [
+                                "bound",
+                                "canceled",
+                                "superseded"
+                              ]
+                            },
+                            "request": {
+                              "type": "object",
+                              "required": [
+                                "transport",
+                                "destination",
+                                "callSid",
+                                "expectedAgentSid",
+                                "campaignId"
+                              ],
+                              "properties": {
+                                "transport": {
+                                  "type": "string",
+                                  "enum": [
+                                    "phone",
+                                    "computer"
+                                  ]
+                                },
+                                "destination": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "callSid": {
+                                  "type": "string",
+                                  "pattern": "^CA[0-9a-fA-F]{32}$",
+                                  "nullable": true
+                                },
+                                "expectedAgentSid": {
+                                  "type": "string",
+                                  "pattern": "^CA[0-9a-fA-F]{32}$",
+                                  "nullable": true
+                                },
+                                "campaignId": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "nullable": true
+                                }
+                              },
+                              "nullable": true
+                            },
+                            "connection": {
+                              "type": "object",
+                              "required": [
+                                "connection_id",
+                                "connection_state",
+                                "workspace_id",
+                                "user_id",
+                                "connection_intent_id",
+                                "destination",
+                                "control_intent_id",
+                                "requested_call_sid",
+                                "campaign_id",
+                                "callSid",
+                                "source_agent_sid",
+                                "generation",
+                                "transport",
+                                "cancel_requested"
+                              ],
+                              "properties": {
+                                "connection_id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "connection_state": {
+                                  "type": "string",
+                                  "enum": [
+                                    "prepared",
+                                    "creating",
+                                    "joining",
+                                    "ready",
+                                    "switching",
+                                    "active",
+                                    "retired",
+                                    "failed",
+                                    "canceled"
+                                  ]
+                                },
+                                "workspace_id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "user_id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "connection_intent_id": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "description": "Stored intent of this connection. Reusing an existing connection retains its original intent UUID."
+                                },
+                                "control_intent_id": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "description": "Current request that owns connection controls. A reused connection can have a different original intent."
+                                },
+                                "destination": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "description": "Saved verified E.164 phone number or server-resolved client identity."
+                                },
+                                "requested_call_sid": {
+                                  "type": "string",
+                                  "pattern": "^CA[0-9a-fA-F]{32}$",
+                                  "nullable": true
+                                },
+                                "campaign_id": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "nullable": true
+                                },
+                                "callSid": {
+                                  "type": "string",
+                                  "pattern": "^CA[0-9a-fA-F]{32}$",
+                                  "nullable": true
+                                },
+                                "source_agent_sid": {
+                                  "type": "string",
+                                  "pattern": "^CA[0-9a-fA-F]{32}$",
+                                  "nullable": true
+                                },
+                                "generation": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                "transport": {
+                                  "type": "string",
+                                  "enum": [
+                                    "phone",
+                                    "computer"
+                                  ]
+                                },
+                                "cancel_requested": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "nullable": true
+                            }
+                          },
+                          "nullable": true
+                        },
+                        "recovery_required": {
+                          "type": "boolean",
+                          "description": "Unresolved physical cleanup, room stop or promotion blocks new audio work."
+                        },
+                        "customer_pending": {
+                          "type": "boolean",
+                          "description": "An unresolved staffed customer reservation blocks another Start until its customer owner is confirmed. This does not prove that a human joined."
                         }
                       }
                     }

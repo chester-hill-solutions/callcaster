@@ -1,7 +1,8 @@
 import { findVoiceAudioConnection, type VoiceAudioConnection } from "@/server/voice-audio-connection.server";
 import { VOICE_AUDIO_ACTOR_HEADER, type VoiceAudioFailureReason } from "@/lib/voice-audio-connection";
 import { OUTBOUND_CREDITS_BLOCKED_BODY } from "@/lib/outbound-credit-gate.server";
-import { voiceAudioConnectionQuerySchema } from "@/lib/schemas/api/common";
+import { voiceAudioConnectionQuerySchema, voiceAudioReadQuerySchema } from "@/lib/schemas/api/common";
+import type { ZodType } from "zod";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { dispatchVoiceAudioConnection, VoiceAudioConnectionPendingError } from "@/lib/voice-audio-dispatch.server";
 import { attemptVoiceAudioCancellation } from "@/lib/voice-audio-recovery.server";
@@ -39,12 +40,15 @@ export function voiceAudioActorConflict(request: Request, userId: string) {
     ? Response.json({ error: "Agent audio session changed", reason: "stale_audio" }, { status: 409 }) : null;
 }
 
-export function parseVoiceAudioQuery(request: Request) {
+function parseAudioQuery<T>(request: Request, schema: ZodType<T>) {
   const query = new URL(request.url).searchParams;
   if ([...query.keys()].some((key) => query.getAll(key).length !== 1)) return null;
-  const result = voiceAudioConnectionQuerySchema.safeParse(Object.fromEntries(query.entries()));
+  const result = schema.safeParse(Object.fromEntries(query.entries()));
   return result.success ? result.data : null;
 }
+
+export const parseVoiceAudioQuery = (request: Request) => parseAudioQuery(request, voiceAudioConnectionQuerySchema);
+export const parseVoiceAudioReadQuery = (request: Request) => parseAudioQuery(request, voiceAudioReadQuerySchema);
 
 function pendingResponse(row: VoiceAudioConnection, headers?: HeadersInit) {
   return Response.json({ error: "Agent audio connection is awaiting provider verification", reason: "voice_audio_pending",
