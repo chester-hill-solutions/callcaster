@@ -1,5 +1,38 @@
 [
   {
+    "issueNumber": 3085,
+    "verdict": "fix-now",
+    "summary": "High-priority child of user requirement #2546. Reuse an unambiguous workspace contact when importing its phone into another audience.",
+    "currentBehavior": "The local candidate adds the audience membership and reuse receipt without replacing the saved contact. A transaction lock serializes imports in one workspace. Ambiguous legacy contacts receive an invalid row result without another contact or membership.",
+    "rootCause": "The old import lookup checked only the target audience, so another audience could create a second workspace contact and make manual SMS ambiguous.",
+    "resolution": "Complete full local CI and publish one atomic draft from dev under the one-open-PR rule. Verify dev after an approved merge. Keep legacy repair and remaining SMS requirements in #2546.",
+    "lookIn": [
+      "app/server/audience-import-effects.server.ts",
+      "app/lib/database/contact.server.ts",
+      "app/lib/audience-import-download.server.ts",
+      "test/integration-db/audience-import-recovery.test.ts",
+      "test/integration-db/audience-import-report.test.ts"
+    ],
+    "existingTests": [
+      "50 real-database cases pass without skips. The original implementation fails four contact-reuse cases while 33 controls pass. The original renderer fails the new reuse/ambiguity download assertion while three controls pass.",
+      "35 focused Node cases pass. Changed runtime files and the report test have no lint warnings; the recovery test retains its one existing warning."
+    ],
+    "missingTests": [
+      "Full npm run ci:local is required on the clean publication commit. Record that result and applicable remote checks in the PR. Deployed dev acceptance and release remain."
+    ],
+    "acceptanceCriteria": [
+      "One workspace contact can belong to two audiences.",
+      "Concurrent imports, replay and recovery cannot duplicate contacts, memberships or receipts.",
+      "Reuse preserves saved profile, opt-out, line type, household and history.",
+      "Ambiguous legacy phones add no contact or membership and produce a clear report.",
+      "Workspace isolation and unmapped-phone behavior stay intact."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Native Bug, Priority High, assigned @wra-sol, native parent #2546. Project Status In progress, verified in the authenticated board on 2026-10-31. Local branch bug/3085-reuse-workspace-contacts; no implementation PR yet."
+  },
+  {
     "issueNumber": 2638,
     "verdict": "fix-now",
     "summary": "PR #3023 names the Call list selection controls and reuses one named Rows per page control. Review, merge and deployed acceptance remain.",

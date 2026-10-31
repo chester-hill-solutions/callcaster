@@ -88,16 +88,29 @@ function phoneLookupFilters(exactPhoneCandidates: string[]): SQL | undefined {
 }
 
 /** Search prefixes cannot establish recipient identity or prove uniqueness. */
+function normalizedContactPhoneSql() {
+  const digits = sql`regexp_replace(coalesce(${contactTable.phone}, ''), '[^0-9]', '', 'g')`;
+  return sql`case when length(${digits}) = 10 then '1' || ${digits} else ${digits} end`;
+}
+
+/** Use the same phone identity for import reuse and SMS recipient verification. */
+export async function findSmsRecipientContactsForPhones(workspaceId: string, phoneNumbers: string[], tdb?: TenantDb): Promise<Contact[]> {
+  const keys = [...new Set(phoneNumbers.flatMap(phone => {
+    const key = getConversationPhoneKey(phone);
+    return key ? [key] : [];
+  }))];
+  if (!keys.length) return [];
+  return (tdb ?? createTenantDb(workspaceId)).contact.findMany({ where: inArray(normalizedContactPhoneSql(), keys) });
+}
+
 export async function findSmsRecipientContacts(
   workspaceId: string,
   phoneNumber: string,
 ): Promise<Contact[]> {
   const phoneKey = getConversationPhoneKey(phoneNumber);
   if (!phoneKey) return [];
-  const digits = sql`regexp_replace(coalesce(${contactTable.phone}, ''), '[^0-9]', '', 'g')`;
-  const normalizedPhone = sql`case when length(${digits}) = 10 then '1' || ${digits} else ${digits} end`;
   return createTenantDb(workspaceId).contact.findMany({
-    where: eq(normalizedPhone, phoneKey),
+    where: eq(normalizedContactPhoneSql(), phoneKey),
   });
 }
 

@@ -1072,10 +1072,10 @@
   {
     "issueNumber": 2546,
     "verdict": "needs-decision",
-    "summary": "High priority. Cross-audience imports create multiple workspace contacts for one normalized phone. SMS refuses ambiguous recipients, and a campaign can select duplicate contacts.",
-    "currentBehavior": "The issue documents separate contacts per audience and deliberately fail-closed manual SMS. A new import rule alone cannot safely repair existing consent, history and queue references.",
+    "summary": "High-priority user requirement. Child #3085 implements contact reuse across audience imports. Legacy duplicate repair and the remaining SMS requirements stay open.",
+    "currentBehavior": "The local #3085 candidate reuses exactly one workspace phone match, preserves its saved data and adds an audience membership. Ambiguous legacy matches add no contact or membership. The candidate is not merged or deployed.",
     "rootCause": "Contact identity is deduplicated inside one audience, while SMS recipient identity is workspace-wide.",
-    "resolution": "Approve deterministic merge rules for identity, profile conflicts, consent and opt-out, household links, message history and queue references. Split repair, canonical identity enforcement, import reuse and campaign phone deduplication into atomic tasks before implementation.",
+    "resolution": "Finish the tested #3085 import-reuse fix first. Keep legacy repair separate until identity, profile, consent, history and queue conflict rules are recorded. Verify remaining campaign and manual-SMS requirements against current code before filing more work.",
     "lookIn": [
       "app/lib/audience-import-map.server.ts",
       "app/server/audience-import-effects.server.ts",
@@ -1088,7 +1088,10 @@
     ],
     "size": "L",
     "risk": "high",
-    "trackerRecommendation": "Native Bug, Priority High, Effort Medium, Project Status Backlog; no linked implementation PR or native blocker. Reviewed full issue and relationships on 2026-10-28. Policy and task decomposition remain."
+    "trackerRecommendation": "Native Bug, Priority High, Effort Medium. Parent and native child #3085 have Project Status In progress, verified in the authenticated board on 2026-10-31. This child does not repair existing duplicate contacts or complete every SMS requirement.",
+    "existingTests": [
+      "The #3085 focused real-database run passes 50 cases, including cross-audience reuse, concurrent imports, formatted phones, opt-out preservation, workspace isolation, replay/recovery, manual-SMS identity and download messages. The original implementation fails four regression cases."
+    ]
   },
   {
     "issueNumber": 2941,
