@@ -114,9 +114,13 @@ jobs:
       - run: npm run lint
       - run: npm run check:lint-ratchet
 
-  test-node:
+  test-node-shards:
     needs: changes
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -129,10 +133,49 @@ jobs:
       - run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
-      - run: npm run test:node
+      - name: Collect full Node file inventory
+        if: matrix.shard == 1
+        run: npx --no-install vitest list -c vitest.node.config.ts --filesOnly --json=node-manifest.json
+      - name: Run Node test shard
+        run: npm run test:node:vitest -- --shard=${{ matrix.shard }}/2 --maxWorkers=2 --reporter=default --reporter=json --outputFile=node-shard-${{ matrix.shard }}.json
         env:
           TWILIO_SID: AC_ci_test_placeholder
           TWILIO_AUTH_TOKEN: ci_test_placeholder
+      - name: Run Bun runtime tests
+        if: matrix.shard == 1
+        run: npm run test:node:runtime
+        env:
+          TWILIO_SID: AC_ci_test_placeholder
+          TWILIO_AUTH_TOKEN: ci_test_placeholder
+      - name: Upload shard result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-shard-${{ matrix.shard }}
+          path: |
+            node-shard-${{ matrix.shard }}.json
+            node-manifest.json
+          if-no-files-found: error
+          retention-days: 3
+
+  test-node:
+    needs: [changes, test-node-shards]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every shard
+        run: test "${{ needs.test-node-shards.result }}" = success
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: node-shard-*
+          merge-multiple: true
+          path: node-shards
+      - name: Verify complete Node suite execution
+        run: node scripts/verify-node-shards.mjs node-shards/node-manifest.json node-shards/node-shard-1.json node-shards/node-shard-2.json
 
   test-ui:
     needs: changes
