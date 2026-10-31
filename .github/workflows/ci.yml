@@ -137,7 +137,7 @@ jobs:
         if: matrix.shard == 1
         run: npx --no-install vitest list -c vitest.node.config.ts --filesOnly --json=node-manifest.json
       - name: Run Node test shard
-        run: npm run test:node:vitest -- --shard=${{ matrix.shard }}/2 --maxWorkers=2 --reporter=default --reporter=json --outputFile=node-shard-${{ matrix.shard }}.json
+        run: npm run test:node:vitest -- --shard=${{ matrix.shard }}/2 --reporter=default --reporter=json --outputFile=node-shard-${{ matrix.shard }}.json
         env:
           TWILIO_SID: AC_ci_test_placeholder
           TWILIO_AUTH_TOKEN: ci_test_placeholder
