@@ -8,6 +8,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { DeviceSettingsPanel } from "@/components/call/CallScreen.DeviceSettings";
+import { CallSessionTimers } from "@/components/call/CallScreen.SessionTimers";
 import { cn } from "@/lib/utils";
 import { PhoneOff, AlertTriangle, MoreHorizontal } from "lucide-react";
 import {
@@ -211,7 +212,9 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
 };
 
 interface TopChromeProps {
-  campaign: { title: string };
+  campaign: { id: number; title: string };
+  workspaceId: string;
+  isTalking: boolean;
   count: number;
   completed: number;
   availableCredits: number;
@@ -225,6 +228,8 @@ interface TopChromeProps {
 
 export function TopChrome({
   campaign,
+  workspaceId,
+  isTalking,
   count,
   completed,
   availableCredits,
@@ -237,7 +242,7 @@ export function TopChrome({
 }: TopChromeProps) {
   return (
     <header className="sticky top-0 z-20 rounded-xl border bg-background/95 px-3 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/85">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="min-w-0 flex-1">
           <Heading as="h1" level={3} branded={false} className="truncate">
             {campaign.title}
@@ -249,6 +254,7 @@ export function TopChrome({
             <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-foreground">
               {predictive ? "Predictive dialing" : "Power dialing"}
             </span>
+            <CallSessionTimers key={`${workspaceId}:${campaign.id}`} isTalking={isTalking} />
             {hasAccess ? (
               <span
                 className={cn(
@@ -261,7 +267,7 @@ export function TopChrome({
             ) : null}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 flex-wrap items-center gap-1">
           {children}
           <Button
             type="button"

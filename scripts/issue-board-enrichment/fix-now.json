@@ -1,5 +1,38 @@
 [
   {
+    "issueNumber": 2533,
+    "verdict": "fix-now",
+    "summary": "The owner requires both elapsed session time and total connected talk time. The active feature adds them to the shared calling header; final checks, merge and release acceptance remain.",
+    "currentBehavior": "At dev@a6ba6390, the call screen shows individual call duration but no session totals. The candidate shows Session and Talk for the current workspace/campaign visit in both dialing modes.",
+    "rootCause": "The header has no visit clock or accumulated connected-time display. The individual call counter resets between contacts.",
+    "resolution": "Keep elapsed and connected-time totals in the shared header. Use the canonical recipient display state for talk time, preserve totals across queue updates, reset on a new workspace/campaign visit, and keep the header readable at phone widths.",
+    "lookIn": [
+      "app/components/call/CallScreen.SessionTimers.tsx",
+      "app/components/call/CallScreen.Header.tsx",
+      "app/components/call/CallScreen.Layout.tsx",
+      "test/ui/call-screen-session-timers.test.tsx",
+      "test/ui/call-screen-leave.test.tsx"
+    ],
+    "existingTests": [
+      "The original runtime fails all eleven new header cases while fourteen existing controls pass. The first candidate run passes 35 UI cases.",
+      "Using the agent device state as talk-time input fails both real call-screen connection tests; fourteen controls pass. The correct source is restored exactly."
+    ],
+    "missingTests": [
+      "Require final exact-head local checks, focused tests and applicable GitHub CI. Verify the deployed dev app and complete release acceptance."
+    ],
+    "acceptanceCriteria": [
+      "Both dialing modes show elapsed session time and total connected talk time.",
+      "Session time continues between calls; talk time pauses when the recipient is not connected and adds time across contacts.",
+      "Queue and title refreshes preserve the totals; leaving or changing workspace/campaign starts a new visit.",
+      "Delayed timer callbacks do not slow the clock, and fractional connected time is retained between short calls.",
+      "Both timers and the campaign title remain readable on phone and desktop widths; timer updates do not announce every second."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Native Project Status is In progress, confirmed in the authenticated board. Type Feature, Priority Medium, Effort Low, Enviornment unset; assigned to @wra-sol. No parent, children or open blockers. Owner clarification: show both timers. Keep open for release acceptance."
+  },
+  {
     "issueNumber": 2776,
     "verdict": "fix-now",
     "summary": "The reported routing error uses an internal block ID. The active fix uses the saved title in both editors and launch validation; final checks, merge and acceptance remain.",

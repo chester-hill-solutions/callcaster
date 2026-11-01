@@ -20,6 +20,8 @@ Released-number task #2995 is merged in PR #3097 at dev@0b73c943. All applicable
 
 Stripe prerequisites, 2026-11-01: #1983 already specifies 13% Ontario tax and is blocked by #2700. #1981 also has that native open blocker; preserve its existing receipt-quantity branch. A read-only audit found that dev and QA share a test account with no webhook endpoints. Production uses a separate live account. The dedicated dev sandbox, customer-reference plan and once-only fulfillment proof remain. See [the current account map](docs/stripe-environments.md). These selected entries are refreshed; unrelated entries retain their dated evidence.
 
+Caller timing #2533 was refreshed on 2026-10-31 (America/Toronto). The owner requires both elapsed session time and accumulated connected talk time. The task is In progress; the active candidate keeps these totals across queue updates and resets them on a new workspace/campaign visit. Final checks, merge and acceptance remain.
+
 ## How to use this board
 
 1. Pick from **Fix now** first (confirmed, with an exact resolution path).
@@ -47,9 +49,21 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 24
+## Fix now — 25
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
+
+### [#2533](https://github.com/chester-hill-solutions/callcaster/issues/2533) show caller how long theyve been calling for somewhere (agent request)
+- **IN PROGRESS** · Verdict: **Fix now** · Type: Feature · Priority: Medium · Effort: Low · Environment: unset · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-11-01
+- The owner requires both elapsed session time and total connected talk time. The active feature adds them to the shared calling header; final checks, merge and release acceptance remain.
+- Current behavior: At dev@a6ba6390, the call screen shows individual call duration but no session totals. The candidate shows Session and Talk for the current workspace/campaign visit in both dialing modes.
+- Root cause: The header has no visit clock or accumulated connected-time display. The individual call counter resets between contacts.
+- Resolution: Keep elapsed and connected-time totals in the shared header. Use the canonical recipient display state for talk time, preserve totals across queue updates, reset on a new workspace/campaign visit, and keep the header readable at phone widths.
+- Look in: `app/components/call/CallScreen.SessionTimers.tsx`, `app/components/call/CallScreen.Header.tsx`, `app/components/call/CallScreen.Layout.tsx`, `test/ui/call-screen-session-timers.test.tsx`, `test/ui/call-screen-leave.test.tsx`
+- Existing tests: The original runtime fails all eleven new header cases while fourteen existing controls pass. The first candidate run passes 35 UI cases.; Using the agent device state as talk-time input fails both real call-screen connection tests; fourteen controls pass. The correct source is restored exactly.
+- Missing tests: Require final exact-head local checks, focused tests and applicable GitHub CI. Verify the deployed dev app and complete release acceptance.
+- Done when: Both dialing modes show elapsed session time and total connected talk time.; Session time continues between calls; talk time pauses when the recipient is not connected and adds time across contacts.; Queue and title refreshes preserve the totals; leaving or changing workspace/campaign starts a new visit.; Delayed timer callbacks do not slow the clock, and fractional connected time is retained between short calls.; Both timers and the campaign title remain readable on phone and desktop widths; timer updates do not announce every second.
+- Tracker: Native Project Status is In progress, confirmed in the authenticated board. Type Feature, Priority Medium, Effort Low, Enviornment unset; assigned to @wra-sol. No parent, children or open blockers. Owner clarification: show both timers. Keep open for release acceptance.
 
 ### [#2776](https://github.com/chester-hill-solutions/callcaster/issues/2776) Script validation error doesn't use human readable block names
 - **IN PROGRESS** · Verdict: **Fix now** · Type: Bug · Priority: Medium · Effort: unset · Environment: prod · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-11-01
@@ -2015,7 +2029,7 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 223
+## Needs triage — 222
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
 
@@ -2061,10 +2075,6 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 
 ### [#2521](https://github.com/chester-hill-solutions/callcaster/issues/2521) call interface doesn't need the background card
 - Status: Backlog · Type: Task · Priority: Medium · Effort: nothing-burger · Environment: prod · Labels: design · Assignee: none · Updated: 2026-10-15
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2533](https://github.com/chester-hill-solutions/callcaster/issues/2533) show caller how long theyve been calling for somewhere (agent request)
-- Status: Backlog · Type: Feature · Priority: Medium · Effort: Low · Environment: unset · Labels: ux · Assignee: none · Updated: 2026-10-15
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2516](https://github.com/chester-hill-solutions/callcaster/issues/2516) Users with "Agent" role shouldn't see compliance status info on the today page
