@@ -69,7 +69,6 @@ app/lib/verification-db.server.ts::@/server/admin-db	1
 app/lib/verification-number.server.ts::@/server/admin-db	1
 app/lib/worker/enqueue-job.server.ts::@/server/db	1
 app/lib/worker/handlers/elevenlabs-batch-transcribe.server.ts::@/server/admin-db	1
-app/lib/worker/handlers/elevenlabs-batch-transcribe.server.ts::@/server/db	1
 app/lib/worker/job-retention.server.ts::@/server/db	1
 app/lib/worker/poll-jobs.server.ts::@/server/db	1
 app/lib/worker/webhook-side-effects.server.ts::@/server/db	1

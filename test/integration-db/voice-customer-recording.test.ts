@@ -8,6 +8,7 @@ import { recordVoiceReservationProvider, startVoiceReservation } from "@/server/
 import { findVoiceRecordingOperation } from "@/server/voice-recording-operation.server";
 import { enqueueFundedVoiceTerminalOutcome } from "@/server/voice-terminal-outcome.server";
 import { recordVoiceCustomerCallTiming } from "@/server/voice-customer-media-boundary.server";
+import { readVoiceCallRecordingManifest } from "@/server/voice-recording-batch.server";
 import { runVoiceRecordingCopy } from "@/lib/voice-recording-copy.server";
 import type { CallListInstanceCreateOptions } from "twilio/lib/rest/api/v2010/account/call";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
@@ -133,6 +134,13 @@ describe("recorded customer Start through an existing phone", () => {
     expect((await signedCustomerRecording(urls.customerRecording.callbackUrl, params({ customerSid, recordingSid }))).status).toBe(403);
     expect(web.fetch).not.toHaveBeenCalled();
     expect(reservation.customer_recording_id).toBeNull(); expect(reservation.send_started_at).toBeNull();
+  });
+
+  test("a saved customer recording nonce cannot fall back to unjournaled legacy media", async () => {
+    const f = await armed(); await recordVoiceReservationProvider(f.reservation, f.customerSid);
+    await sql`delete from public.workspace_voice_recording_operation where workspace = ${workspaceId}::uuid and id = ${f.urls.customerRecording.id}::uuid`;
+    expect(await readVoiceCallRecordingManifest(workspaceId, f.customerSid, "owned/copied-before-registration.mp3"))
+      .toEqual({ state: "pending", reason: "recording_incomplete" });
   });
 
   test("local part registration failure retains customer acceptance and repairs on intent replay", async () => {

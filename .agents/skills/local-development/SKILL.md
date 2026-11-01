@@ -1101,6 +1101,13 @@ Database fault controls can leave deliberately broken rows. Clean only the owned
 fixture rows after each case, before the next control runs. A passing control
 must not inherit orphan rows or missing receipts from the preceding mutation.
 
+For non-fatal event callbacks, collect database observations in the callback and
+assert them after the worker returns. An assertion inside a swallowed callback
+can leave the test green. Reuse a shared fixture's existing mocked export rather
+than registering another factory for that module. For lock proofs, pg_stat_activity
+query text can be truncated; use pg_blocking_pids with pg_locks relation and mode
+to identify the expected reservation wait instead of matching a query suffix.
+
 For a Drizzle rollback test with postgres.js, use `drizzle(client).transaction()`
 and pass its transaction executor to the app. Do not construct `drizzle(tx)`
 from a raw `postgres.begin()` callback; that client lacks driver options.

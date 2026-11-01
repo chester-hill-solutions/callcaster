@@ -1,19 +1,14 @@
 import { eq } from "drizzle-orm";
 import { call as callTable, workspace as workspaceTable } from "@/db/schema";
-import { call_transcript } from "@/db/schema-transcription";
-import { batchTranscriptionKey } from "@/lib/billing-keys";
 import { hasFeatureFlag } from "@/lib/feature-flags";
 import { warnInvalidWorkspaceFeatureFlags } from "@/lib/workspace-feature-flags.server";
 import { downloadObject } from "@/lib/object-storage.server";
-import { debitAmountFromCredits } from "@/lib/pricing";
-import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { logger } from "@/lib/logger.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
 import { adminDb } from "@/server/admin-db";
-import { db } from "@/server/db";
-import { TRANSCRIPTION_BATCH_CREDITS } from "../../../../shared/billing-rates";
 import { requireStringParam } from "./shared.server";
-import { isSinglePartCallRecording } from "@/server/voice-recording-batch.server";
+import { readVoiceCallRecordingManifest } from "@/server/voice-recording-batch.server";
+import { publishVoiceRecordingTranscript } from "@/server/voice-recording-publication.server";
 
 const ELEVENLABS_SCRIBE_MODEL = "scribe_v2";
 
@@ -22,7 +17,7 @@ const ELEVENLABS_SCRIBE_MODEL = "scribe_v2";
  * which is default-off everywhere. Product policy for batch (ship or not, bill
  * per call or bundle it) is UNDECIDED — until it is, nothing is enqueued and
  * nothing is billed. Both the enqueue site (`runRecordingSideEffects`) and the
- * debit site below consult this so a stale queued job cannot bill either.
+ * atomic publication consult this so a stale queued job cannot bill either.
  */
 export async function isBatchTranscriptionEnabled(
   workspaceId: string,
@@ -105,7 +100,8 @@ export async function elevenlabsBatchTranscribeHandler(
   if (callRow.transcript_id) {
     return { status: "skipped", reason: "already_transcribed" };
   }
-  if (!await isSinglePartCallRecording(callRow.workspace, callSid, callRow.audio_url)) {
+  const manifest = await readVoiceCallRecordingManifest(callRow.workspace, callSid, callRow.audio_url);
+  if (manifest.state === "pending") {
     return { status: "skipped", reason: "recording_parts_pending" };
   }
 
@@ -115,14 +111,8 @@ export async function elevenlabsBatchTranscribeHandler(
     throw new Error("elevenlabs_batch_transcribe: transcription returned no text");
   }
   const text = result.text.trim();
-  if (!await isSinglePartCallRecording(callRow.workspace, callSid, callRow.audio_url)) {
-    return { status: "skipped", reason: "recording_parts_pending" };
-  }
-
-  const [transcript] = await adminDb
-    .insert(call_transcript)
-    .values({
-      call_sid: callSid,
+  const publication = await publishVoiceRecordingTranscript({ workspaceId: callRow.workspace, source: callRow, manifest,
+    transcript: {
       provider: "elevenlabs_scribe_v2",
       language: result.language_code ?? "en",
       full_text: text,
@@ -134,36 +124,15 @@ export async function elevenlabsBatchTranscribeHandler(
         elevenlabsModel: ELEVENLABS_SCRIBE_MODEL,
         wordCount: result.words?.length ?? 0,
       },
-    })
-    .returning();
-
-  if (!transcript) {
-    throw new Error("Failed to insert call_transcript");
-  }
-
-  await adminDb
-    .update(callTable)
-    .set({ transcript_id: transcript.id })
-    .where(eq(callTable.sid, callSid));
-
-  const billable = await isBatchTranscriptionEnabled(callRow.workspace);
-  if (billable) {
-    await insertTransactionHistoryIdempotent(db, {
-      workspaceId: callRow.workspace,
-      type: "DEBIT",
-      amount: debitAmountFromCredits(TRANSCRIPTION_BATCH_CREDITS),
-      note: `Batch transcription ${callSid}`,
-      idempotencyKey: batchTranscriptionKey(callSid),
-      callSid,
-    });
-  }
+    } });
+  if (publication.status === "skipped") return publication;
 
   logger.info("elevenlabs_batch_transcribe.completed", {
     callSid,
     workspaceId: callRow.workspace,
-    transcriptId: transcript.id,
-    billed: billable,
+    transcriptId: publication.transcriptId,
+    billed: publication.billed,
   });
 
-  return { status: "completed", transcriptId: transcript.id };
+  return { status: "completed", transcriptId: publication.transcriptId };
 }

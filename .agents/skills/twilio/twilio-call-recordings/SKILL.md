@@ -210,6 +210,17 @@ not copy again. Propagate enqueue failure to the durable job. Prove copy-before-
 callback, missing-clock replay, provider recovery, duplicate delivery and job-write
 rollback. A passing terminal-before-copy fixture does not cover this ordering.
 
+For final single-part publication, hold workspace, original reservation and Call
+locks through the manifest recheck, transcript insert, Call link and canonical
+ledger RPC. Suppress ledger events inside that transaction; emit after commit
+and keep event failures non-fatal. Initial nonce preparation uses only the
+reservation, so lock a known owner even before its first recording row exists.
+A saved customer nonce with missing journal evidence is pending, not legacy.
+Compare physical media identity; stronger matching timing does not change the
+copied bytes. Preserve unjournaled legacy policy and the queued flag-off/no-debit
+contract. Do not adopt unknown unlinked transcripts. Prove write rollback,
+concurrent delivery, changed media, first-nonce blocking and after-commit visibility.
+
 ### ConversationRelay Recording
 
 **Critical:** `record:true` on the REST API call is **silently ignored** with ConversationRelay. No error. No recording.

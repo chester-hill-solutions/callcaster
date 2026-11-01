@@ -91,9 +91,6 @@ test/auto-dial.server.test.ts::@/lib/database/workspace.server#1
 test/auto-dial.server.test.ts::@/lib/db-rpc.server#1
 test/auto-dial.server.test.ts::@/lib/env.server#1
 test/auto-dial.server.test.ts::@/lib/logger.server#1
-test/batch-transcription-gating.test.ts::@/lib/logger.server#1
-test/batch-transcription-gating.test.ts::@/lib/object-storage.server#1
-test/batch-transcription-gating.test.ts::@/lib/transaction-history.server#1
 test/billing-action-role-gate.test.ts::@/lib/platform-billing.server#1
 test/billing-manual-dial.test.ts::@/lib/env.server#1
 test/billing-manual-dial.test.ts::@/lib/logger.server#1

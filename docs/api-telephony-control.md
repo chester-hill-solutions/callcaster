@@ -238,10 +238,21 @@ the recording manifest pending. A root ending does not prove that its customer
 ended. Journaled single-part batch transcription requires a completed original
 customer and a proved terminal boundary. Its manifest reads the customer and
 capture set under the same ownership locks. Conference and multipart media still
-require complete-history proof, assembly and a final publication fence.
+require complete-history proof and assembly.
 If timing arrives after the copy, its transaction retains an existing recording
 job. That job retries batch admission from the saved object without copying it
 again. Failed enqueue keeps the job retryable and preserves the logical-call key.
+
+For eligible single-part media, final transcript publication rechecks the captured
+media and original customer under workspace, reservation and Call locks. The
+transcript, Call link and canonical batch debit commit together. Failed writes
+roll back for durable retry; concurrent deliveries retain one transcript and
+charge. Ledger events follow commit and cannot undo it. The reservation fence
+also covers initial nonce preparation before a recording row exists. A saved
+customer recording nonce with a missing journal stays pending. Legacy recordings
+keep their existing eligibility and queued jobs can finish without billing when
+the batch flag is off. Unlinked older transcripts with unknown source are retained
+and require separate reconciliation; publication does not adopt or overwrite them.
 
 `DELETE` with the same query cancels only the selected pending attempt or an
 idle connection. An uncertain create keeps its pending state until recovery
