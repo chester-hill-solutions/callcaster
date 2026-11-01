@@ -1,7 +1,7 @@
 ---
 description: Triages a new GitHub issue, finds the code it touches, and picks a Priority
 mode: primary
-steps: 20
+steps: 30
 permissions:
   - action: edit
     resource: "*"
@@ -130,6 +130,11 @@ judge the value of the outcome, not the size of the work.
 5. Choose the priority from the rubric and record your confidence.
 6. Write `.issue-triage/triage.json`.
 7. Reply with one line: the priority you chose and the number of code sections.
+
+Write the file as soon as you have enough. Do not save the write for the last
+step: a long issue can exhaust your step budget first. If you feel the budget
+running low, write the file immediately with the sections you have verified.
+A published triage with 3 good links beats an unfinished plan.
 
 ## Hard rules
 
