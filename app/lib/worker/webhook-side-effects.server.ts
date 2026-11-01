@@ -16,9 +16,9 @@ import { recheckCampaignCompletion } from "@/lib/campaign-completion.server";
 import { MMS_CREDITS, SMS_SEGMENT_CREDITS, debitAmountFromCredits } from "@/lib/pricing";
 import { smsKey } from "@/lib/billing-keys";
 import type { TwilioSmsStatusWebhook, TwilioSmsStatus, OutreachDisposition } from "@/lib/twilio.types";
-import { campaign as campaignTable, campaign_queue as campaignQueueTable } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
-import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
+import { campaign as campaignTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { dequeueLegacyVoiceAttempt } from "@/server/legacy-voice-queue.server";
 import { findMessageBySid, updateMessageBySid, type MessageRow } from "@/lib/message-db.server";
 import { parseSmsProviderCount, smsProviderQuantityFields } from "@/lib/sms-provider-quantities";
 import {
@@ -129,55 +129,8 @@ export async function runCallStatusSideEffects(args: {
     return { ok: true };
   }
 
-  // A provider-terminal status must collapse the contact's queue entry exactly
-  // like /api/hangup does; otherwise a callee hang-up leaves the agent's
-  // nextRecipient (and the whole queue view) pointing at a finished contact
-  // while an agent hang-up clears it. Idempotent: if the agent already
-  // hung up, the guarded dequeue_contact RPC no-ops on dequeued rows. The
-  // assignee id is required for the RPC to cover assigned rows, so take it
-  // from the queue row itself — a webhook has no acting user. Test calls can
-  // name a campaign and contact, but they deliberately have no outreach
-  // attempt and must leave the matching queue row untouched.
-  if (
-    outreachAttemptId != null &&
-    CALL_STATUS_TO_DISPOSITION[callStatus.toLowerCase()] &&
-    callRow.contact_id != null &&
-    callRow.campaign_id != null
-  ) {
-    const dequeueWorkspace = workspaceId ?? callRow.workspace;
-    if (!dequeueWorkspace) {
-      logger.warn("call_status.dequeue_skipped", {
-        callSid: args.callSid,
-        reason: "no workspace",
-      });
-      return { ok: true };
-    }
-    const tdb = createTenantDb(dequeueWorkspace);
-    const [queueRow, campaign] = await Promise.all([
-      callRow.campaign_id
-        ? tdb.campaign_queue.findFirst({
-            where: and(
-              eq(campaignQueueTable.contact_id, callRow.contact_id),
-              eq(campaignQueueTable.campaign_id, callRow.campaign_id),
-            ),
-            columns: { assigned_to_user_id: true },
-          })
-        : Promise.resolve(null),
-      callRow.campaign_id
-        ? tdb.campaign.findFirst({
-            where: eq(campaignTable.id, callRow.campaign_id),
-            columns: { group_household_queue: true },
-          })
-        : Promise.resolve(null),
-    ]);
-    await dequeueQueueEntry({
-      by: { contactId: callRow.contact_id, campaignId: callRow.campaign_id },
-      workspaceId: dequeueWorkspace,
-      household: campaign?.group_household_queue ?? false,
-      userId: queueRow?.assigned_to_user_id ?? null,
-      reason: "Call completed",
-      exec: tdb,
-    });
+  if (outreachAttemptId != null && workspaceId && CALL_STATUS_TO_DISPOSITION[callStatus.toLowerCase()]) {
+    await dequeueLegacyVoiceAttempt(workspaceId, args.callSid);
   }
 
   return { ok: true };

@@ -387,7 +387,7 @@ export async function getQueuedContactIdsForCampaign(args: {
  */
 async function dequeueCampaignQueueById(args: {
   queueId: number;
-  userId: string;
+  userId: string | null;
   reason: string;
   workspaceId: string;
   expectedGeneration?: string | null;
@@ -535,7 +535,7 @@ async function dequeueCampaignQueueByContact(args: {
  */
 type DequeueQueueEntryByIdArgs = {
   by: { id: number };
-  userId: string;
+  userId: string | null;
   reason: string;
   workspaceId: string;
   /** A funded dispatch may finish only its own queue intent. Null refuses the write. */

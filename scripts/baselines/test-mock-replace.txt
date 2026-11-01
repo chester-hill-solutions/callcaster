@@ -382,7 +382,6 @@ test/export-authz.test.ts::@/lib/object-storage.server#1
 test/get-audience-detail-api.test.ts::@/lib/logger.server#1
 test/handset-token.server.test.ts::@/lib/env.server#1
 test/handset-token.server.test.ts::@/lib/workspace-members-db.server#1
-test/hangup.route.test.ts::@/lib/campaign-queue-db.server#1
 test/hangup.route.test.ts::@/lib/logger.server#1
 test/hangup.route.test.ts::@/lib/telephony-db.server#1
 test/inbound-handset-dial-end.route.test.ts::@/lib/env.server#1
@@ -746,7 +745,6 @@ test/utils.test.ts::@/lib/logger.server#1
 test/verify-call-in-session.route.test.ts::@/lib/auth.server#1
 test/verify-call-in-session.route.test.ts::@/lib/verification-db.server#1
 test/webhook-side-effects.test.ts::@/lib/call-recording-storage.server#1
-test/webhook-side-effects.test.ts::@/lib/campaign-queue-db.server#1
 test/webhook-side-effects.test.ts::@/lib/database/call-actions.server#1
 test/webhook-side-effects.test.ts::@/lib/database/workspace.server#1
 test/webhook-side-effects.test.ts::@/lib/env.server#1

@@ -4,12 +4,10 @@ import {
 } from "@/lib/database/workspace.server";
 import { parseActionRequest } from "@/lib/request-utils.server";
 import { findCallBySid, updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
-import { campaign as campaignTable } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
-import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
+import { dequeueLegacyVoiceAttempt } from "@/server/legacy-voice-queue.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
 import { defineAction } from "@/lib/handler.server";
@@ -57,19 +55,8 @@ export const action = defineAction({
             // never asked for household grouping.
             if (reservation) {
                 await dequeueFundedVoiceAttempt(reservation);
-            } else if (call.campaign_id) {
-                const campaign = await tdb.campaign.findFirst({
-                    where: eq(campaignTable.id, call.campaign_id),
-                    columns: { group_household_queue: true },
-                });
-                await dequeueQueueEntry({
-                    by: { contactId: call.contact_id, campaignId: call.campaign_id },
-                    workspaceId,
-                    household: campaign?.group_household_queue ?? false,
-                    userId: user.id,
-                    reason: "Call completed",
-                    exec: tdb,
-                });
+            } else {
+                await dequeueLegacyVoiceAttempt(workspaceId, callSid);
             }
             // Scope the disposition to THIS call's attempt. The old
             // updateOutreachDispositionByContactId rewrote every attempt for

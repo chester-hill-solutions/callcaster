@@ -5,6 +5,7 @@ import {
 import { data as routeData } from "react-router";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { defineAction } from "@/lib/handler.server";
+import { findCallBySid } from "@/lib/telephony-db.server";
 import { enqueueCallStatusSideEffects } from "@/lib/worker/enqueue-call-status.server";
 import type { ActionFunctionArgs } from "react-router";
 import { bindVerifiedFundedCallStatus } from "@/lib/voice-bridge-webhook.server";
@@ -36,7 +37,7 @@ export const action = defineAction({
     return { params, callSid: callSidRaw, funded };
   },
   // Sync upsert skips billing; the enqueued worker job debits terminal calls.
-  sideEffects: ["db-write"],
+  sideEffects: ["db-write", "credit"],
   handler: async ({ auth }) => {
     const { params, callSid: callSidRaw, funded } = auth;
     if (!callSidRaw) {
@@ -50,7 +51,8 @@ export const action = defineAction({
     }
 
     const updateData = buildCallUpsertFromTwilioParams(params);
-    const { call } = await processCallStatusWebhook(updateData, { skipBilling: true, workspaceId: funded?.workspaceId });
+    const workspaceId = funded?.workspaceId ?? (await findCallBySid(callSidRaw))?.workspace ?? undefined;
+    const { call } = await processCallStatusWebhook(updateData, { skipBilling: true, workspaceId });
 
     await enqueueCallStatusSideEffects(call, params);
 

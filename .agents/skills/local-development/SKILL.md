@@ -713,6 +713,13 @@ Drizzle can remap the inner columns to the outer table alias. Use transaction-
 bound select subqueries or separate tenant-scoped reads, and verify the query
 against an owned database with both positive and refusal cases.
 
+For queue generation tests, use explicit requeue through
+`enqueueContactsForCampaign(..., { requeue: true })`. Assignment release keeps
+the current intent. Inspect foreign-key delete actions before rebuilding a
+fixture row: deleting a bound queue can also delete its saved Call. Preserve an
+unbound legacy Call explicitly when that is the case under test, and require
+failures at the queue assertion, not a missing-Call setup error.
+
 For real RPC fixtures, inspect and seed each required foreign-key actor.
 Membership or an auth identity may not supply the legacy user-profile row.
 A fixture or constraint error before the target assertion is not defect proof.

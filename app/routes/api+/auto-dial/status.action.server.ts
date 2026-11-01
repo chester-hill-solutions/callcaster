@@ -15,9 +15,7 @@ import {
   type TwilioVoiceCallback,
 } from "@/lib/twilio/voice-callback";
 import { handlePredictiveParticipantJoin, handlePredictiveParticipantLeave } from "@/lib/predictive-participant-join.server";
-import {
-  dequeueQueueEntry
-} from "@/lib/campaign-queue-db.server";
+import { dequeueLegacyVoiceAttempt } from "@/server/legacy-voice-queue.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { data as routeData } from "react-router";
 import { runAutoDialerTurn, sendFundedPredictiveRecipient, stopRefusedPredictiveSetup } from "@/lib/auto-dial.server";
@@ -29,7 +27,6 @@ import {
   claimTerminalCallStatus,
   findCallBySid,
   findCampaignTypeByCampaignId,
-  findOutreachAttemptById,
   updateOutreachAttemptForWorkspace,
 } from "@/lib/telephony-db.server";
 import { requireTwilioSignature, resolveCanonicalTwilioWebhookUrl, twilioWebhookForbiddenHangup } from "@/lib/twilio-webhook.server";
@@ -123,38 +120,17 @@ const handleCallStatus = async (
 
     const { call: callUpdate } = await processCallStatusWebhook(updateData, {
       campaignType,
+      skipBilling: true,
       workspaceId: workspace,
       campaignId: dbCall.campaign_id ?? null,
       contactId: dbCall.contact_id ?? null,
       outreachAttemptId: dbCall.outreach_attempt_id ?? null,
     });
 
-    if (!callUpdate.outreach_attempt_id) {
-      throw new Error(
-        "Missing outreach_attempt_id for auto-dial status update",
-      );
-    }
-    const outreachStatus = await findOutreachAttemptById(
-      workspace,
-      callUpdate.outreach_attempt_id,
-    );
-    if (!outreachStatus) {
-      return;
-    }
-
-    await dequeueQueueEntry({
-      by: {
-        contactId: outreachStatus.contact_id,
-        campaignId: outreachStatus.campaign_id,
-      },
-      workspaceId: workspace,
-      household: true,
-      // A conference name is `${userId}~${uuid}`, and this argument is bound
-      // as ::uuid — passing the raw name raised 22P02 on every terminal call,
-      // so the contact was never dequeued and the dialer stopped after one.
-      userId: resolveUserIdFromConferenceName(callUpdate.conference_id) || null,
-      reason: `Call ${status?.toLowerCase()}`,
-    });
+    const outcome = await enqueueCallStatusSideEffects(callUpdate, event.raw);
+    await runCallStatusSideEffects({ callSid: callUpdate.sid, event: outcome });
+    const queueOutcome = await dequeueLegacyVoiceAttempt(workspace, callUpdate.sid);
+    if (!queueOutcome.ownedPrimary) return;
     const conferences = await twilio.conferences.list({
       friendlyName: callUpdate.conference_id ?? "",
       status: "in-progress",

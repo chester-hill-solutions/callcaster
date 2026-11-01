@@ -105,6 +105,18 @@ members stay queued. `superseded` returns no removed entries. HTTP 409, failed r
 and unknown replies keep the contact and answers visible. Retry an unknown
 request with the same captured fields. GET adds a read-only `advance_snapshot` to call-screen rows. DELETE is unchanged.
 
+Legacy completion callbacks use the saved Call and outreach attempt to identify
+the original queue work. A saved parent can supply a legacy child leg's queue
+identity. The queue ID, original actor and full database timestamps must still
+match; a later explicit requeue, reservation, outreach attempt or live customer
+keeps that row queued. Unknown legacy ownership never borrows the current
+assignee. Eligible household members created before the original attempt still
+advance; newer or live members stay queued. Call billing and the original
+outreach result continue through their canonical owners. Legacy Hang Up waits
+for a confirmed terminal Call before queue completion. Predictive continuation
+requires an owned completed primary. These checks are required because
+[Twilio status callbacks can arrive out of order](https://www.twilio.com/docs/voice/api/call-resource#statuscallbackevent).
+
 ## Browser dialer / tokens
 
 | Method | Path | Purpose |
