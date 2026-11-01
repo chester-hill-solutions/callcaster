@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Added: Calling screens show elapsed session time and total connected talk time across contacts in both dialing modes. The totals remain through queue refreshes and reset on a new campaign visit; phone-width controls keep both timers readable ([#2533](https://github.com/chester-hill-solutions/callcaster/issues/2533)).
+
 - Fixed: Script routing errors show the saved block names in inbound and outbound editors and launch validation. Untitled legacy blocks keep their ID fallback ([#2776](https://github.com/chester-hill-solutions/callcaster/issues/2776)).
 
 - Fixed: Released phone numbers stay in dated, read-only workspace and support history. Live sender lists, routing, rental billing and reports exclude them; repeat release is refused ([PR #3097](https://github.com/chester-hill-solutions/callcaster/pull/3097), [#2995](https://github.com/chester-hill-solutions/callcaster/issues/2995)).

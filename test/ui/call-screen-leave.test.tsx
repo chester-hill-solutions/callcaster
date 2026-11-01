@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, MemoryRouter, RouterProvider, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { CallScreenLayoutProps } from "@/hooks/call/useCallScreen";
@@ -252,4 +252,40 @@ describe("Leave Campaign", () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(controls.hangUp).not.toHaveBeenCalled();
   });
+});
+
+
+describe("calling session connection timing", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-31T12:00:00Z"));
+  });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  test.each(["predictive", "call"] as const)(
+    "counts recipient connection, not device connection, in %s mode", (dialType) => {
+      setup(dialType, null, (props) => {
+        const controls = { ...props.callControls, callState: "connected" };
+        const { rerender } = render(<MemoryRouter><CallScreenLayout {...props}
+          callControls={{ ...controls, displayState: "dialing" }} /></MemoryRouter>);
+        const session = () => screen.getByRole("timer", { name: "Calling session elapsed time" });
+        const talk = () => screen.getByRole("timer", { name: "Calling session talk time" });
+        act(() => { vi.advanceTimersByTime(10_000); });
+        expect(session()).toHaveTextContent("Session 00:00:10");
+        expect(talk()).toHaveTextContent("Talk 00:00:00");
+        rerender(<MemoryRouter><CallScreenLayout {...props}
+          callControls={{ ...controls, displayState: "connected" }} /></MemoryRouter>);
+        act(() => { vi.advanceTimersByTime(6_000); });
+        expect(talk()).toHaveTextContent("Talk 00:00:06");
+        rerender(<MemoryRouter><CallScreenLayout {...props}
+          callControls={{ ...controls, displayState: "completed" }} /></MemoryRouter>);
+        act(() => { vi.advanceTimersByTime(9_000); });
+        expect(session()).toHaveTextContent("Session 00:00:25");
+        expect(talk()).toHaveTextContent("Talk 00:00:06");
+      });
+    },
+  );
 });

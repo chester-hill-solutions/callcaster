@@ -268,6 +268,8 @@ export function CallScreenLayout({
       ) : null}
       <TopChrome
         campaign={campaign}
+        workspaceId={workspaceId}
+        isTalking={displayState === "connected"}
         count={count}
         completed={completed}
         availableCredits={availableCredits}

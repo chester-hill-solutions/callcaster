@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**134** documented / **136** total effects (2 grandfathered, ratcheting to 0).
+**135** documented / **137** total effects (2 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -16,6 +16,7 @@
 | `app/components/audience/use-audience-upload-progress.ts` | Poll the upload status serially for one committed processing attempt; the Effect task aborts on exit or attempt replacement. | pollingEnabled, uploadId, workspaceId, attemptNonce (the committed processing identity; the nonce distinguishes a same-id retry) | Effect task + fetch; abort on unmount or identity replacement | Upload status is live server state that changes after the POST returns; a loader cannot poll. |
 | `app/components/call/CallScreen.CallArea.tsx` | Clean up the hang-up and dial-arm confirmation timers on unmount | [] — fire-once cleanup, no external state to track | timer (clearTimeout on unmount) | Component lifecycle cleanup, not data fetching. |
 | `app/components/call/CallScreen.CallArea.tsx` | Arm a "click again to dial" guard on the Dial button whenever it | [showInCall, predictive] — flip is only meaningful when these two derived values change. | timer (arms + 3s auto-disarm) | Pure UI state, no data fetch. |
+| `app/components/call/CallScreen.SessionTimers.tsx` | Refresh the session clocks and record each connected-state edge. | isTalking (the call screen's recipient connection state) | timer (setInterval) + reducer updates; clear on change/unmount | Elapsed visit time is a live client clock, not request data. |
 | `app/components/campaign/CampaignSendWindowNotice.tsx` | Remove the campaign notice when its page identity changes or unmounts. | identity identifies the campaign whose notice this page owns. | dom: dismiss the notice through the root feedback host. | The shared feedback host is a browser subscription. |
 | `app/components/campaign/CampaignSendWindowNotice.tsx` | Keep the persistent SMS warning aligned with the saved campaign window. | identity and message choose the notice; workspaceId, campaignId, canEdit and navigate choose its remedy. | dom: update or dismiss a notice after the root host subscribes. | Sonner renders through the existing browser feedback host. |
 | `app/components/campaign/home/CampaignStatusRail.tsx` | Keep the active place tab scrolled into view in the horizontal rail. | location.pathname, location.hash, items (active slot changes with route/hash) | dom (tablist scrollLeft/scrollTo) | Scroll position is viewport chrome, not request data. |
