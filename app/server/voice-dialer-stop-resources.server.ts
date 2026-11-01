@@ -60,6 +60,12 @@ export async function isDialerCallClosed(owner: VoiceDialerIntent, sid: string) 
     eq(call.account_sid, owner.account_sid ?? ""), eq(call.sid, sid), inArray(call.status, [...TERMINAL_CALL_STATUSES]))).limit(1);
   return Boolean(saved);
 }
+function matchesStoppedLeg(current: VoiceReservation, purpose: "setup" | "recipient", remote: CallInstance) {
+  const expected = voiceCallLegIdentity(current, purpose), sid = purpose === "setup" ? current.setup_sid : current.provider_sid;
+  const status = normalizeProviderStatus(remote.status);
+  return Boolean(status && isTerminalStatus(status) && remote.sid === sid && remote.accountSid === current.account_sid && remote.to === expected.to &&
+    remote.from === expected.from && remote.direction === expected.direction && (remote.parentCallSid || null) === expected.parent_call_sid);
+}
 /** An actual provider receipt records closure without inventing final duration or billing. */
 export async function recordDialerStoppedCall(owner: VoiceDialerIntent, snapshot: VoiceReservation, purpose: "setup" | "recipient", remote: CallInstance) {
   const savedCall = await db.transaction(async tx => {
@@ -67,10 +73,8 @@ export async function recordDialerStoppedCall(owner: VoiceDialerIntent, snapshot
     const [intent] = await tx.select({ id: intents.intent_id }).from(intents).where(currentStop(owner));
     const [current] = await tx.select().from(reservations).where(and(callOwner(owner), eq(reservations.id, snapshot.id))).for("update");
     if (!intent || !current) throw new Error("Dialer Stop lost its provider receipt owner");
-    const expected = voiceCallLegIdentity(current, purpose), sid = purpose === "setup" ? current.setup_sid : current.provider_sid;
     const status = normalizeProviderStatus(remote.status);
-    if (!status || !isTerminalStatus(status) || remote.sid !== sid || remote.accountSid !== current.account_sid || remote.to !== expected.to ||
-      remote.from !== expected.from || remote.direction !== expected.direction || (remote.parentCallSid || null) !== expected.parent_call_sid)
+    if (!matchesStoppedLeg(current, purpose, remote))
       throw new Error("Dialer Stop receipt does not match its funded leg");
     const [updated] = await tx.update(reservations).set(purpose === "setup" ? {
       setup_terminal_at: current.setup_terminal_at ?? new Date(), setup_terminal_status: current.setup_terminal_status ?? status,

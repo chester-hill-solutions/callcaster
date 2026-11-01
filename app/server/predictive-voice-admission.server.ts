@@ -155,6 +155,6 @@ async function fundClaimedRecipient(
       statusCallback: voiceBridgeUrl(urls.statusCallback, admitted.reservation.id, "setup"),
       recipientVoiceUrl: urls.voiceUrl, recipientStatusCallback: urls.statusCallback,
     }) : await startVoiceReservationInTransaction(tx, admitted.reservation, urls, input.audioSource?.proof);
-    if (input.setup) await bindDialerStartIntent(tx, { ...input, setup: input.setup }, reservation);
+    await bindDialerStartIntent(tx, input, reservation);
     return { ok: true, reservation, urls, contact } as const;
 }

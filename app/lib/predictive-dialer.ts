@@ -75,6 +75,16 @@ export class PredictiveDialer {
     if (!this.live || !this.recoveryAllowed || this.journal || this.state.conference) return;
     this.publish({ conference });
   };
+  private recoveredJournal(control: VoiceDialerCurrent) {
+    const saved = this.journal;
+    if (saved && (saved.intentId !== control.intent_id || saved.campaignId !== String(control.campaign_id)) || !saved && !this.recoveryAllowed) return null;
+    const journal: DialerJournal = saved ?? { version: 1, ...this.owner, campaignId: String(control.campaign_id),
+      intentId: control.intent_id, conference: control.conference_id, request: null, state: "active" };
+    if (journal.conference && journal.conference !== control.conference_id) return null;
+    journal.conference = control.conference_id;
+    if (journal.state !== "stopping") journal.state = control.dialer_state === "stopping" ? "stopping" : "active";
+    return journal;
+  }
   recover = (control: VoiceDialerCurrent | null, verified = true) => {
     if (!this.live) return;
     if (!verified || control && (control.workspace_id !== this.owner.workspaceId || control.user_id !== this.owner.userId)) {
@@ -82,15 +92,8 @@ export class PredictiveDialer {
     }
     if (!control) { this.publish({ currentVerified: true, ...(this.state.error === CHECK_CURRENT ? { error: null } : {}) }); return; }
     if (this.stopped.has(control.intent_id)) return;
-    const saved = this.journal;
-    if (saved && (saved.intentId !== control.intent_id || saved.campaignId !== String(control.campaign_id)) || !saved && !this.recoveryAllowed) {
-      this.publish({ currentVerified: false }); return;
-    }
-    const journal: DialerJournal = saved ?? { version: 1, ...this.owner, campaignId: String(control.campaign_id),
-      intentId: control.intent_id, conference: control.conference_id, request: null, state: "active" };
-    if (journal.conference && journal.conference !== control.conference_id) { this.publish({ currentVerified: false }); return; }
-    journal.conference = control.conference_id;
-    if (journal.state !== "stopping") journal.state = control.dialer_state === "stopping" ? "stopping" : "active";
+    const saved = this.journal, journal = this.recoveredJournal(control);
+    if (!journal) { this.publish({ currentVerified: false }); return; }
     this.journal = journal; this.save(journal, saved?.intentId ?? null);
     this.publish({ currentVerified: true, conference: journal.campaignId === this.owner.campaignId ? journal.conference : null,
       awaitingReceipt: false, pendingStartIntentId: null, stopPending: journal.state === "stopping", error: journal.state === "stopping" ? PENDING_STOP
@@ -103,12 +106,24 @@ export class PredictiveDialer {
     return refused && context(refused) === context(request) ? refused : { ...request, actor_id: this.owner.userId, dial_intent_id: crypto.randomUUID(),
       ...(request.audioSource ? { audioSource: { ...request.audioSource } } : {}) };
   }
+  private canBegin(disabledReason: string | null, showError?: (message: string, creditsError: boolean) => void) {
+    if (!this.live || this.startOperation || this.journal?.state === "stopping" || this.journal?.state === "active") return false;
+    if (!this.journal && !this.state.currentVerified) { this.publish({ error: CHECK_CURRENT }); return false; }
+    if (!this.storageReadable) { this.publish({ error: STORAGE_ERROR }); showError?.(STORAGE_ERROR, false); return false; }
+    if (disabledReason && !this.journal) { this.publish({ error: disabledReason }); showError?.(disabledReason, false); return false; }
+    return true;
+  }
+  private failStart(journal: DialerJournal, cause: unknown, showError?: (message: string, creditsError: boolean) => void) {
+    const definite = cause instanceof ConferenceStartRefusedError;
+    const creditsError = definite && cause.message === "Insufficient credits to start dialing";
+    if (definite) { this.refused = journal.request; if (this.save(null, journal.intentId)) this.journal = null; }
+    const message = cause instanceof Error ? cause.message : UNKNOWN_START;
+    this.publish({ error: message, creditsError, awaitingReceipt: !definite, pendingStartIntentId: definite ? null : journal.intentId });
+    showError?.(message, creditsError);
+  }
   begin = async (request: Omit<StartConferenceParams, "dial_intent_id" | "actor_id">, disabledReason: string | null,
     showError?: (message: string, creditsError: boolean) => void) => {
-    if (!this.live || this.startOperation || this.journal?.state === "stopping" || this.journal?.state === "active") return;
-    if (!this.journal && !this.state.currentVerified) { this.publish({ error: CHECK_CURRENT }); return; }
-    if (!this.storageReadable) { this.publish({ error: STORAGE_ERROR }); showError?.(STORAGE_ERROR, false); return; }
-    if (disabledReason && !this.journal) { this.publish({ error: disabledReason }); showError?.(disabledReason, false); return; }
+    if (!this.canBegin(disabledReason, showError)) return;
     this.recoveryAllowed = false;
     let journal = this.journal;
     if (!journal) {
@@ -137,12 +152,7 @@ export class PredictiveDialer {
       this.publish({ conference: result.conferenceName, customerCallSid: result.callSid ?? null, awaitingReceipt: false, pendingStartIntentId: null });
     } catch (cause) {
       if (!ownsReply()) return;
-      const definite = cause instanceof ConferenceStartRefusedError;
-      const creditsError = definite && cause.message === "Insufficient credits to start dialing";
-      if (definite) { this.refused = saved; if (this.save(null, journal.intentId)) this.journal = null; }
-      const message = cause instanceof Error ? cause.message : UNKNOWN_START;
-      this.publish({ error: message, creditsError, awaitingReceipt: !definite, pendingStartIntentId: definite ? null : journal.intentId });
-      showError?.(message, creditsError);
+      this.failStart(journal, cause, showError);
     } finally {
       if (this.live && this.lifetime === lifetime && this.startOperation === operation) {
         this.startOperation = null; this.publish({ isLoading: false });

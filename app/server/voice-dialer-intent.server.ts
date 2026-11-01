@@ -69,11 +69,14 @@ export async function checkDialerRoomIntent(tx: CreditTransaction, owner: { work
 }
 
 /** The first funded reservation fixes account and room ownership for this Start. */
-export async function bindDialerStartIntent(tx: CreditTransaction, input: PredictiveConferenceStartIdentity, reservation: VoiceReservation) {
-  const owner = dialerStartOwner(input);
-  if (await checkDialerStartIntent(tx, input)) throw new Error("Stopped Start reached its send checkpoint");
+export async function bindDialerStartIntent(tx: CreditTransaction, input: Omit<PredictiveConferenceStartIdentity, "setup"> & {
+  setup?: PredictiveConferenceStartIdentity["setup"];
+}, reservation: VoiceReservation) {
+  if (!input.setup) return null;
+  const start = { ...input, setup: input.setup }, owner = dialerStartOwner(start);
+  if (await checkDialerStartIntent(tx, start)) throw new Error("Stopped Start reached its send checkpoint");
   const values = { workspace: owner.workspaceId, user_id: owner.userId, intent_id: owner.intentId, campaign_id: owner.campaignId,
-    request: requestIdentity(input), account_sid: reservation.account_sid, conference_id: reservation.conference_id,
+    request: requestIdentity(start), account_sid: reservation.account_sid, conference_id: reservation.conference_id,
     reservation_id: reservation.id, retired_at: null, updated_at: new Date() };
   const saved = await findDialerIntent(tx, owner);
   if (saved) await tx.update(intents).set(values).where(dialerIntentIdentity(owner));

@@ -65,14 +65,18 @@ export async function bindPredictiveConferenceEvent(input: ConferenceBindingInpu
 }
 
 /** The initial recipient has already been claimed and funded before agent setup. */
+function isUncalledSetup(row: VoiceReservation | undefined, setupSid: string): row is VoiceReservation {
+  return Boolean(row && row.conference_id && row.setup_sid === setupSid && row.conference_sid && row.state === "creating" &&
+    !row.provider_sid && !row.recipient_instruction_issued_at && !row.recipient_refused_at && !row.setup_terminal_at);
+}
+
 export async function claimFirstPredictiveRecipient(reservation: VoiceReservation, setupSid: string) {
   return db.transaction(async (tx) => {
     await tx.select({ id: workspace.id }).from(workspace).where(eq(workspace.id, reservation.workspace)).for("no key update");
     const [current] = await tx.select().from(reservations).where(and(
       eq(reservations.id, reservation.id), eq(reservations.workspace, reservation.workspace),
     )).for("update");
-    if (!current || !current.conference_id || current.setup_sid !== setupSid || !current.conference_sid ||
-        current.state !== "creating" || current.provider_sid || current.recipient_instruction_issued_at || current.recipient_refused_at || current.setup_terminal_at) return null;
+    if (!isUncalledSetup(current, setupSid)) return null;
     if (await dialerReservationIsStopped(tx, current))
       return { send: false as const, reservation: await refuseRecipient(tx, current, "Captured dialer Stop blocks the first customer") };
     const [savedCampaign] = await tx.select().from(campaign).where(and(
