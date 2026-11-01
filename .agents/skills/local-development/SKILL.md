@@ -284,7 +284,9 @@ and a successful production build do not prove that the route can render.
 
 For current-resource recovery, an empty server read cannot discard a saved
 request whose POST is still unknown. Retain that nonce for explicit Check or
-Cancel. Keep cancellation and browser-readiness continuations tied to their
+Cancel. A retry refusal does not resolve an earlier unknown POST. Keep its
+original nonce and Stop path, including after an auth or rate-limit refusal.
+Only a definite refusal without earlier uncertainty can retire that request. Keep cancellation and browser-readiness continuations tied to their
 captured owner; discovery must not transfer them to a newer control intent.
 Validate the full recovered snapshot before changing either audio role, and
 retain known terminal intents so a later read cannot revive them.

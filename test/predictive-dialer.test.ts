@@ -55,6 +55,19 @@ describe("saved Start and captured Stop ownership", () => {
     vi.mocked(fetch).mockImplementation(async (_url, init) => stopped(String(init?.body)));
     expect(await dialer.stop()).toBe(true); expect(body(0).dial_intent_id).toBe(intentId);
   });
+  test.each([400, 401, 402, 403, 404, 429])("a retry HTTP %i refusal cannot erase an earlier unknown Start", async status => {
+    const storage = memoryStorage(), dialer = mounted(storage);
+    vi.mocked(fetch).mockRejectedValueOnce(new Error("Original response lost"))
+      .mockResolvedValueOnce(Response.json({ error: "Retry refused" }, { status }))
+      .mockImplementationOnce(async (_url, init) => stopped(String(init?.body)));
+    await dialer.begin(request, null); const id = body(0).dial_intent_id;
+    await dialer.begin({ ...request, caller_id: "+16135550999" }, null);
+    expect(body(1)).toEqual(body(0));
+    expect(dialer.getSnapshot()).toMatchObject({ awaitingReceipt: true, pendingStartIntentId: id });
+    expect(readDialerJournal(storage, owner)?.intentId).toBe(id);
+    expect(await dialer.stop()).toBe(true);
+    expect(calls()[2][0]).toBe("/api/auto-dial/end"); expect(body(2).dial_intent_id).toBe(id);
+  });
   test("a successful credit retry and Stop retire the refused nonce before the next session", async () => {
     const dialer = mounted();
     vi.mocked(fetch).mockResolvedValueOnce(Response.json({ creditsError: true }, { status: 402 })).mockResolvedValueOnce(accepted())

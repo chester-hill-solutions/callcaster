@@ -113,17 +113,20 @@ export class PredictiveDialer {
     if (disabledReason && !this.journal) { this.publish({ error: disabledReason }); showError?.(disabledReason, false); return false; }
     return true;
   }
-  private failStart(journal: DialerJournal, cause: unknown, showError?: (message: string, creditsError: boolean) => void) {
-    const definite = cause instanceof ConferenceStartRefusedError;
+  private failStart({ journal, cause, uncertainRetry, showError }: {
+    journal: DialerJournal; cause: unknown; uncertainRetry: boolean; showError?: (message: string, creditsError: boolean) => void;
+  }) {
+    const refusal = cause instanceof ConferenceStartRefusedError, definite = refusal && !uncertainRetry;
     const creditsError = definite && cause.message === "Insufficient credits to start dialing";
     if (definite) { this.refused = journal.request; if (this.save(null, journal.intentId)) this.journal = null; }
-    const message = cause instanceof Error ? cause.message : UNKNOWN_START;
+    const message = uncertainRetry && refusal ? UNKNOWN_START : cause instanceof Error ? cause.message : UNKNOWN_START;
     this.publish({ error: message, creditsError, awaitingReceipt: !definite, pendingStartIntentId: definite ? null : journal.intentId });
     showError?.(message, creditsError);
   }
   begin = async (request: Omit<StartConferenceParams, "dial_intent_id" | "actor_id">, disabledReason: string | null,
     showError?: (message: string, creditsError: boolean) => void) => {
     if (!this.canBegin(disabledReason, showError)) return;
+    const uncertainRetry = this.journal !== null;
     this.recoveryAllowed = false;
     let journal = this.journal;
     if (!journal) {
@@ -152,7 +155,7 @@ export class PredictiveDialer {
       this.publish({ conference: result.conferenceName, customerCallSid: result.callSid ?? null, awaitingReceipt: false, pendingStartIntentId: null });
     } catch (cause) {
       if (!ownsReply()) return;
-      this.failStart(journal, cause, showError);
+      this.failStart({ journal, cause, uncertainRetry, showError });
     } finally {
       if (this.live && this.lifetime === lifetime && this.startOperation === operation) {
         this.startOperation = null; this.publish({ isLoading: false });
