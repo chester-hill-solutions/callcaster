@@ -1,6 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { z } from "zod";
 import { workspace_voice_recording_customer_event as events, workspace_voice_reservation as reservations } from "@/db/schema";
 import { VoiceRecordingBindingError } from "@/lib/voice-recording";
 import { createTenantDb } from "./tenant-db";
@@ -9,27 +8,9 @@ import { withVoiceRecordingOperation, type VoiceRecordingOperation } from "./voi
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
 import { withVoiceAudioConnection, type VoiceAudioConnection } from "./voice-audio-connection.server";
 import type { ParticipantEventName } from "@/lib/twilio/voice-callback";
+import { parseTwilioVoiceTimestamp, parseTwilioVoiceSequence } from "@/lib/twilio/voice-event-clock";
 
 type RoomEvent = { callSid: string | null; event: ParticipantEventName; sequenceNumber?: string; timestamp?: string | null };
-const isoTime = z.iso.datetime({ offset: true });
-const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-function providerTime(value: string | null | undefined) {
-  if (!value) return null;
-  // Convert the documented RFC 2822 form before strict calendar validation.
-  const rfc = /^(?:[A-Za-z]{3}, )?(\d{1,2}) ([A-Za-z]{3}) (\d{4}) (\d{2}:\d{2}:\d{2}) (GMT|[+-]\d{4})$/.exec(value);
-  const [, day = "", monthName = "", year = "", clock = "", zone = ""] = rfc ?? [];
-  const month = months.indexOf(monthName) + 1, offset = zone === "GMT" ? "Z" : zone.replace(/(\d{2})$/, ":$1");
-  const normalized = rfc ? `${year}-${String(month).padStart(2, "0")}-${day.padStart(2, "0")}T${clock}${offset}` : value;
-  const parsed = isoTime.safeParse(normalized);
-  return parsed.success ? new Date(parsed.data) : null;
-}
-
-function providerSequence(value: string | undefined) {
-  if (!value || !/^(0|[1-9]\d*)$/.test(value)) return null;
-  const sequence = Number(value);
-  return Number.isSafeInteger(sequence) && sequence <= 2147483647 ? sequence : null;
-}
 
 /** Under the existing workspace/audio locks; retain history after the phone ends. */
 export async function recordVoiceCustomerConferenceEvent(tx: CreditTransaction, owner: VoiceAudioConnection, input: RoomEvent) {
@@ -42,7 +23,7 @@ export async function recordVoiceCustomerConferenceEvent(tx: CreditTransaction, 
       reservation.setup_sid !== owner.original_agent_sid || reservation.provider_sid !== owner.customer_sid || reservation.conference_id)
     throw new VoiceRecordingBindingError("Recording membership has a different customer owner");
   const event = input.event;
-  const sequence = providerSequence(input.sequenceNumber), occurredAt = providerTime(input.timestamp);
+  const sequence = parseTwilioVoiceSequence(input.sequenceNumber), occurredAt = parseTwilioVoiceTimestamp(input.timestamp);
   // Preserve the original customer encoding across the room-witness extension.
   const identity = [owner.workspace, owner.reservation_id, owner.user_id,
     owner.original_agent_sid, owner.customer_sid, owner.account_sid, owner.conference_sid, owner.conference_id, event,

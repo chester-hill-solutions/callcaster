@@ -193,6 +193,23 @@ the first phone ends. A schema extension must retain the persisted customer even
 key encoding. Test exact callback replay against a retained pre-extension row;
 adding new witness identity must not change existing customer keys.
 
+Keep signed Call-progress event time and sequence separate from actual Call
+start/end/duration recovered through the original account. Save them through the
+canonical funded customer owner, with first facts immutable. Recovery parameters
+cannot acquire signed callback provenance. A root ending cannot prove customer
+completion. Read the customer and full capture set under workspace-before-
+reservation locks before admitting journaled single-part batch work. Retain a
+provider-duration conflict as evidence and keep its manifest pending. Test both
+live and ended customers with the batch flag on and off; a completed recording
+alone must not make an old fixture eligible. Conference sequence contiguity and
+initial numbering are not documented Call-progress rules. Customer terminal time
+does not prove complete room history or replace an atomic final publication fence.
+If customer timing follows a completed copy, retain the existing recording job in
+the same timing transaction. Retry batch admission from that saved object; do
+not copy again. Propagate enqueue failure to the durable job. Prove copy-before-
+callback, missing-clock replay, provider recovery, duplicate delivery and job-write
+rollback. A passing terminal-before-copy fixture does not cover this ordering.
+
 ### ConversationRelay Recording
 
 **Critical:** `record:true` on the REST API call is **silently ignored** with ConversationRelay. No error. No recording.

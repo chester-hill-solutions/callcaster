@@ -5,7 +5,8 @@ import { ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE } from "@/lib/worker/job-types.ser
 import { logger } from "@/lib/logger.server";
 
 /** Keep the existing default-off policy and one logical-call job key. */
-export async function enqueueCallRecordingTranscription(workspaceId: string, callSid: string, audioUrl: string) {
+export async function enqueueCallRecordingTranscription(workspaceId: string, callSid: string, audioUrl: string,
+  options: { retryOnError?: boolean } = {}) {
   try {
     if (!await isBatchTranscriptionEnabled(workspaceId) || !await isSinglePartCallRecording(workspaceId, callSid, audioUrl)) return;
     await enqueueRegisteredJob({ type: ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE, workspaceId,
@@ -14,5 +15,6 @@ export async function enqueueCallRecordingTranscription(workspaceId: string, cal
     logger.warn("elevenlabs_batch_transcribe.enqueue_failed", {
       callSid, workspaceId, error: error instanceof Error ? error.message : String(error),
     });
+    if (options.retryOnError) throw error;
   }
 }

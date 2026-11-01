@@ -15,6 +15,7 @@ import { terminalVoiceCallDuration as terminalDuration } from "@/lib/voice-recov
 import { reconcileVoiceBridge, recoverVoiceBridgeCandidate } from "@/lib/voice-bridge-recovery.server";
 import { settleRecoveredVoiceCall } from "@/lib/recovered-voice-status.server";
 import { hasVoiceSetup } from "@/lib/voice-bridge-identity";
+import { recordVoiceCustomerCallTiming } from "@/server/voice-customer-media-boundary.server";
 
 function matchesReservation(reservation: VoiceReservation, candidate: CallInstance) {
   return candidate.accountSid === reservation.account_sid &&
@@ -90,14 +91,15 @@ export async function reconcileVoiceReservation(reservation: VoiceReservation) {
     : await findUnknownCall(reservation, twilio);
   if (!remote || !matchesReservation(reservation, remote) ||
       (reservation.provider_sid && remote.sid !== reservation.provider_sid)) return "pending";
-  await recordVoiceReservationProvider(reservation, remote.sid);
+  const accepted = await recordVoiceReservationProvider(reservation, remote.sid);
   const duration = terminalDuration(remote.status, remote.duration);
   if (duration === null) return "pending";
+  await recordVoiceCustomerCallTiming(accepted, remote);
   const { call: saved } = await processCallStatusWebhook({
     sid: remote.sid, account_sid: remote.accountSid, to: remote.to, from: remote.from,
     parent_call_sid: remote.parentCallSid || null, direction: remote.direction,
     status: remote.status, duration: String(duration),
-    date_updated: remote.dateUpdated ?? new Date(), end_time: remote.endTime ?? undefined,
+    date_updated: remote.dateUpdated ?? new Date(), start_time: remote.startTime ?? undefined, end_time: remote.endTime ?? undefined,
   }, {
     workspaceId: reservation.workspace, skipBilling: true,
   });

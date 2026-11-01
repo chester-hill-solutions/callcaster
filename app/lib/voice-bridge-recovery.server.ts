@@ -8,6 +8,7 @@ import { terminalVoiceCallDuration } from "@/lib/voice-recovery-duration";
 import { processCallStatusWebhook } from "@/lib/twilio-call-status.server";
 import { settleRecoveredVoiceCall } from "@/lib/recovered-voice-status.server";
 import { matchesVoiceSetupRoot } from "@/lib/voice-bridge-identity";
+import { recordVoiceCustomerCallTiming } from "@/server/voice-customer-media-boundary.server";
 
 function matchesSetup(reservation: VoiceReservation, candidate: CallInstance) {
   return matchesVoiceSetupRoot(reservation, candidate);
@@ -81,10 +82,11 @@ export async function reconcileVoiceBridge(reservation: VoiceReservation, twilio
   if (!child || !matchesRecipient(owned, child) || (owned.provider_sid && child.sid !== owned.provider_sid)) return "pending";
   const duration = terminalVoiceCallDuration(child.status, child.duration);
   if (duration === null) return "pending";
-  await recordVoiceReservationProvider(owned, child.sid);
+  const accepted = await recordVoiceReservationProvider(owned, child.sid);
+  await recordVoiceCustomerCallTiming(accepted, child);
   const { call: saved } = await processCallStatusWebhook({ sid: child.sid, account_sid: child.accountSid, to: child.to, from: child.from,
     parent_call_sid: owned.conference_id ? null : root.sid, direction: child.direction, status: child.status, duration: String(duration),
-    date_updated: child.dateUpdated ?? new Date(), end_time: child.endTime ?? undefined,
+    date_updated: child.dateUpdated ?? new Date(), start_time: child.startTime ?? undefined, end_time: child.endTime ?? undefined,
   }, { workspaceId: owned.workspace, skipBilling: true });
   await settleRecoveredVoiceCall(saved);
   return "settled";

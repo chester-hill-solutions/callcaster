@@ -25,12 +25,17 @@ export async function enqueueVoiceRecordingCopy(owner: VoiceRecordingOperation) 
 export async function runVoiceRecordingCopy(workspaceId: string, operationId: string, leaseToken: string) {
   const current = await startVoiceRecordingCopy(workspaceId, operationId, leaseToken);
   if (!current?.provider_sid) return { copied: false };
+  if (current.audio_url) {
+    if (current.kind === "dial" || current.kind === "customer")
+      await enqueueCallRecordingTranscription(current.workspace, current.logical_call_sid, current.audio_url, { retryOnError: true });
+    return { copied: false };
+  }
   try {
     const result = await persistCallRecordingToStorage({ workspaceId: current.workspace, callSid: current.logical_call_sid,
       accountSid: current.account_sid, recordingSid: current.provider_sid, existingAudioUrl: current.audio_url, storageMode: "recording" });
     const copied = await finishVoiceRecordingCopy(current, result.audioUrl);
     if (copied && (current.kind === "dial" || current.kind === "customer"))
-      await enqueueCallRecordingTranscription(current.workspace, current.logical_call_sid, result.audioUrl);
+      await enqueueCallRecordingTranscription(current.workspace, current.logical_call_sid, result.audioUrl, { retryOnError: true });
     return { copied };
   } catch (error) {
     await deferVoiceRecordingCopy(current);

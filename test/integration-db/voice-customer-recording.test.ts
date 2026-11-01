@@ -1,15 +1,19 @@
 import { accountSid, callerId, clearFault, customer, fault, phone, sid, sql, state, useOwnedAudioFixture, web, workspaceId } from "../helpers/voice-audio-fixture";
 import { customerAttempt, customerUrls, fundCustomerAttempt, signedCustomerRecording } from "../helpers/voice-audio-customer-fixture";
 import { randomUUID } from "node:crypto";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { dispatchPhoneCustomerVoiceCall } from "@/lib/phone-customer-dispatch.server";
 import { recordVoiceReservationProvider, startVoiceReservation } from "@/server/voice-credit-reservation.server";
 import { findVoiceRecordingOperation } from "@/server/voice-recording-operation.server";
+import { enqueueFundedVoiceTerminalOutcome } from "@/server/voice-terminal-outcome.server";
+import { recordVoiceCustomerCallTiming } from "@/server/voice-customer-media-boundary.server";
 import { runVoiceRecordingCopy } from "@/lib/voice-recording-copy.server";
 import type { CallListInstanceCreateOptions } from "twilio/lib/rest/api/v2010/account/call";
+import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
 
 const storage = vi.hoisted(() => ({ copy: vi.fn<typeof import("@/lib/call-recording-storage.server").persistCallRecordingToStorage>() }));
+const boundaryFault = `recording_boundary_${randomUUID().replaceAll("-", "")}`;
 vi.mock("@/lib/call-recording-storage.server", async importOriginal => ({
   ...await importOriginal<typeof import("@/lib/call-recording-storage.server")>(), persistCallRecordingToStorage: storage.copy,
 }));
@@ -30,6 +34,27 @@ function params(f: { customerSid: string; recordingSid: string }, status = "in-p
     RecordingStartTime: new Date().toUTCString(), ...(status === "completed" ? { RecordingDuration: "42" } : {}) };
 }
 
+function terminal(f: { customerSid: string }): Record<string, string> {
+  return { AccountSid: accountSid, CallSid: f.customerSid, To: customer, From: callerId, Direction: "outbound-api",
+    CallStatus: "completed", CallDuration: "42", Timestamp: "Sun, 1 Nov 2026 14:00:42 +0000",
+    CallbackSource: "call-progress-events", SequenceNumber: "3" };
+}
+
+async function runBoundaryJob(partId: string) {
+  const [row] = await sql`select id, type, params, max_attempts from public.job where workspace_id = ${workspaceId}::uuid
+    and idempotency_key = ${`voice_recording_boundary:${partId}`}`;
+  if (!row) throw new Error("Durable recording boundary job required");
+  const job: ClaimedJobRow = { id: Number(row.id), type: row.type, params: row.params, workspace_id: workspaceId,
+    user_id: null, attempt_count: 1, max_attempts: row.max_attempts };
+  const { jobHandlers } = await import("@/lib/worker/handlers.server");
+  return jobHandlers.recording_side_effects(job);
+}
+
+async function clearBoundaryFault() {
+  await sql.unsafe(`drop trigger if exists ${boundaryFault} on public.job`);
+  await sql.unsafe(`drop function if exists public.${boundaryFault}()`);
+}
+
 async function dispatch(f: Awaited<ReturnType<typeof customerAttempt>>) {
   if (!f.args.audioSource) throw new Error("Confirmed phone source required");
   const { voiceUrl, statusCallback } = customerUrls();
@@ -39,6 +64,7 @@ async function dispatch(f: Awaited<ReturnType<typeof customerAttempt>>) {
 
 describe("recorded customer Start through an existing phone", () => {
   useOwnedAudioFixture();
+  afterEach(clearBoundaryFault);
   beforeEach(() => {
     storage.copy.mockReset().mockImplementation(async args => ({ ok: true, skipped: false,
       audioUrl: `call-recordings/${args.workspaceId}/recording-${args.callSid}-${args.recordingSid}.mp3` }));
@@ -122,8 +148,12 @@ describe("recorded customer Start through an existing phone", () => {
     expect(web.create).toHaveBeenCalledTimes(1);
   });
 
-  test.each([false, true])("completed customer playback and the existing batch flag remain idempotent (%s)", async enabled => {
+  test.each([
+    { enabled: false, completed: false }, { enabled: true, completed: false },
+    { enabled: false, completed: true }, { enabled: true, completed: true },
+  ])("completed customer playback remains idempotent (batch=$enabled, customer ended=$completed)", async ({ enabled, completed }) => {
     const f = await armed(); await recordVoiceReservationProvider(f.reservation, f.customerSid);
+    if (completed) await enqueueFundedVoiceTerminalOutcome(workspaceId, f.customerSid, terminal(f));
     await sql`update public.workspace set feature_flags = ${sql.json({ batchTranscription: enabled })} where id = ${workspaceId}::uuid`;
     expect((await signedCustomerRecording(f.urls.customerRecording.callbackUrl, params(f, "completed"))).status).toBe(204);
     const part = await findVoiceRecordingOperation(f.urls.customerRecording.id); if (!part) throw new Error("Owned customer part required");
@@ -133,7 +163,57 @@ describe("recorded customer Start through an existing phone", () => {
     const [playback] = await sql`select recording_sid, audio_url from public.call where sid = ${f.customerSid}`;
     expect(playback).toEqual({ recording_sid: f.recordingSid, audio_url: `call-recordings/${workspaceId}/recording-${f.customerSid}-${f.recordingSid}.mp3` });
     const jobs = await sql`select params from public.job where workspace_id = ${workspaceId}::uuid and type = 'elevenlabs_batch_transcribe'`;
-    expect(jobs).toEqual(enabled ? [{ params: { callSid: f.customerSid } }] : []);
+    expect(jobs).toEqual(enabled && completed ? [{ params: { callSid: f.customerSid } }] : []);
+    expect(storage.copy).toHaveBeenCalledTimes(1); expect(await state()).toMatchObject({ ledger: 0, reservations: 1 });
+  });
+
+  test.each(["first callback", "late callback", "recovery"])("a copied recording retains batch work after %s timing", async source => {
+    const f = await armed(), owner = await recordVoiceReservationProvider(f.reservation, f.customerSid);
+    await sql`update public.workspace set feature_flags = ${sql.json({ batchTranscription: true })} where id = ${workspaceId}::uuid`;
+    if (source !== "first callback") await enqueueFundedVoiceTerminalOutcome(workspaceId, f.customerSid, { ...terminal(f), Timestamp: "" });
+    expect((await signedCustomerRecording(f.urls.customerRecording.callbackUrl, params(f, "completed"))).status).toBe(204);
+    const part = await findVoiceRecordingOperation(f.urls.customerRecording.id); if (!part) throw new Error("Owned customer part required");
+    expect(await runVoiceRecordingCopy(workspaceId, part.id, part.lease_token)).toEqual({ copied: true });
+    expect(await sql`select id from public.job where workspace_id = ${workspaceId}::uuid and type = 'elevenlabs_batch_transcribe'`).toHaveLength(0);
+    const retainBoundary = () => source === "recovery"
+      ? recordVoiceCustomerCallTiming(owner, { sid: f.customerSid, accountSid, to: customer, from: callerId,
+        direction: "outbound-api", parentCallSid: null, status: "completed", duration: "42",
+        startTime: new Date("2026-11-01T14:00:00Z"), endTime: new Date("2026-11-01T14:00:42Z") })
+      : enqueueFundedVoiceTerminalOutcome(workspaceId, f.customerSid, terminal(f));
+    await retainBoundary(); await retainBoundary();
+    const wakeups = await sql`select params from public.job where workspace_id = ${workspaceId}::uuid
+      and idempotency_key = ${`voice_recording_boundary:${part.id}`}`;
+    expect(wakeups).toEqual([{ params: { recordingOperationId: part.id, leaseToken: part.lease_token } }]);
+    expect(await runBoundaryJob(part.id)).toEqual({ copied: false });
+    expect(await runBoundaryJob(part.id)).toEqual({ copied: false });
+    expect(await sql`select params from public.job where workspace_id = ${workspaceId}::uuid and type = 'elevenlabs_batch_transcribe'`)
+      .toEqual([{ params: { callSid: f.customerSid } }]);
+    expect(storage.copy).toHaveBeenCalledTimes(1); expect(await state()).toMatchObject({ ledger: 0, reservations: 1 });
+  });
+
+  test.each(["recording_side_effects", "elevenlabs_batch_transcribe"])("retains copied media through a failed %s enqueue", async type => {
+    const f = await armed(); await recordVoiceReservationProvider(f.reservation, f.customerSid);
+    await sql`update public.workspace set feature_flags = ${sql.json({ batchTranscription: true })} where id = ${workspaceId}::uuid`;
+    expect((await signedCustomerRecording(f.urls.customerRecording.callbackUrl, params(f, "completed"))).status).toBe(204);
+    const part = await findVoiceRecordingOperation(f.urls.customerRecording.id); if (!part) throw new Error("Owned customer part required");
+    expect(await runVoiceRecordingCopy(workspaceId, part.id, part.lease_token)).toEqual({ copied: true });
+    await sql.unsafe(`create function public.${boundaryFault}() returns trigger language plpgsql as $$ begin
+      if new.type = '${type}' then raise exception 'Owned boundary enqueue fault'; end if; return new; end $$`);
+    await sql.unsafe(`create trigger ${boundaryFault} before insert on public.job for each row execute function public.${boundaryFault}()`);
+    if (type === "recording_side_effects") {
+      await expect(enqueueFundedVoiceTerminalOutcome(workspaceId, f.customerSid, terminal(f))).rejects.toThrow();
+      const [saved] = await sql`select terminal_status, terminal_event_at from public.workspace_voice_reservation where id = ${f.reservation.id}::uuid`;
+      expect(saved).toEqual({ terminal_status: null, terminal_event_at: null });
+    } else {
+      await enqueueFundedVoiceTerminalOutcome(workspaceId, f.customerSid, terminal(f));
+      await expect(runBoundaryJob(part.id)).rejects.toThrow();
+    }
+    await clearBoundaryFault();
+    await enqueueFundedVoiceTerminalOutcome(workspaceId, f.customerSid, terminal(f));
+    expect(await runBoundaryJob(part.id)).toEqual({ copied: false });
+    expect(await runBoundaryJob(part.id)).toEqual({ copied: false });
+    expect(await sql`select params from public.job where workspace_id = ${workspaceId}::uuid and type = 'elevenlabs_batch_transcribe'`)
+      .toEqual([{ params: { callSid: f.customerSid } }]);
     expect(storage.copy).toHaveBeenCalledTimes(1); expect(await state()).toMatchObject({ ledger: 0, reservations: 1 });
   });
 });

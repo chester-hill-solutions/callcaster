@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: A completed agent recording cannot start batch transcription while the original customer call is still live. Customer terminal times retain their provider source; unknown or conflicting times keep transcription pending. Recording assembly and live handoff remain in development ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
+
 - Fixed: Delayed funded call results preserve reassigned queue work and household members with live calls, later outreach or unknown ownership. Completion uses the original funded actor and keeps the existing billing result ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
 
 - Fixed: Late legacy call results preserve requeued, rebuilt and reassigned contacts and newer household work, including replacements inserted by an earlier transaction. Confirmed original calls, including older records without queue IDs, still advance their queues, keep one billing entry and record their results. Legacy predictive callbacks use the durable result worker before continuing ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).

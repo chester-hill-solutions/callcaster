@@ -230,6 +230,19 @@ complete call and recording boundaries still need proof before assembly. These
 offsets do not publish a combined recording, enable batch transcription of partial
 media, or enable live customer promotion.
 
+The original customer's terminal owner retains signed Call-progress event time
+and sequence separately from actual Call start, end and duration read by
+original-account recovery. These facts keep their source and first saved values.
+Unknown time stays unknown; a conflict with the frozen billing duration keeps
+the recording manifest pending. A root ending does not prove that its customer
+ended. Journaled single-part batch transcription requires a completed original
+customer and a proved terminal boundary. Its manifest reads the customer and
+capture set under the same ownership locks. Conference and multipart media still
+require complete-history proof, assembly and a final publication fence.
+If timing arrives after the copy, its transaction retains an existing recording
+job. That job retries batch admission from the saved object without copying it
+again. Failed enqueue keeps the job retryable and preserves the logical-call key.
+
 `DELETE` with the same query cancels only the selected pending attempt or an
 idle connection. An uncertain create keeps its pending state until recovery
 can stop the accepted agent leg. It cannot end or advance the customer. End a

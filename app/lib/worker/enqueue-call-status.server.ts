@@ -7,7 +7,7 @@ import { enqueueFundedVoiceTerminalOutcome } from "@/server/voice-terminal-outco
 export async function enqueueCallStatusSideEffects(
   call: Tables<"call">, params: Record<string, string>, source: "callback" | "recovery" = "callback",
 ) {
-  const funded = call.workspace ? await enqueueFundedVoiceTerminalOutcome(call.workspace, call.sid, params) : null;
+  const funded = call.workspace ? await enqueueFundedVoiceTerminalOutcome(call.workspace, call.sid, params, source) : null;
   if (funded) return funded;
   const event = parseTwilioVoiceCallback(params);
   const status = String(call.status ?? params.CallStatus ?? params.call_status ?? "unknown").trim().toLowerCase();

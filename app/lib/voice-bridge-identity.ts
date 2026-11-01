@@ -34,3 +34,10 @@ export function voiceCallLegIdentity(row: VoiceReservation, purpose: "recipient"
     direction: row.setup_sid && !row.conference_id ? "outbound-dial" : "outbound-api",
   };
 }
+
+export function matchesVoiceRecipient(row: VoiceReservation, candidate: VoiceSetupRoot) {
+  const expected = voiceCallLegIdentity(row, "recipient");
+  return candidate.accountSid === row.account_sid && (!row.provider_sid || candidate.sid === row.provider_sid) &&
+    candidate.to === expected.to && candidate.from === expected.from && candidate.direction === expected.direction &&
+    (candidate.parentCallSid || null) === expected.parent_call_sid;
+}

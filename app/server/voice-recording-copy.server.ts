@@ -1,16 +1,31 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, isNotNull, isNull, lte, or } from "drizzle-orm";
-import { call, workspace_voice_recording_operation as recordings } from "@/db/schema";
+import { and, desc, eq, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { call, job, workspace_voice_recording_operation as recordings } from "@/db/schema";
 import { callRecordingPartStoragePath, twilioRecordingMp3Url } from "@/lib/call-recording-storage.server";
 import { VoiceRecordingBindingError } from "@/lib/voice-recording";
 import { db } from "./db";
 import { createTenantDb } from "./tenant-db";
 import { deferVoiceRecordingWork, withVoiceRecordingOperation, type VoiceRecordingOperation } from "./voice-recording-operation.server";
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
+import type { VoiceReservation } from "./voice-credit-reservation.server";
+import { recordingSideEffectsParams } from "@/lib/worker/job-params.server";
+import { RECORDING_SIDE_EFFECTS_JOB_TYPE } from "@/lib/worker/job-types.server";
 
 const LEASE_MS = 5 * 60_000;
 function needsCopy(row: VoiceRecordingOperation) {
   return row.provider_status === "completed" && row.provider_sid !== null && row.terminal_at !== null && row.audio_url === null;
+}
+
+/** The caller owns workspace then reservation locks; late timing cannot lose copied media work. */
+export async function retainVoiceRecordingBoundaryWork(tx: CreditTransaction, owner: VoiceReservation) {
+  const rows = await createTenantDb(owner.workspace, tx).workspace_voice_recording_operation.findMany({
+    where: and(eq(recordings.reservation_id, owner.id), inArray(recordings.kind, ["dial", "customer"]), isNotNull(recordings.audio_url)),
+  });
+  for (const row of rows) await tx.insert(job).values({ type: RECORDING_SIDE_EFFECTS_JOB_TYPE,
+    workspace_id: owner.workspace, user_id: owner.user_id,
+    params: recordingSideEffectsParams.parse({ recordingOperationId: row.id, leaseToken: row.lease_token }),
+    idempotency_key: `voice_recording_boundary:${row.id}`, status: "queued",
+  }).onConflictDoNothing();
 }
 
 /** An initial root recording owns the existing single-recording playback pointer. */
@@ -46,7 +61,8 @@ export async function startVoiceRecordingCopy(workspaceId: string, operationId: 
   const row = await createTenantDb(workspaceId).workspace_voice_recording_operation.findFirst({ where: eq(recordings.id, operationId) });
   if (!row) return null;
   return withVoiceRecordingOperation(row, async (tx, current) => {
-    if (current.lease_token !== leaseToken || !needsCopy(current)) return null;
+    if (current.lease_token !== leaseToken || (!needsCopy(current) && !current.audio_url)) return null;
+    if (current.audio_url) return current;
     const [started] = await tx.update(recordings).set({ lease_expires_at: new Date(Date.now() + LEASE_MS), updated_at: new Date() })
       .where(eq(recordings.id, current.id)).returning();
     if (!started) throw new Error("Recording copy start was not saved");

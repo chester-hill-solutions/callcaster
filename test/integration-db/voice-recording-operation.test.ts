@@ -153,6 +153,18 @@ describe("owned recording parts (#2879)", () => {
     const prepared = await prepare();
     return { ...prepared, operation: await arm(prepared.reservation, prepared.operation) };
   }
+  async function completeCustomer(operation: Operation) {
+    const { createTenantDb } = await import("@/server/tenant-db");
+    const { workspace_voice_reservation: reservations } = await import("@/db/schema");
+    const row = await createTenantDb(workspaceId).workspace_voice_reservation.findFirst({ where: eq(reservations.id, operation.reservation_id) });
+    if (!row) throw new Error("Owned recording customer required");
+    const child = ca(), accepted = await funding.recordVoiceReservationProvider(row, child);
+    const { enqueueFundedVoiceTerminalOutcome } = await import("@/server/voice-terminal-outcome.server");
+    await enqueueFundedVoiceTerminalOutcome(workspaceId, child, { AccountSid: accountSid, CallSid: child,
+      ParentCallSid: accepted.setup_sid ?? "", To: recipient, From: callerId, Direction: "outbound-dial",
+      CallStatus: "completed", CallDuration: "71", Timestamp: "Fri, 30 Oct 2026 01:01:11 +0000",
+      CallbackSource: "call-progress-events", SequenceNumber: "3" });
+  }
   function receipt(row: Operation, overrides: Partial<VoiceRecordingReceipt> = {}): VoiceRecordingReceipt {
     return { requestUrl: row.callback_url, accountSid, callSid: row.source_call_sid,
       recordingSid: re(), source: "DialVerb", status: "in-progress", ...overrides };
@@ -666,6 +678,7 @@ describe("owned recording parts (#2879)", () => {
   });
   test.each([false, true])("initial playback keeps the existing batch flag (%s)", async (enabled) => {
     const { operation } = await armed(), params = callbackParams(operation); providerMedia(params);
+    await completeCustomer(operation);
     await sql`update public.workspace set feature_flags = ${sql.json({ batchTranscription: enabled })} where id = ${workspaceId}::uuid`;
     expect((await signedCallback(operation, params)).status).toBe(204);
     expect(await runQueued()).toEqual({ copied: true });
@@ -679,6 +692,7 @@ describe("owned recording parts (#2879)", () => {
     const { operation } = await armed(), params = callbackParams(operation); const media = providerMedia(params);
     await sql`update public.workspace set feature_flags = '{"batchTranscription":true}'::jsonb where id = ${workspaceId}::uuid`;
     const next = await nextCapture(operation, false);
+    await completeCustomer(operation);
     expect((await signedCallback(operation, params)).status).toBe(204);
     expect(await runQueued()).toEqual({ copied: true });
     const jobs = await sql`select id from public.job where workspace_id = ${workspaceId}::uuid and type = 'elevenlabs_batch_transcribe'`;
@@ -687,6 +701,7 @@ describe("owned recording parts (#2879)", () => {
   });
   test.each(["before download", "during transcription"])("a stale batch waits for segment assembly %s", async (phase) => {
     const { operation } = await armed(), params = callbackParams(operation); providerMedia(params);
+    await completeCustomer(operation);
     await sql`update public.workspace set feature_flags = '{"batchTranscription":true}'::jsonb where id = ${workspaceId}::uuid`;
     expect((await signedCallback(operation, params)).status).toBe(204); expect(await runQueued()).toEqual({ copied: true });
     vi.stubEnv("ELEVENLABS_API_KEY", "owned-batch-key");
