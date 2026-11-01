@@ -253,6 +253,12 @@ boundary line locations only when the source file, expression and callsite count
 are unchanged; keep their approval metadata. Regenerate the reports from source
 instead of selecting one side of a generated-file conflict.
 
+After a rebase combines API contracts, regenerate every checked-in API view
+with `npm run tools:api:codegen` and `npm run tools:api:surface:report`.
+A public-view merge can be clean while the complete view retains old fields.
+Inspect all generated changes, commit them, then require `npm run ci:codegen:verify`
+to leave the generated files unchanged.
+
 The compose migration fixture grants its public schema to the `callcaster`
 role. Create disposable Postgres with that role, or create it inside the owned
 database before bootstrapping. Keep both database URLs command-scoped to that
