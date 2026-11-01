@@ -10,6 +10,7 @@ import { logger } from "@/lib/logger.server";
 import { VoiceAudioBindingError } from "@/lib/voice-audio-connection";
 import { handleBoundVoiceAudioParticipant, handleBoundVoiceAudioBridgeParticipant, handleBoundVoiceAudioCustomerParticipant } from "@/lib/voice-audio-participant.server";
 import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
+import { VoiceRecordingBindingError } from "@/lib/voice-recording";
 
 type VerifiedContext = { owner: VoiceAudioConnection; params: Record<string, string>; event: "voice" | "status" | "conference" };
 
@@ -49,10 +50,10 @@ export async function handleVerifiedVoiceAudioWebhook(request: Request, auth: Ve
     }
     const result = await issueVoiceAudioInstruction(bound, params.Digits);
     let xml = hangupTwiml();
-    if (result.ok) xml = result.confirmed ? voiceAudioConferenceTwiml(result.connection) : voiceAudioConfirmationTwiml(result.connection);
+    if (result.ok) xml = result.confirmed ? voiceAudioConferenceTwiml(result.connection, result.recording) : voiceAudioConfirmationTwiml(result.connection);
     return new Response(xml, { headers: { "Content-Type": "text/xml" } });
   } catch (error) {
-    if (error instanceof VoiceAudioBindingError) {
+    if (error instanceof VoiceAudioBindingError || error instanceof VoiceRecordingBindingError) {
       logger.warn("voice_audio.webhook_binding_rejected", { connectionId: owner.id, event });
       return twilioWebhookForbiddenHangup();
     }

@@ -78,7 +78,8 @@ function sameOwner(current: VoiceRecordingOperation, owner: VoiceRecordingOperat
     current.intent_id === owner.intent_id && current.logical_call_sid === owner.logical_call_sid &&
     current.source_call_sid === owner.source_call_sid && current.source_to === owner.source_to &&
     current.source_from === owner.source_from && current.source_direction === owner.source_direction &&
-    current.source_parent_sid === owner.source_parent_sid && current.callback_url === owner.callback_url;
+    current.source_parent_sid === owner.source_parent_sid && current.source_conference_name === owner.source_conference_name &&
+    (!owner.source_conference_sid || current.source_conference_sid === owner.source_conference_sid) && current.callback_url === owner.callback_url;
 }
 
 /** Receipt handling never locks a reservation after taking the recording row lock. */

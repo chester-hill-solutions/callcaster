@@ -116,6 +116,58 @@ describe("original-account recording observation recovery (#2879)", () => {
   }
   async function jobs() { return sql`select params from public.job where workspace_id = ${workspaceId}::uuid`; }
 
+  async function conferenceFixture(known = true) {
+    const f = await fixture("dial", known), conferenceSid = `CF${randomUUID().replaceAll("-", "")}`, name = `handoff-${randomUUID()}`;
+    await sql`update public.workspace_voice_recording_operation set kind = 'conference', logical_call_sid = ${ca()},
+      source_conference_name = ${name}, source_conference_sid = ${conferenceSid} where id = ${f.row.id}::uuid`;
+    const row = await read(f.row); if (!row) throw new Error("Owned Conference fixture required");
+    const conferenceUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Conferences/${conferenceSid}.json`;
+    const recordingUrl = conferenceUrl.replace(/\.json$/, `/Recordings/${f.recordingSid}.json`);
+    const room = { sid: conferenceSid, account_sid: accountSid, friendly_name: name, status: "completed" };
+    Object.assign(f.recording, { source: "Conference", conference_sid: conferenceSid });
+    Reflect.deleteProperty(f.event.request.parameters, "call_sid");
+    Object.assign(f.event.request.parameters, { conference_sid: conferenceSid, recording_source: "Conference" });
+    provider.responses.delete(f.recordingUrl); provider.responses.set(conferenceUrl, room); provider.responses.set(recordingUrl, f.recording);
+    return { ...f, row, room, conferenceUrl, recordingUrl };
+  }
+
+  test.each([true, false])("recovers a Conference part through the real SDK (known identity: %s)", async (known) => {
+    const f = await conferenceFixture(known);
+    expect(await recovery.runVoiceRecordingRecovery()).toEqual({ lifecycle: { examined: 1, closed: 1, pending: 0 }, copies: { examined: 1, enqueued: 1, pending: 0 } });
+    expect(await read(f.row)).toMatchObject({ kind: "conference", provider_sid: f.recordingSid, provider_status: "completed",
+      logical_call_sid: f.row.logical_call_sid, source_call_sid: f.row.source_call_sid, source_conference_sid: f.room.sid, channels: 1 });
+    expect(provider.requests.map(row => row.uri)).toEqual([f.conferenceUrl, f.callUrl, ...(known ? [] : [f.eventsUrl]), f.recordingUrl]);
+    expect(await jobs()).toHaveLength(1);
+  });
+  test.each(["sid", "account_sid", "friendly_name"])("a changed Conference %s cannot own the recording", async (field) => {
+    const f = await conferenceFixture(); Object.assign(f.room, { [field]: "foreign" });
+    expect(await run()).toEqual({ examined: 1, closed: 0, pending: 1 });
+    expect(provider.requests.map(row => row.uri)).toEqual([f.conferenceUrl]);
+    expect((await read(f.row))?.terminal_at).toBeNull();
+  });
+  test.each(["conference_sid", "account_sid", "source", "sid"])("a Conference recording with changed %s stays pending", async (field) => {
+    const f = await conferenceFixture(); Object.assign(f.recording, { [field]: "foreign" });
+    expect(await run()).toEqual({ examined: 1, closed: 0, pending: 1 });
+    expect((await read(f.row))?.terminal_at).toBeNull();
+  });
+  test("Conference processing cannot prove active capture", async () => {
+    const f = await conferenceFixture(false); f.recording.status = "processing"; f.recording.duration = "";
+    expect(await run()).toEqual({ examined: 1, closed: 0, pending: 1 });
+    expect(await read(f.row)).toMatchObject({ provider_sid: f.recordingSid, provider_status: null, terminal_at: null });
+  });
+  test("an unknown Conference SID cannot be guessed from provider inventory", async () => {
+    const f = await conferenceFixture();
+    await sql`update public.workspace_voice_recording_operation set source_conference_sid = null where id = ${f.row.id}::uuid`;
+    expect(await run()).toEqual({ examined: 1, closed: 0, pending: 1 });
+    expect(provider.requests).toHaveLength(0);
+  });
+  test("unknown Conference recording identity needs its exact callback nonce", async () => {
+    const f = await conferenceFixture(false); f.event.request.url += "-foreign";
+    expect(await run()).toEqual({ examined: 1, closed: 0, pending: 1 });
+    expect(provider.requests.map(row => row.uri)).toEqual([f.conferenceUrl, f.callUrl, f.eventsUrl]);
+    expect((await read(f.row))?.provider_sid).toBeNull();
+  });
+
   test.each(["dial", "parent", "customer"] as const)("recovers a lost root %s callback from its exact nonce and real SDK response", async (kind) => {
     const f = await fixture(kind);
     expect(await recovery.runVoiceRecordingRecovery()).toEqual({ lifecycle: { examined: 1, closed: 1, pending: 0 }, copies: { examined: 1, enqueued: 1, pending: 0 } });

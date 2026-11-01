@@ -84,6 +84,7 @@ export const workspace_voice_audio_connection = pgTable("workspace_voice_audio_c
   voice_url: text().notNull(),
   status_callback: text().notNull(),
   conference_callback: text().notNull(),
+  recording_operation_id: uuid(),
   state: text().$type<"prepared" | "creating" | "joining" | "ready" | "switching" | "active" | "retired" | "failed" | "canceled">().notNull().default("prepared"),
   provider_sid: text(),
   send_started_at: timestamp({ withTimezone: true, mode: "date" }),

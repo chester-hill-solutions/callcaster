@@ -642,6 +642,28 @@ describe("owned recording parts (#2879)", () => {
     const [holds] = await sql`select count(*)::int as count from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;
     expect(holds.count).toBe(1);
   });
+  test("a Conference part keeps separate bytes without replacing the initial playback", async () => {
+    const { operation } = await armed(), first = callbackParams(operation), before = providerMedia(first, "before promotion");
+    expect((await signedCallback(operation, first)).status).toBe(204);
+    expect(await runQueued()).toEqual({ copied: true });
+    const next = await nextCapture(operation), conferenceSid = `CF${randomUUID().replaceAll("-", "")}`, instructionSid = ca();
+    await sql`update public.workspace_voice_recording_operation set kind = 'conference', source_call_sid = ${instructionSid},
+      source_conference_name = ${`handoff-${next.id}`}, source_conference_sid = ${conferenceSid} where id = ${next.id}::uuid`;
+    const conference = await read(next); if (!conference) throw new Error("Owned Conference part required");
+    const second = { AccountSid: accountSid, ConferenceSid: conferenceSid, RecordingSid: re(), RecordingSource: "Conference",
+      RecordingStatus: "completed", RecordingDuration: "41", RecordingChannels: "1" };
+    const after = providerMedia(second, "after promotion");
+    expect((await signedCallback(conference, second)).status).toBe(204);
+    expect(await runQueued(1)).toEqual({ copied: true });
+    const firstSaved = await read(operation), secondSaved = await read(conference);
+    expect(secondSaved).toMatchObject({ logical_call_sid: operation.logical_call_sid, source_call_sid: instructionSid, source_conference_sid: conferenceSid });
+    expect(secondSaved?.audio_url).not.toBe(firstSaved?.audio_url);
+    expect(io.objects.get(`workspaceAudio:${firstSaved?.audio_url}`)).toEqual(before.bytes);
+    expect(io.objects.get(`workspaceAudio:${secondSaved?.audio_url}`)).toEqual(after.bytes);
+    expect(io.objects.size).toBe(2);
+    const [playback] = await sql`select recording_sid, audio_url from public.call where workspace = ${workspaceId}::uuid and sid = ${operation.logical_call_sid}`;
+    expect(playback).toEqual({ recording_sid: first.RecordingSid, audio_url: firstSaved?.audio_url });
+  });
   test.each([false, true])("initial playback keeps the existing batch flag (%s)", async (enabled) => {
     const { operation } = await armed(), params = callbackParams(operation); providerMedia(params);
     await sql`update public.workspace set feature_flags = ${sql.json({ batchTranscription: enabled })} where id = ${workspaceId}::uuid`;

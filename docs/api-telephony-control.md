@@ -201,6 +201,18 @@ rejected promotion permits a fresh room while the original call remains live.
 A confirmed room end prevents reuse before delayed customer status arrives.
 Recording and transcript continuity must be ready before source retirement.
 
+For a direct manual replacement, the confirmed agent join saves its Conference
+recording nonce in the same transaction as the join instruction. Recording
+callbacks bind the original account, nonce, Conference SID and `Conference`
+source; they do not require a customer Call SID. A receipt can precede the
+participant join, but the join must prove the same room. Neither receipt changes
+the effective audio transport. Capture uses untrimmed audio. Exact retries retain
+their recording part, including a saved shared capture; a new attempt can share a live part in the same room or
+own a fresh part after it ends. Different rooms retain separate parts under the
+original logical customer call. Completed parts use distinct storage keys and
+cannot replace the initial playback pointer. Provider GET `processing` proves
+identity, not active capture. Idle phone connection alone starts no recording.
+
 `DELETE` with the same query cancels only the selected pending attempt or an
 idle connection. An uncertain create keeps its pending state until recovery
 can stop the accepted agent leg. It cannot end or advance the customer. End a

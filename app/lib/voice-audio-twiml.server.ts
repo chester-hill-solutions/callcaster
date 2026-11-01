@@ -3,11 +3,13 @@ import { voiceAudioParticipantLabel, voiceAudioStartsMuted } from "@/lib/voice-a
 import type { VoiceAudioConnection } from "@/server/voice-audio-connection.server";
 import { voiceWebhookDeliveryUrl } from "@/lib/twilio-webhook-delivery";
 
-export function voiceAudioConferenceTwiml(row: VoiceAudioConnection) {
+export function voiceAudioConferenceTwiml(row: VoiceAudioConnection, recording?: { callback_url: string } | null) {
   const response = createVoiceResponse();
   response.dial().conference({ beep: "false", startConferenceOnEnter: true, endConferenceOnExit: false,
     muted: row.state === "active" ? false : voiceAudioStartsMuted(row), participantLabel: voiceAudioParticipantLabel(row), waitUrl: "",
     statusCallback: voiceWebhookDeliveryUrl(row.conference_callback), statusCallbackMethod: "POST", statusCallbackEvent: ["join", "leave", "end"],
+    ...(recording ? { record: "record-from-start", trim: "do-not-trim", recordingStatusCallback: voiceWebhookDeliveryUrl(recording.callback_url),
+      recordingStatusCallbackMethod: "POST", recordingStatusCallbackEvent: ["in-progress", "completed", "absent"] } : {}),
   }, row.conference_id);
   return response.toString();
 }

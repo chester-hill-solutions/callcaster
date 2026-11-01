@@ -7,8 +7,9 @@ export class VoiceRecordingBindingError extends Error {
 
 export type VoiceCustomerRecordingIntent = { id: string; callbackUrl: string };
 
-export function voiceRecordingSource(kind: "dial" | "parent" | "customer") {
+export function voiceRecordingSource(kind: "dial" | "parent" | "customer" | "conference") {
   if (kind === "dial") return "DialVerb";
+  if (kind === "conference") return "Conference";
   return kind === "customer" ? "OutboundAPI" : "StartCallRecordingAPI";
 }
 
@@ -18,20 +19,26 @@ export function voiceRecordingCallbackUrl(baseUrl: string, operationId: string) 
   return url.href;
 }
 
-export const voiceRecordingReceiptSchema = z.strictObject({
-  requestUrl: z.url(), accountSid: z.string().regex(/^AC[0-9a-f]{32}$/i), callSid: z.string().regex(/^CA[0-9a-f]{32}$/i),
-  recordingSid: z.string().regex(/^RE[0-9a-f]{32}$/i), source: z.enum(["DialVerb", "StartCallRecordingAPI", "OutboundAPI"]),
+const receiptFields = z.strictObject({
+  requestUrl: z.url(), accountSid: z.string().regex(/^AC[0-9a-f]{32}$/i), callSid: z.string().regex(/^CA[0-9a-f]{32}$/i).optional(),
+  conferenceSid: z.string().regex(/^CF[0-9a-f]{32}$/i).optional(),
+  recordingSid: z.string().regex(/^RE[0-9a-f]{32}$/i), source: z.enum(["DialVerb", "StartCallRecordingAPI", "OutboundAPI", "Conference"]),
   status: z.enum(["in-progress", "completed", "absent"]), startedAt: z.date().optional(),
   durationSeconds: z.int().nonnegative().max(2147483647).optional(), channels: z.union([z.literal(1), z.literal(2)]).optional(),
 });
+function hasRecordingSource(value: { source: string; callSid?: string; conferenceSid?: string }) {
+  return value.source === "Conference" ? Boolean(value.conferenceSid && !value.callSid) : Boolean(value.callSid && !value.conferenceSid);
+}
+export const voiceRecordingReceiptSchema = receiptFields.refine(hasRecordingSource, "Recording physical source is invalid");
+export const voiceRecordingObservationSchema = receiptFields.partial({ status: true }).refine(hasRecordingSource, "Recording physical source is invalid");
 export type VoiceRecordingReceipt = z.infer<typeof voiceRecordingReceiptSchema>;
 export type VoiceRecordingObservation = Omit<VoiceRecordingReceipt, "status"> & { status?: VoiceRecordingReceipt["status"] };
 
 const integerParam = z.string().regex(/^(0|[1-9][0-9]*)$/).transform(Number).pipe(z.int().nonnegative().max(2147483647));
 const callbackSchema = z.object({
-  AccountSid: voiceRecordingReceiptSchema.shape.accountSid, CallSid: voiceRecordingReceiptSchema.shape.callSid,
-  RecordingSid: voiceRecordingReceiptSchema.shape.recordingSid, RecordingSource: voiceRecordingReceiptSchema.shape.source,
-  RecordingStatus: voiceRecordingReceiptSchema.shape.status, RecordingDuration: integerParam.optional(),
+  AccountSid: receiptFields.shape.accountSid, CallSid: receiptFields.shape.callSid, ConferenceSid: receiptFields.shape.conferenceSid,
+  RecordingSid: receiptFields.shape.recordingSid, RecordingSource: receiptFields.shape.source,
+  RecordingStatus: receiptFields.shape.status, RecordingDuration: integerParam.optional(),
   RecordingChannels: integerParam.pipe(z.union([z.literal(1), z.literal(2)])).optional(),
   RecordingStartTime: z.string().min(1).transform((value) => new Date(value)).pipe(z.date()).optional(),
 });
@@ -45,7 +52,9 @@ export function voiceRecordingReceiptFromParams(params: Record<string, string>, 
   const parsed = callbackSchema.safeParse(params);
   if (!parsed.success) return null;
   const event = parsed.data;
-  return { requestUrl, accountSid: event.AccountSid, callSid: event.CallSid, recordingSid: event.RecordingSid,
+  const receipt = voiceRecordingReceiptSchema.safeParse({ requestUrl, accountSid: event.AccountSid,
+    callSid: event.CallSid, conferenceSid: event.ConferenceSid, recordingSid: event.RecordingSid,
     source: event.RecordingSource, status: event.RecordingStatus, durationSeconds: event.RecordingDuration,
-    channels: event.RecordingChannels, startedAt: event.RecordingStartTime };
+    channels: event.RecordingChannels, startedAt: event.RecordingStartTime });
+  return receipt.success ? receipt.data : null;
 }

@@ -162,6 +162,20 @@ selecting a create API: its Call Recordings helper supports `create`, while its
 Conference Recordings helper does not. Use a documented supported primitive.
 See [Recordings resource](https://www.twilio.com/docs/voice/api/recording).
 
+Conference recording callbacks use `ConferenceSid` and `RecordingSource=Conference`,
+not a required customer `CallSid`. Save the nonce with the physical join
+instruction, and keep the instruction Call and recording Conference identities
+separate. A callback can precede the participant join; require both to agree
+before any transport commit. Request `trim="do-not-trim"` when preserving the
+logical timeline. Do not add unsupported Conference channel attributes.
+
+Scope a shared live capture to its physical room. Preserve exact-intent terminal
+history, but do not let an old room or terminal part block a new admitted attempt.
+Save each sharing audio intent's selected recording ID with its join instruction;
+a retry cannot borrow a successor's capture after the shared part ends.
+Keep distinct parts and storage keys when a fresh capture is needed. Test fresh-room
+retry, terminal-part retry and old-intent replay as separate behaviors.
+
 ### ConversationRelay Recording
 
 **Critical:** `record:true` on the REST API call is **silently ignored** with ConversationRelay. No error. No recording.

@@ -1,14 +1,14 @@
 import { eq } from "drizzle-orm";
 import { workspace_voice_recording_operation as recordings } from "@/db/schema";
-import { VoiceRecordingBindingError, voiceRecordingReceiptSchema, voiceRecordingSource, type VoiceRecordingObservation, type VoiceRecordingReceipt } from "@/lib/voice-recording";
+import { VoiceRecordingBindingError, voiceRecordingObservationSchema, voiceRecordingReceiptSchema, voiceRecordingSource, type VoiceRecordingObservation, type VoiceRecordingReceipt } from "@/lib/voice-recording";
 import { withVoiceRecordingOperation, type VoiceRecordingOperation } from "./voice-recording-operation.server";
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
 
-const observationSchema = voiceRecordingReceiptSchema.partial({ status: true });
-
 async function saveReceipt(tx: CreditTransaction, current: VoiceRecordingOperation, receipt: VoiceRecordingObservation) {
+  const sourceMatches = current.kind === "conference" ? receipt.conferenceSid !== undefined &&
+    (!current.source_conference_sid || receipt.conferenceSid === current.source_conference_sid) : receipt.callSid === current.source_call_sid;
   if (!current.send_started_at || receipt.requestUrl !== current.callback_url || receipt.accountSid !== current.account_sid ||
-      receipt.callSid !== current.source_call_sid || receipt.source !== voiceRecordingSource(current.kind) ||
+      !sourceMatches || receipt.source !== voiceRecordingSource(current.kind) ||
       current.provider_sid && current.provider_sid !== receipt.recordingSid)
     throw new VoiceRecordingBindingError("Recording receipt does not match its instruction");
   // Late progress and duplicate completion cannot erase a terminal receipt.
@@ -16,6 +16,7 @@ async function saveReceipt(tx: CreditTransaction, current: VoiceRecordingOperati
   const terminal = receipt.status === "completed" || receipt.status === "absent";
   const [saved] = await tx.update(recordings).set({
     provider_sid: receipt.recordingSid, provider_status: receipt.status ?? current.provider_status,
+    source_conference_sid: current.kind === "conference" ? receipt.conferenceSid : current.source_conference_sid,
     state: current.state === "creating" ? "accepted" : current.state,
     recording_started_at: current.recording_started_at ?? receipt.startedAt,
     recording_duration_seconds: receipt.durationSeconds ?? current.recording_duration_seconds,
@@ -36,14 +37,14 @@ export async function recordVoiceRecordingReceipt(owner: VoiceRecordingOperation
 
 /** A create acknowledgement preserves identity even after its worker lease changes. */
 export async function recordVoiceRecordingProvider(owner: VoiceRecordingOperation, input: unknown) {
-  const parsed = observationSchema.safeParse(input);
+  const parsed = voiceRecordingObservationSchema.safeParse(input);
   if (!parsed.success) throw new VoiceRecordingBindingError("Invalid recording create acknowledgement");
   return withVoiceRecordingOperation(owner, (tx, current) => saveReceipt(tx, current, parsed.data));
 }
 
 /** A processing API response proves identity, never an in-progress recording. */
 export async function recordRecoveredVoiceRecording(owner: VoiceRecordingOperation, input: VoiceRecordingObservation) {
-  const parsed = observationSchema.safeParse(input);
+  const parsed = voiceRecordingObservationSchema.safeParse(input);
   if (!parsed.success) throw new VoiceRecordingBindingError("Invalid recording observation");
   return withVoiceRecordingOperation(owner, async (tx, current) => {
     if (current.lease_token !== owner.lease_token || current.lease_expires_at.getTime() <= Date.now() ||

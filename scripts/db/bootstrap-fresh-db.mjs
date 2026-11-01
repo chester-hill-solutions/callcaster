@@ -160,6 +160,9 @@ const steps = [
   "client/migrations/20261101000003_voice_dialer_intents.sql",
   "client/migrations/20261101000006_voice_legacy_queue_insertion.sql",
   "client/migrations/20261101000007_funded_voice_queue_ownership.sql",
+  "client/migrations/20261101000008_voice_conference_recording.sql",
+  "client/migrations/20261101000009_voice_recording_conference_phases.sql",
+  "client/migrations/20261101000010_voice_audio_recording_owner.sql",
 ];
 
 /**

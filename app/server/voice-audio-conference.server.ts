@@ -8,6 +8,7 @@ import { lockVoiceAudioMember, resolveVoiceAudioAdmission } from "./voice-audio-
 import { hasFundedAgentVoice, hasPendingVoiceAudioConferenceStop } from "./voice-audio-classification.server";
 import { voiceAudioSavedInput, withVoiceAudioConnection, type VoiceAudioConnection } from "./voice-audio-connection.server";
 import { getOutboundHeldCredits, type CreditTransaction } from "./outbound-credit-reservations.server";
+import { bindVoiceConferenceRecording, issueVoiceConferenceRecording } from "./voice-conference-recording.server";
 
 async function refuseInstruction(tx: CreditTransaction, row: VoiceAudioConnection, reason: VoiceAudioFailureReason) {
   await tx.update(connections).set({ cancel_requested_at: row.cancel_requested_at ?? new Date(), lease_expires_at: new Date(), updated_at: new Date() })
@@ -22,7 +23,7 @@ function canIssueInstruction(current: VoiceAudioConnection | undefined, expected
 
 async function confirmPhoneInstruction(tx: CreditTransaction, row: VoiceAudioConnection, confirmation?: string) {
   if (row.transport !== "phone" || confirmation === "1") return null;
-  if (confirmation === undefined) return { ok: true as const, connection: row, confirmed: false, replayed: false };
+  if (confirmation === undefined) return { ok: true as const, connection: row, recording: null, confirmed: false, replayed: false };
   return refuseInstruction(tx, row, "device_not_verified");
 }
 
@@ -34,7 +35,8 @@ export async function issueVoiceAudioInstruction(row: VoiceAudioConnection, conf
     const [current] = await tx.select().from(connections).where(and(eq(connections.id, row.id), eq(connections.workspace, row.workspace))).for("update");
     if (!canIssueInstruction(current, row)) return voiceAudioRefusal("stale_audio");
     if (await hasPendingVoiceAudioConferenceStop(member.tdb, row.user_id)) return refuseInstruction(tx, current, "stale_audio");
-    if (current.voice_issued_at) return { ok: true as const, connection: current, confirmed: true, replayed: true };
+    if (current.voice_issued_at) return { ok: true as const, connection: current,
+      recording: await issueVoiceConferenceRecording(tx, current), confirmed: true, replayed: true };
     if (member.owner.disabled) return refuseInstruction(tx, current, "workspace_unavailable");
     const credentials = readTwilioWorkspaceCredentials(member.owner.twilio_data);
     if (credentials?.sid !== current.account_sid) return refuseInstruction(tx, current, "account_changed");
@@ -50,9 +52,11 @@ export async function issueVoiceAudioInstruction(row: VoiceAudioConnection, conf
       return refuseInstruction(tx, current, "insufficient_credits");
     const confirmationResult = await confirmPhoneInstruction(tx, current, confirmation);
     if (confirmationResult) return confirmationResult;
-    const [issued] = await tx.update(connections).set({ voice_issued_at: new Date(), updated_at: new Date() }).where(eq(connections.id, current.id)).returning();
+    const recording = await issueVoiceConferenceRecording(tx, current);
+    const [issued] = await tx.update(connections).set({ voice_issued_at: new Date(), recording_operation_id: recording?.id ?? null,
+      updated_at: new Date() }).where(eq(connections.id, current.id)).returning();
     if (!issued) throw new Error("Agent audio instruction was not saved");
-    return { ok: true as const, connection: issued, confirmed: true, replayed: false };
+    return { ok: true as const, connection: issued, recording, confirmed: true, replayed: false };
   });
 }
 
@@ -106,6 +110,7 @@ export async function observeVoiceAudioConferenceEvent(input: VoiceAudioConferen
         .where(eq(connections.id, current.id)).returning();
       return left ?? current;
     }
+    await bindVoiceConferenceRecording(tx, current, input.conferenceSid);
     if (current.state === "active" || current.joined_at) return current;
     return observeAudioJoin(tx, current, input);
   });

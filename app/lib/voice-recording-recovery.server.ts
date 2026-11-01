@@ -17,13 +17,16 @@ function matchesSource(row: VoiceRecordingOperation, source: CallInstance) {
     source.from === row.source_from && source.direction === row.source_direction && source.parentCallSid === row.source_parent_sid;
 }
 
-function observation(row: VoiceRecordingOperation, recordingSid: string, recording: RecordingInstance): VoiceRecordingObservation {
-  if (recording.sid !== recordingSid || recording.accountSid !== row.account_sid || recording.callSid !== row.source_call_sid ||
+function observation(row: VoiceRecordingOperation, recordingSid: string, recording: Pick<RecordingInstance,
+  "sid" | "accountSid" | "callSid" | "conferenceSid" | "source" | "status" | "duration" | "channels" | "startTime">): VoiceRecordingObservation {
+  const sourceMatches = row.kind === "conference" ? recording.conferenceSid === row.source_conference_sid : recording.callSid === row.source_call_sid;
+  if (recording.sid !== recordingSid || recording.accountSid !== row.account_sid || !sourceMatches ||
       recording.source !== voiceRecordingSource(row.kind))
     throw new VoiceRecordingBindingError("Provider recording does not match its source");
   if (!["processing", "completed", "absent"].includes(recording.status))
     throw new VoiceRecordingBindingError("Provider recording fetch has an unsupported status");
-  const identity = { requestUrl: row.callback_url, accountSid: recording.accountSid, callSid: recording.callSid,
+  const identity = { requestUrl: row.callback_url, accountSid: recording.accountSid,
+    ...(row.kind === "conference" ? { conferenceSid: recording.conferenceSid } : { callSid: recording.callSid }),
     recordingSid: recording.sid, source: recording.source };
   if (recording.status === "absent") return { ...identity, status: "absent" };
   const duration = recording.duration;
@@ -39,7 +42,14 @@ function observation(row: VoiceRecordingOperation, recordingSid: string, recordi
 }
 
 async function readObservation(current: VoiceRecordingOperation, requireActive: () => void) {
+  if (current.kind === "conference" && !current.source_conference_sid) return null;
   const client = await createOriginalVoiceAccountClient(current);
+  if (current.kind === "conference" && current.source_conference_sid) {
+    requireActive();
+    const room = await client.conferences(current.source_conference_sid).fetch();
+    if (room.sid !== current.source_conference_sid || room.accountSid !== current.account_sid || room.friendlyName !== current.source_conference_name)
+      throw new VoiceRecordingBindingError("Recording source conference identity changed");
+  }
   requireActive();
   const source = await client.calls(current.source_call_sid).fetch();
   if (!matchesSource(current, source)) throw new VoiceRecordingBindingError("Recording source call identity changed");
@@ -51,7 +61,9 @@ async function readObservation(current: VoiceRecordingOperation, requireActive: 
     if (!recordingSid) return null;
   }
   requireActive();
-  const resource = await client.calls(current.source_call_sid).recordings(recordingSid).fetch();
+  const resource = current.kind === "conference" && current.source_conference_sid ?
+    await client.conferences(current.source_conference_sid).recordings(recordingSid).fetch() :
+    await client.calls(current.source_call_sid).recordings(recordingSid).fetch();
   return observation(current, recordingSid, resource);
 }
 
