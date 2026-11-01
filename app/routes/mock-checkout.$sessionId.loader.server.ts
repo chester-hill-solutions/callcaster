@@ -5,8 +5,8 @@ import { defineLoader } from "@/lib/handler.server";
 export const loader = defineLoader({
   sideEffects: ["db-read"],
   handler: async ({ request, params }) => {
-    await verifyAuth(request);
-    const session = getLocalMockCheckout(params.sessionId ?? "");
+    const { user } = await verifyAuth(request);
+    const session = await getLocalMockCheckout({ userId: user.id, sessionId: params.sessionId ?? "" });
     if (!session) throw new Response("Not found", { status: 404 });
     return { creditAmount: session.creditAmount };
   },

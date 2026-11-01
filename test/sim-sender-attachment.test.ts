@@ -4,7 +4,7 @@ import type { ResolvedSimProfile } from "../e2e/sim/personas";
 
 const profile = { environment: "local", personaKey: "person-a", workspaceMarker: "sim:dev-local", runtimeIdentity: "dev-local" } as ResolvedSimProfile;
 const provider: VerifiedSender = { sid: "PN123", accountSid: "AC123", phoneNumber: "+14165550123", friendlyName: "SIM", capabilities: { sms: true, mms: false, voice: true, fax: false } };
-const row = (capabilities: unknown = { simMarker: profile.workspaceMarker, provenance: "provider-verified-existing-sender", accountSid: provider.accountSid, capabilities: provider.capabilities }): SenderRow => ({ id: 1, workspace: "ws", type: "sim_existing", phone_number: provider.phoneNumber, twilio_phone_number_sid: provider.sid, friendly_name: "SIM", capabilities });
+const row = (capabilities: unknown = { simMarker: profile.workspaceMarker, provenance: "provider-verified-existing-sender", accountSid: provider.accountSid, capabilities: provider.capabilities }): SenderRow => ({ id: 1, workspace: "ws", type: "sim_existing", status: "active", phone_number: provider.phoneNumber, twilio_phone_number_sid: provider.sid, friendly_name: "SIM", capabilities });
 function repo(initial: SenderRow[] = [], failAudit = false) {
   const state = [...initial];
   const audit = vi.fn(async () => { if (failAudit) throw new Error("audit failed"); });
@@ -51,6 +51,15 @@ describe("safe local SIM sender attachment", () => {
     expect((await call(repo([row()]))).status).toBe("reused");
     await expect(call(repo([row()], false), { phone: "+14165550124", providers: [{ ...provider, phoneNumber: "+14165550124" }] })).rejects.toThrow();
     await expect(call(repo([row({ ...(row().capabilities as object), provenance: "unknown" })]))).rejects.toThrow(/does not match/);
+  });
+  test("reuses metadata with database JSONB key order", async () => {
+    const reordered = { capabilities: provider.capabilities, accountSid: provider.accountSid, provenance: "provider-verified-existing-sender", simMarker: profile.workspaceMarker };
+    expect((await call(repo([row(reordered)]))).status).toBe("reused");
+  });
+  test("refuses a released attachment and reports it blocked", async () => {
+    const db = repo([{ ...row(), status: "released" }]);
+    await expect(call(db)).rejects.toThrow(/does not match/);
+    expect(await getSimSenderStatus(profile, "ws", db.transaction)).toMatchObject({ status: "blocked" });
   });
   test("rolls back insertion when audit fails", async () => {
     const db = repo([], true);

@@ -19,7 +19,7 @@ They never reconcile, repair, audit, create resources, or read credentials.
 Catalog capabilities are a SIM allowlist. The canonical workspace role matrix
 is the real authorization floor: owner-only capabilities deny members.
 
-## Sai-local SMS flow
+## Resolved-profile SMS flow
 
 ### Existing local sender
 
@@ -77,29 +77,38 @@ the password is retrieved only by the sign-in task through the runtime context.
 This prevents an environment mix-up from sending a live message to an
 unapproved number.
 
-The planned inherited configuration and secret-provider migration is defined in
-[ADR-0040](adr/0040-inherited-config-and-pluggable-secrets.md). Until ADR-0040
-Phase 5 migrates SIM, this page describes the current interface. Do not add new
-SIM-specific variables; new SIM work uses the compatibility boundary until the
-shared loader is available.
+Profiles use the shared project configuration and secret-provider boundary in
+[ADR-0040](adr/0040-inherited-config-and-pluggable-secrets.md). The temporary
+recipient adapter remains until #2812 is complete. Do not add new SIM-specific
+variables or read dotenv files inside browser tasks.
 
 `e2e/sim/config.ts` is the temporary #2812 compatibility adapter. It is only
 used at SIM bootstrap to build typed task input. Task modules do not import it.
 
 The flow does these tasks through the product UI:
 
-1. Sign in as the configured sender.
-2. Generate a one-contact CSV and upload it through Call Lists.
-3. Wait for the worker-backed upload to complete.
-4. Read the current credit balance and calculate the SMS requirement from the
-   shared rate card.
-5. Open Stripe Checkout only when the balance is too low. It purchases the
-   smallest permitted amount that covers the flow.
-6. Send the configured SMS through Chats.
+1. Resolve `person-a` (owner) and `person-b` (member) from the same marked
+   workspace. Check both roles and required capabilities before browser work.
+2. Sign in as the owner. Read the balance and calculate the SMS requirement
+   from the shared rate card. Buy only the shortfall, subject to the minimum
+   purchase. The local profile uses the local test checkout and the real ledger;
+   deployed profiles use Stripe. Production refuses mock checkout.
+3. Close the owner browser context. Sign in as the member in a separate context.
+4. Generate a one-contact CSV and upload it through Call Lists. Wait for the
+   worker-backed upload to complete.
+5. Send the configured SMS through Chats as the member.
+
+Among browser tasks, only sign-in can request the persona password. The other
+tasks receive a non-secret context and cannot select a stronger persona.
+
+Normal CI verifies configuration, task permissions, local checkout roles and
+one-time ledger fulfillment without provider traffic. It does not prove handset
+delivery. The real SMS step requires a separate explicit operator request.
 
 The generated CSV and a redacted evidence record are Playwright artifacts.
 They are not committed. The local target needs a running app, worker, object
-storage, and the local Stripe test configuration.
+storage, reconciled personas, and an approved existing SMS sender. Local test
+checkout does not need a Stripe customer or card.
 
 Run the browser visibly when first configuring an environment:
 

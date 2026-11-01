@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vit
 import { asRouteResponse } from "../helpers/route-result";
 
 vi.hoisted(() => {
+  vi.stubEnv("ENV", "dev");
   process.env.TZ = "UTC";
   process.env.STRIPE_SECRET_KEY = "sk_test_checkout_access";
 });
@@ -66,7 +67,11 @@ suite("billing checkout enforces Admin against real rows (#2371)", () => {
     } finally {
       await client?.end();
       const { pool, directPool } = await import("@/server/db");
-      await Promise.all([pool.end(), directPool.end()]);
+      try {
+        await Promise.all([pool.end(), directPool.end()]);
+      } finally {
+        vi.unstubAllEnvs();
+      }
     }
   });
 

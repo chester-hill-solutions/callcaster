@@ -1,10 +1,11 @@
+import { isDeepStrictEqual } from "node:util";
 import type { ResolvedSimProfile } from "../../e2e/sim/personas";
 
 export type VerifiedSender = Readonly<{
   sid: string; accountSid: string; phoneNumber: string; friendlyName: string | null;
   capabilities: Readonly<{ sms: boolean; mms: boolean; voice: boolean; fax: boolean }>;
 }>;
-export type SenderRow = Readonly<{ id: number; workspace: string; type: string; phone_number: string | null; twilio_phone_number_sid: string | null; friendly_name: string | null; capabilities: unknown }>;
+export type SenderRow = Readonly<{ id: number; workspace: string; type: string; status: "active" | "released"; phone_number: string | null; twilio_phone_number_sid: string | null; friendly_name: string | null; capabilities: unknown }>;
 export type SenderRepository = Readonly<{
   rows(phone: string, sid?: string): Promise<SenderRow[]>;
   insert(input: Omit<SenderRow, "id">): Promise<SenderRow>;
@@ -44,12 +45,12 @@ export async function attachSimSender(input: {
     const markerRow = rows.length === 1 ? rows[0] : undefined;
     if (markerRow) {
       const expected = { simMarker: input.profile.workspaceMarker, provenance: "provider-verified-existing-sender", accountSid: provider.accountSid, capabilities: provider.capabilities };
-      if (bySid.length !== 1 || byNumber.length !== 1 || markerRow.twilio_phone_number_sid !== provider.sid || markerRow.phone_number !== phone || markerRow.type !== "sim_existing" || JSON.stringify(markerRow.capabilities) !== JSON.stringify(expected)) throw new SimSenderAttachmentError("Existing sender row does not match this SIM attachment");
+      if (bySid.length !== 1 || byNumber.length !== 1 || markerRow.twilio_phone_number_sid !== provider.sid || markerRow.phone_number !== phone || markerRow.type !== "sim_existing" || markerRow.status !== "active" || !isDeepStrictEqual(markerRow.capabilities, expected)) throw new SimSenderAttachmentError("Existing sender row does not match this SIM attachment");
       return { status: "reused", phoneLast4: phone.slice(-4), capabilities: provider.capabilities };
     }
     if (bySid.length || byNumber.length) throw new SimSenderAttachmentError("Duplicate sender record exists");
     const capabilities = { simMarker: input.profile.workspaceMarker, provenance: "provider-verified-existing-sender", accountSid: provider.accountSid, capabilities: provider.capabilities };
-    await repo.insert({ workspace: input.workspaceId, type: "sim_existing", phone_number: phone, twilio_phone_number_sid: provider.sid, friendly_name: provider.friendlyName, capabilities });
+    await repo.insert({ workspace: input.workspaceId, type: "sim_existing", status: "active", phone_number: phone, twilio_phone_number_sid: provider.sid, friendly_name: provider.friendlyName, capabilities });
     await repo.audit("sim.sender.attached", { persona: input.profile.personaKey, workspaceMarker: input.profile.workspaceMarker, phoneLast4: phone.slice(-4), capabilities: provider.capabilities, provenance: "provider-verified-existing-sender" });
     return { status: "attached", phoneLast4: phone.slice(-4), capabilities: provider.capabilities };
   });
@@ -62,7 +63,7 @@ export async function getSimSenderStatus(profile: ResolvedSimProfile, workspaceI
     if (rows.length === 0) return { status: "missing" as const, phoneLast4: null, capabilities: null, provenance: null };
     const row = rows[0];
     if (!row) return { status: "missing" as const, phoneLast4: null, capabilities: null, provenance: null };
-    if (rows.length !== 1 || row.type !== "sim_existing" || row.workspace !== workspaceId || (row.capabilities as { simMarker?: string } | null)?.simMarker !== profile.workspaceMarker) return { status: "blocked" as const, phoneLast4: null, capabilities: null, provenance: null };
+    if (rows.length !== 1 || row.type !== "sim_existing" || row.status !== "active" || row.workspace !== workspaceId || (row.capabilities as { simMarker?: string } | null)?.simMarker !== profile.workspaceMarker) return { status: "blocked" as const, phoneLast4: null, capabilities: null, provenance: null };
     return { status: "ready" as const, phoneLast4: row.phone_number?.slice(-4) ?? null, capabilities: (row.capabilities as { capabilities?: unknown })?.capabilities ?? null, provenance: (row.capabilities as { provenance?: unknown })?.provenance ?? null };
   });
 }

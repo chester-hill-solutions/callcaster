@@ -14,6 +14,8 @@ Earlier selected updates remain: #1724 is answered and closed as completed; #299
 
 Name backfill, 2026-11-01 UTC: #3102 is the separate Urgent child of #2168 and is In progress. The source provides reviewed plan/apply tooling, with 83 focused Node and 5 PostgreSQL cases passing. The live GET-only plan has 7 eligible dev names, 1 already correct and 30 protected records. Operational apply and release acceptance remain separate; #2029 still owns retention/repeat decisions. The inventory below includes the new child (404 open issues); this selected change is not a full Project export.
 
+SIM Stage 1 selected update, 2026-11-01 UTC: #2828 moves to Fix now after reproducing the checkout-mode failure. The existing #3067 branch is resumed; final CI and separate real SMS acceptance remain. This is a selected Issue and Project check, not a full Project export.
+
 ## How to use this board
 
 1. Pick from **Fix now** first (confirmed, with an exact resolution path).
@@ -41,7 +43,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 22
+## Fix now — 23
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -303,6 +305,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Tracker: Included from original PR #3010 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges.
 
 ---
+
+### [#2828](https://github.com/chester-hill-solutions/callcaster/issues/2828) Task: migrate existing SIM SMS setup to personas
+- **IN PROGRESS** · Verdict: **Fix now** · Type: Task · Priority: unset · Effort: unset · Environment: unset · Labels: none · Assignee: @sai-sy · Updated: 2026-10-27
+- Resume the preserved SIM SMS candidate in #3067; checkout failures are reproduced and the cause is confirmed.
+- Current behavior: PR #3067 was closed without merge and its original branch is preserved. The branch is now rebased onto dev. The old guards and E2E jobs both failed during Stripe database tests, before browser tests started. The current candidate separates owner funding from member SMS, and verifies local checkout access and one-time credit fulfillment.
+- Root cause: Stripe contract suites inherited the new local mock-checkout default. The reproduced candidate failed 38 of 60 real-database cases. Selecting the Stripe environment explicitly restores those contracts without weakening Admin access. Local checkout reads also need the workspace billing role check.
+- Resolution: Continue the existing branch and PR as the single active draft. Verify local mock and Stripe checkout separately, keep the released-number filter, and require local and exact-head GitHub checks before merge. Run a real SMS only after a separate explicit operator request; keep Stage 2 and voice work behind Stage 1 acceptance.
+- Look in: `e2e/sim/sms-send.sim.spec.ts`, `e2e/sim/preflight.ts`, `app/lib/platform-billing.server.ts`, `test/integration-db/billing-checkout-access.test.ts`, `test/integration-db/billing-local-checkout.test.ts`
+- Existing tests: Rebased source: 38 failing and 22 passing Stripe database cases reproduce the original checkout-mode mismatch. After explicit Stripe selection and local access checks: all 73 database cases, 121 focused Node cases and 6 UI cases pass without skips. No provider traffic or deployed data changes were used.
+- Missing tests: Final local gate and exact-head GitHub CI on the resumed candidate.; Explicit operator acceptance: owner funding and member SMS through the local product flow, with approved recipient and redacted evidence. Handset delivery is not proved by no-traffic tests.
+- Tracker: Selected snapshot, 2026-11-01 UTC: native Task assigned @sai-sy; native Priority, Effort and Enviornment are unset. Actual Project Status In progress was read in the authenticated issue sidebar. Parent #2815 and native blocker #2827 remain open; profile/status code is already merged in #2974. Existing Development link to #3067 is preserved. Do not create another SIM implementation or mark real SMS acceptance complete.
 
 ## Verify and close — 65
 
@@ -1012,7 +1025,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Needs reproduction — 17
+## Needs reproduction — 16
 
 Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, payload, trace) before coding.
 
@@ -1027,15 +1040,6 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 - Searching Pickering does not find South Pickering. PR #1675 changed rate-centre display names; it did not prove search matching.
 - Resolution: Compare the submitted locality with provider results and determine whether the provider supports partial matching before changing the search contract.
 - Look in: `app/components/phone-numbers/NumberPurchase.tsx`, `app/lib/number-locality.ts`
-
-### [#2828](https://github.com/chester-hill-solutions/callcaster/issues/2828) Task: migrate existing SIM SMS setup to personas
-- **IN PROGRESS** · Verdict: **Needs reproduction** · Type: Task · Priority: unset · Effort: unset · Environment: unset · Labels: none · Assignee: @sai-sy · Updated: 2026-10-27
-- The local SIM migration candidate is open in PR #3067, but its remote verification is not green.
-- Current behavior: PR #3067 at 43666254 has failed billing-checkout access guards and browser tests. The browser job was rerun once and failed again. The source is not merged into dev.
-- Root cause: The failed guard assertions involve expected checkout sessions and access results. This review records the failure without assigning a new source cause.
-- Resolution: Inspect the billing-checkout guard failures and compare the persisted browser failure with a passing sibling before editing policy or fixtures. Keep local mock credit fulfillment isolated and preserve no-traffic verification.
-- Look in: `test/integration-db/billing-checkout-access.test.ts`
-- Tracker: Native Task, live Project Status In progress. Continue the existing PR and issue; do not create another SIM implementation or treat the local CI report as completed remote acceptance.
 
 ### [#2902](https://github.com/chester-hill-solutions/callcaster/issues/2902) Caller-supplied forwarded host/proto widen the per-request Better Auth trusted-origin list; a wildcard host becomes a catch-all glob that switches off the CSRF…
 - Verdict: **Needs reproduction** · Type: Bug · Priority: unset · Effort: unset · Environment: unset · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-24

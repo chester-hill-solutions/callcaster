@@ -67,12 +67,16 @@ export async function completeLocalMockCheckout(args: {
   return { ok: true as const, workspaceId: session.metadata.workspaceId };
 }
 
-export function getLocalMockCheckout(sessionId: string) {
+export async function getLocalMockCheckout(args: { userId: string; sessionId: string }) {
   if (checkoutProvider !== "mock") return null;
-  const session = localCheckoutSessions.get(sessionId);
-  return session
-    ? { creditAmount: Number(session.metadata.creditAmount) }
-    : null;
+  const session = localCheckoutSessions.get(args.sessionId);
+  if (!session) return null;
+  await requireWorkspaceAccess({
+    user: { id: args.userId },
+    workspaceId: session.metadata.workspaceId,
+    minRole: MemberRole.Admin,
+  });
+  return { creditAmount: Number(session.metadata.creditAmount) };
 }
 
 export const billingPricing = billingPricingSchema.parse({
@@ -428,13 +432,9 @@ export async function confirmStripeCheckoutSessionForRedirect(args: {
 }
 
 /** Ledger keys and notes carry the Checkout Session id; the receipt lives on its charge or invoice. */
-function stripeSessionIdForLedgerRow(row: {
-  idempotency_key: string | null;
-  note: string | null;
-}): string | null {
+function stripeSessionIdForLedgerRow(row: { idempotency_key: string | null; note: string | null }): string | null {
   const key = row.idempotency_key ?? "";
-  if (key.startsWith("stripe_session:"))
-    return key.slice("stripe_session:".length) || null;
+  if (key.startsWith("stripe_session:")) return key.slice("stripe_session:".length) || null;
   const fromNote = /stripe_session:(cs_[A-Za-z0-9_]+)/.exec(row.note ?? "");
   return fromNote?.[1] ?? null;
 }
@@ -450,9 +450,7 @@ export async function getPurchaseReceiptUrl(args: {
   userId: string;
   workspaceId: string;
   transactionId: number;
-}): Promise<
-  { ok: true; url: string } | { ok: false; error: string; status: number }
-> {
+}): Promise<{ ok: true; url: string } | { ok: false; error: string; status: number }> {
   const { userId, workspaceId, transactionId } = args;
   await requireWorkspaceAccess({ user: { id: userId }, workspaceId });
   const tdb = createTenantDb(workspaceId);
@@ -461,19 +459,11 @@ export async function getPurchaseReceiptUrl(args: {
     columns: { id: true, type: true, idempotency_key: true, note: true },
   });
   if (!row || row.type !== "CREDIT") {
-    return {
-      ok: false as const,
-      error: "No receipt for this entry.",
-      status: 404,
-    };
+    return { ok: false as const, error: "No receipt for this entry.", status: 404 };
   }
   const sessionId = stripeSessionIdForLedgerRow(row);
   if (!sessionId) {
-    return {
-      ok: false as const,
-      error: "No receipt for this entry.",
-      status: 404,
-    };
+    return { ok: false as const, error: "No receipt for this entry.", status: 404 };
   }
   const stripe = createStripeClient();
   let session: Stripe.Checkout.Session;
@@ -482,43 +472,22 @@ export async function getPurchaseReceiptUrl(args: {
       expand: ["payment_intent.latest_charge", "invoice"],
     });
   } catch (error) {
-    logger.error("getPurchaseReceiptUrl retrieve error", {
-      workspaceId,
-      transactionId,
-      error,
-    });
-    return {
-      ok: false as const,
-      error: "Could not reach the payment provider.",
-      status: 502,
-    };
+    logger.error("getPurchaseReceiptUrl retrieve error", { workspaceId, transactionId, error });
+    return { ok: false as const, error: "Could not reach the payment provider.", status: 502 };
   }
   if ((session.metadata?.workspaceId ?? null) !== workspaceId) {
-    return {
-      ok: false as const,
-      error: "Receipt does not belong to this workspace.",
-      status: 403,
-    };
+    return { ok: false as const, error: "Receipt does not belong to this workspace.", status: 403 };
   }
   const invoice = session.invoice;
   const hostedInvoiceUrl =
-    invoice && typeof invoice !== "string"
-      ? (invoice.hosted_invoice_url ?? null)
-      : null;
+    invoice && typeof invoice !== "string" ? invoice.hosted_invoice_url ?? null : null;
   const paymentIntent = session.payment_intent;
   const charge =
-    paymentIntent && typeof paymentIntent !== "string"
-      ? paymentIntent.latest_charge
-      : null;
-  const receiptUrl =
-    charge && typeof charge !== "string" ? (charge.receipt_url ?? null) : null;
+    paymentIntent && typeof paymentIntent !== "string" ? paymentIntent.latest_charge : null;
+  const receiptUrl = charge && typeof charge !== "string" ? charge.receipt_url ?? null : null;
   const url = hostedInvoiceUrl ?? receiptUrl;
   if (!url) {
-    return {
-      ok: false as const,
-      error: "Receipt not available yet.",
-      status: 404,
-    };
+    return { ok: false as const, error: "Receipt not available yet.", status: 404 };
   }
   return { ok: true as const, url };
 }

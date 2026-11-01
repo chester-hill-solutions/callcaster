@@ -37,7 +37,7 @@ describe("confirm-payment route", () => {
     loggerError.mockReset();
   });
 
-  test("records credits once across duplicate session confirmations", async () => {
+  test("redirects duplicate session confirmations to the same billing result", async () => {
     confirmStripeCheckoutSessionForRedirect.mockResolvedValue({
       ok: true,
       workspaceId: "w1",

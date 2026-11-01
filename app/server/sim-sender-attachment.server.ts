@@ -1,11 +1,13 @@
 import { and, eq, or, sql } from "drizzle-orm";
 import { workspace, workspace_number, workspace_audit_event } from "@/db/schema";
 import { attachSimSender, getSimSenderStatus, type SenderRepository, type VerifiedSender } from "@/lib/sim-sender-attachment.server";
+import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import type { ResolvedSimProfile } from "../../e2e/sim/personas";
 
 async function markedWorkspace(profile: ResolvedSimProfile) {
   const [{ db }] = await Promise.all([import("@/server/db")]);
-  const rows = await db.select({ id: workspace.id, data: workspace.twilio_data }).from(workspace).where(and(eq(workspace.name, profile.workspaceName), eq(workspace.sim_marker, profile.workspaceMarker)));
+  const rows = await db.select({ id: workspace.id }).from(workspace).where(and(eq(workspace.name, profile.workspaceName), eq(workspace.sim_marker, profile.workspaceMarker)));
   if (rows.length !== 1) throw new Error("Marked SIM workspace is missing or ambiguous");
   const row = rows[0];
   if (!row) throw new Error("Marked SIM workspace is missing or ambiguous");
@@ -36,10 +38,8 @@ async function withSimSenderTransaction<T>(workspaceId: string, fn: (repo: Sende
 export async function attachSimSenderInDatabase(profile: ResolvedSimProfile, phone: string, globalSender: string, providerRows: readonly VerifiedSender[]) {
   if (profile.environment !== "local") throw new Error("SIM sender attachment is local only");
   const target = await markedWorkspace(profile);
-  let twilioData: { sid?: string; account_sid?: string } | null = null;
-  try { twilioData = JSON.parse(String(target.data)) as { sid?: string; account_sid?: string }; } catch { /* fail closed below */ }
-  const accountSid = twilioData?.sid ?? twilioData?.account_sid;
-  if (!accountSid) throw new Error("SIM workspace has no Twilio account SID");
+  const accountSid = readTwilioWorkspaceCredentials(await loadWorkspaceTwilioData(target.id))?.sid;
+  if (!accountSid) throw new Error("SIM workspace has no Twilio account credentials");
   const result = await attachSimSender({ profile, workspaceId: target.id, phone, globalSender, expectedAccountSid: accountSid, providerRows, transaction: (fn) => withSimSenderTransaction(target.id, fn) });
   return { ...result, workspaceMarker: profile.workspaceMarker };
 }

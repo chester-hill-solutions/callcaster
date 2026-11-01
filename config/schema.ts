@@ -3,16 +3,17 @@ import { resolveSecretPlan, secretServiceNames } from "./secrets";
 import { secretNames } from "./secret-names";
 
 /** Environments supported by the shared project configuration. */
-export const environmentNames = ["local", "dev", "qa", "production"] as const;
+export const environmentNames = [
+  "local",
+  "dev",
+  "qa",
+  "production",
+] as const;
 
 export const EnvironmentNameSchema = z.enum(environmentNames);
 export type EnvironmentName = z.infer<typeof EnvironmentNameSchema>;
 
-export const simTrafficPolicies = [
-  "local-only",
-  "paid-test-only",
-  "disabled",
-] as const;
+export const simTrafficPolicies = ["local-only", "paid-test-only", "disabled"] as const;
 export type SimTrafficPolicy = (typeof simTrafficPolicies)[number];
 
 /** Secret names are references only. Secret values and providers are not config. */
@@ -24,12 +25,7 @@ export const SecretReferenceSchema = z
   .strict();
 export type SecretReference = z.infer<typeof SecretReferenceSchema>;
 
-export const secretProviderNames = [
-  "dotenv",
-  "password-manager",
-  "github",
-  "railway",
-] as const;
+export const secretProviderNames = ["dotenv", "password-manager", "github", "railway"] as const;
 export type SecretProviderName = (typeof secretProviderNames)[number];
 
 /**
@@ -37,29 +33,21 @@ export type SecretProviderName = (typeof secretProviderNames)[number];
  * Railway; password-manager remains available for controlled migrations.
  * GitHub is retained for CI adapters, not as a runtime environment source.
  */
-export const environmentProviderCompatibility: Record<
-  EnvironmentName,
-  readonly SecretProviderName[]
-> = {
+export const environmentProviderCompatibility: Record<EnvironmentName, readonly SecretProviderName[]> = {
   local: ["dotenv", "password-manager"],
   dev: ["password-manager", "railway"],
   qa: ["password-manager", "railway"],
   production: ["password-manager", "railway"],
 };
 
-const defaultSecretProviderByEnvironment: Record<
-  EnvironmentName,
-  SecretProviderName
-> = {
+const defaultSecretProviderByEnvironment: Record<EnvironmentName, SecretProviderName> = {
   local: "dotenv",
   dev: "railway",
   qa: "railway",
   production: "railway",
 };
 
-export function defaultSecretProvider(
-  environment: EnvironmentName,
-): SecretProviderName {
+export function defaultSecretProvider(environment: EnvironmentName): SecretProviderName {
   return defaultSecretProviderByEnvironment[environment];
 }
 
@@ -67,27 +55,20 @@ const safeProfileSegment = z
   .string()
   .min(1)
   .max(63)
-  .regex(
-    /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-    "must contain only lowercase letters, numbers, and single hyphens",
-  );
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "must contain only lowercase letters, numbers, and single hyphens");
 
 const emailDomain = z
   .string()
   .min(1)
   .max(253)
-  .regex(
-    /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/,
-    "must be a DNS email domain",
-  );
+  .regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/, "must be a DNS email domain");
 
 /** URLs shown in diagnostics must not carry credentials or hidden components. */
 export function parseDiagnosticUrl(value: unknown): URL | undefined {
   if (typeof value !== "string") return undefined;
   try {
     const url = new URL(value);
-    if (url.username || url.password || url.search || url.hash)
-      return undefined;
+    if (url.username || url.password || url.search || url.hash) return undefined;
     return url;
   } catch {
     return undefined;
@@ -105,10 +86,7 @@ const diagnosticUrl = z
       } catch {
         return;
       }
-      ctx.addIssue({
-        code: "custom",
-        message: "must not include credentials, query strings, or fragments",
-      });
+      ctx.addIssue({ code: "custom", message: "must not include credentials, query strings, or fragments" });
     }
   });
 
@@ -120,12 +98,7 @@ export const LocalProfileInputSchema = z
     publicUrl: diagnosticUrl
       .refine((value) => {
         const url = parseDiagnosticUrl(value);
-        return Boolean(
-          url &&
-          (url.protocol === "https:" ||
-            (url.protocol === "http:" &&
-              ["localhost", "127.0.0.1"].includes(url.hostname))),
-        );
+        return Boolean(url && (url.protocol === "https:" || (url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname))));
       }, "must use https unless using local localhost")
       .optional(),
   })
@@ -177,14 +150,7 @@ const projectConfigObjectSchema = z
     parent: EnvironmentNameSchema.optional(),
     emailDomain,
     secretProvider: z.enum(secretProviderNames),
-    runtime: z
-      .object({
-        mode: z
-          .enum(["development", "test", "production"])
-          .default("development"),
-      })
-      .strict()
-      .default({ mode: "development" }),
+    runtime: z.object({ mode: z.enum(["development", "test", "production"]).default("development") }).strict().default({ mode: "development" }),
     urls: z
       .object({ publicApp: diagnosticUrl.optional() })
       .strict()
@@ -200,57 +166,17 @@ const projectConfigObjectSchema = z
       .default({}),
     services: z
       .object({
-        app: ServiceSliceSchema.default({
-          enabled: true,
-          trafficPolicy: "disabled",
-          checkoutProvider: "stripe",
-          secrets: [],
-        }),
-        worker: ServiceSliceSchema.default({
-          enabled: true,
-          trafficPolicy: "disabled",
-          checkoutProvider: "stripe",
-          secrets: [],
-        }),
-        "media-stream": ServiceSliceSchema.default({
-          enabled: true,
-          trafficPolicy: "disabled",
-          checkoutProvider: "stripe",
-          secrets: [],
-        }),
-        sim: ServiceSliceSchema.default({
-          enabled: true,
-          trafficPolicy: "disabled",
-          checkoutProvider: "stripe",
-          secrets: [],
-        }),
+        app: ServiceSliceSchema.default({ enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] }),
+        worker: ServiceSliceSchema.default({ enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] }),
+        "media-stream": ServiceSliceSchema.default({ enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] }),
+        sim: ServiceSliceSchema.default({ enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] }),
       })
       .strict()
       .default({
-        app: {
-          enabled: true,
-          trafficPolicy: "disabled",
-          checkoutProvider: "stripe",
-          secrets: [],
-        },
-        worker: {
-          enabled: true,
-          trafficPolicy: "disabled",
-          checkoutProvider: "stripe",
-          secrets: [],
-        },
-        "media-stream": {
-          enabled: true,
-          trafficPolicy: "disabled",
-          checkoutProvider: "stripe",
-          secrets: [],
-        },
-        sim: {
-          enabled: true,
-          trafficPolicy: "disabled",
-          checkoutProvider: "stripe",
-          secrets: [],
-        },
+        app: { enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] },
+        worker: { enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] },
+        "media-stream": { enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] },
+        sim: { enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] },
       }),
   })
   .strict();
@@ -264,7 +190,6 @@ const serviceOverlaySchema = z
     bucket: z.string().min(1).optional(),
     region: z.string().min(1).optional(),
     trafficPolicy: z.enum(simTrafficPolicies).optional(),
-    checkoutProvider: z.enum(["stripe", "mock"]).optional(),
     secrets: z.array(SecretReferenceSchema).optional(),
   })
   .strict()
@@ -272,11 +197,7 @@ const serviceOverlaySchema = z
     if (service.url && service.host) {
       try {
         if (new URL(service.url).hostname !== service.host) {
-          ctx.addIssue({
-            code: "custom",
-            path: ["host"],
-            message: "host must match the hostname in url",
-          });
+          ctx.addIssue({ code: "custom", path: ["host"], message: "host must match the hostname in url" });
         }
       } catch {
         // The URL schema issue is the useful error for an invalid URL.
@@ -291,12 +212,7 @@ export const ProjectConfigOverlaySchema = z
     parent: EnvironmentNameSchema.optional(),
     emailDomain: emailDomain.optional(),
     secretProvider: z.enum(secretProviderNames).optional(),
-    runtime: z
-      .object({
-        mode: z.enum(["development", "test", "production"]).optional(),
-      })
-      .strict()
-      .optional(),
+    runtime: z.object({ mode: z.enum(["development", "test", "production"]).optional() }).strict().optional(),
     urls: z.object({ publicApp: diagnosticUrl.optional() }).strict().optional(),
     storage: z
       .object({
@@ -323,31 +239,19 @@ export type ProjectConfigOverlay = z.infer<typeof ProjectConfigOverlaySchema>;
 /** Apply a provider that is valid for the config's environment when omitted. */
 export const ProjectConfigSchema = z
   .preprocess((input) => {
-    if (typeof input !== "object" || input === null || Array.isArray(input))
-      return input;
+    if (typeof input !== "object" || input === null || Array.isArray(input)) return input;
     const config = input as Record<string, unknown>;
     if (config.secretProvider !== undefined) return input;
     const environment = EnvironmentNameSchema.safeParse(config.environment);
     if (!environment.success) return input;
-    return {
-      ...config,
-      secretProvider: defaultSecretProviderByEnvironment[environment.data],
-    };
+    return { ...config, secretProvider: defaultSecretProviderByEnvironment[environment.data] };
   }, projectConfigObjectSchema)
   .superRefine((config, ctx) => {
     if (config.parent === config.environment) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["parent"],
-        message: "an environment cannot inherit from itself",
-      });
+      ctx.addIssue({ code: "custom", path: ["parent"], message: "an environment cannot inherit from itself" });
     }
 
-    if (
-      !environmentProviderCompatibility[config.environment].includes(
-        config.secretProvider,
-      )
-    ) {
+    if (!environmentProviderCompatibility[config.environment].includes(config.secretProvider)) {
       ctx.addIssue({
         code: "custom",
         path: ["secretProvider"],
@@ -369,11 +273,7 @@ export const ProjectConfigSchema = z
     if (config.storage.endpoint && config.storage.host) {
       try {
         if (new URL(config.storage.endpoint).hostname !== config.storage.host) {
-          ctx.addIssue({
-            code: "custom",
-            path: ["storage", "host"],
-            message: "host must match endpoint hostname",
-          });
+          ctx.addIssue({ code: "custom", path: ["storage", "host"], message: "host must match endpoint hostname" });
         }
       } catch {
         // endpoint's own schema issue is the useful error.
@@ -382,11 +282,7 @@ export const ProjectConfigSchema = z
 
     for (const service of secretServiceNames) {
       for (const reference of config.services[service].secrets) {
-        if (
-          !resolveSecretPlan(config.environment, service).allowed.includes(
-            reference.name,
-          )
-        ) {
+        if (!resolveSecretPlan(config.environment, service).allowed.includes(reference.name)) {
           ctx.addIssue({
             code: "custom",
             path: ["services", service, "secrets"],
@@ -403,9 +299,7 @@ export class ConfigValidationError extends Error {
   readonly issues: z.ZodIssue[];
 
   constructor(error: z.ZodError) {
-    super(
-      `Invalid project configuration: ${error.issues.map((issue) => issue.message).join("; ")}`,
-    );
+    super(`Invalid project configuration: ${error.issues.map((issue) => issue.message).join("; ")}`);
     this.name = "ConfigValidationError";
     this.issues = error.issues;
   }
@@ -423,18 +317,10 @@ export function safeParseProjectConfig(input: unknown) {
 
 export type ProjectConfigMap = Partial<Record<EnvironmentName, unknown>>;
 
-export function assertProjectConfigMap(
-  input: unknown,
-): asserts input is ProjectConfigMap {
+export function assertProjectConfigMap(input: unknown): asserts input is ProjectConfigMap {
   if (input === null || typeof input !== "object" || Array.isArray(input)) {
     throw new ConfigValidationError(
-      new z.ZodError([
-        {
-          code: "custom",
-          path: [],
-          message: "overlay map must be a non-null object",
-        },
-      ]),
+      new z.ZodError([{ code: "custom", path: [], message: "overlay map must be a non-null object" }]),
     );
   }
 }
@@ -445,20 +331,13 @@ export function validateInheritanceGraph(configs: ProjectConfigMap): void {
   const parsed = new Map<EnvironmentName, ProjectConfigOverlay>();
   for (const [name, value] of Object.entries(configs)) {
     const environment = EnvironmentNameSchema.safeParse(name);
-    if (!environment.success)
-      throw new ConfigValidationError(environment.error);
+    if (!environment.success) throw new ConfigValidationError(environment.error);
     const result = ProjectConfigOverlaySchema.safeParse(value);
     if (!result.success) throw new ConfigValidationError(result.error);
     const config = result.data;
     if (config.environment !== environment.data) {
       throw new ConfigValidationError(
-        new z.ZodError([
-          {
-            code: "custom",
-            path: ["environment"],
-            message: "map key must match environment",
-          },
-        ]),
+        new z.ZodError([{ code: "custom", path: ["environment"], message: "map key must match environment" }]),
       );
     }
     parsed.set(environment.data, config);
@@ -467,25 +346,12 @@ export function validateInheritanceGraph(configs: ProjectConfigMap): void {
   for (const [name, config] of parsed) {
     if (config.parent === name) {
       throw new ConfigValidationError(
-        new z.ZodError([
-          {
-            code: "custom",
-            path: ["parent"],
-            message: "an environment cannot inherit from itself",
-          },
-        ]),
+        new z.ZodError([{ code: "custom", path: ["parent"], message: "an environment cannot inherit from itself" }]),
       );
     }
     if (config.parent === "production" && name !== "production") {
       throw new ConfigValidationError(
-        new z.ZodError([
-          {
-            code: "custom",
-            path: ["parent"],
-            message:
-              "production cannot be a parent of a non-production environment",
-          },
-        ]),
+        new z.ZodError([{ code: "custom", path: ["parent"], message: "production cannot be a parent of a non-production environment" }]),
       );
     }
     const visiting = new Set<EnvironmentName>();
@@ -493,26 +359,14 @@ export function validateInheritanceGraph(configs: ProjectConfigMap): void {
     while (current) {
       if (visiting.has(current)) {
         throw new ConfigValidationError(
-          new z.ZodError([
-            {
-              code: "custom",
-              path: ["parent"],
-              message: "inheritance graph contains a circular parent reference",
-            },
-          ]),
+          new z.ZodError([{ code: "custom", path: ["parent"], message: "inheritance graph contains a circular parent reference" }]),
         );
       }
       visiting.add(current);
       const next: EnvironmentName | undefined = parsed.get(current)?.parent;
       if (next && !parsed.has(next)) {
         throw new ConfigValidationError(
-          new z.ZodError([
-            {
-              code: "custom",
-              path: ["parent"],
-              message: `parent environment '${next}' is not defined`,
-            },
-          ]),
+          new z.ZodError([{ code: "custom", path: ["parent"], message: `parent environment '${next}' is not defined` }]),
         );
       }
       current = next;
