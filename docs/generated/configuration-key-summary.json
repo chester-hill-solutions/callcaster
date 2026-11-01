@@ -3,7 +3,7 @@
   "generatedBy": "tools:config:inventory",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "fb7517c2dbe99a33eb5af8f78a896195d7c27a5de7a824f1c6cdfc4d9607def9",
+    "recordDigest": "116aa581b7d51c82d9f0261a41c244f5223a978ad9ab0aaecfd71340ba9a764a",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -30,7 +30,9 @@
     ],
     "scannedFiles": [
       ".env.example",
+      ".github/actions/install-dependencies/action.yml",
       ".github/workflows/ci.yml",
+      ".github/workflows/dependency-cache.yml",
       ".github/workflows/e2e.yml",
       ".github/workflows/issue-on-dev.yml",
       ".github/workflows/ledger-drift-check.yml",
@@ -79,6 +81,7 @@
       "app/components/call/CallScreen.LiveCoachingPanels.tsx",
       "app/components/call/CallScreen.Questionnaire.tsx",
       "app/components/call/CallScreen.QueueList.tsx",
+      "app/components/call/CallScreen.SessionTimers.tsx",
       "app/components/call/CallScreen.Transcript.tsx",
       "app/components/call/CallScreen.Workbench.tsx",
       "app/components/call/call-panel-classes.ts",
@@ -152,6 +155,7 @@
       "app/components/contact/ContactDetailsFields.tsx",
       "app/components/contact/ContactDetailsOtherFields.tsx",
       "app/components/contact/ContactForm.tsx",
+      "app/components/contact/ContactMergePanel.tsx",
       "app/components/contact/RecentContacts.tsx",
       "app/components/contacts/ContactsPage.tsx",
       "app/components/file-assets/AudioClipEditor.tsx",
@@ -172,6 +176,7 @@
       "app/components/phone-numbers/CallerIdVerificationDialog.tsx",
       "app/components/phone-numbers/CallerIdVerificationForm.tsx",
       "app/components/phone-numbers/NumberCallerId.tsx",
+      "app/components/phone-numbers/NumberHistory.tsx",
       "app/components/phone-numbers/NumberPurchase.ConfirmDialog.tsx",
       "app/components/phone-numbers/NumberPurchase.SearchForm.tsx",
       "app/components/phone-numbers/NumberPurchase.columns.tsx",
@@ -261,9 +266,11 @@
       "app/db/auth-schema.ts",
       "app/db/schema-audience-import.ts",
       "app/db/schema-campaign.ts",
+      "app/db/schema-contact-merge.ts",
       "app/db/schema-defaults.contract.ts",
       "app/db/schema-inbound-queue.ts",
       "app/db/schema-inbound-voicemail.ts",
+      "app/db/schema-message.ts",
       "app/db/schema-number-release.ts",
       "app/db/schema-predictive-machine.ts",
       "app/db/schema-survey.ts",
@@ -488,6 +495,7 @@
       "app/lib/coaching-events.shared.ts",
       "app/lib/coaching-schemas.ts",
       "app/lib/contact-editor.ts",
+      "app/lib/contact-merge.ts",
       "app/lib/contacts-loader.types.ts",
       "app/lib/contacts/search.server.ts",
       "app/lib/contacts/tenant-scope.server.ts",
@@ -824,6 +832,7 @@
       "app/lib/workspace-members.ts",
       "app/lib/workspace-membership.server.ts",
       "app/lib/workspace-middleware.server.ts",
+      "app/lib/workspace-number-history.server.ts",
       "app/lib/workspace-onboarding-goals.ts",
       "app/lib/workspace-role-display.ts",
       "app/lib/workspace-route.server.ts",
@@ -855,6 +864,7 @@
       "app/routes/admin+/panels/AdminSystemSettingsPanel.tsx",
       "app/routes/admin+/panels/AdminUsersPanel.tsx",
       "app/routes/admin+/panels/AdminWorkspacesPanel.tsx",
+      "app/routes/admin+/panels/WorkspaceRestoreDialog.tsx",
       "app/routes/admin+/requireSudoAdmin.server.ts",
       "app/routes/admin+/route.action.server.ts",
       "app/routes/admin+/route.loader.server.ts",
@@ -1392,6 +1402,9 @@
       "app/server/boot-checks.server.ts",
       "app/server/bootstrap-migrations.server.ts",
       "app/server/contact-editor.server.ts",
+      "app/server/contact-identity-lock.server.ts",
+      "app/server/contact-merge-relations.server.ts",
+      "app/server/contact-merge.server.ts",
       "app/server/db-health.server.ts",
       "app/server/db-pool-size.ts",
       "app/server/db.ts",
@@ -1407,6 +1420,8 @@
       "app/server/sim-profile-status.server.ts",
       "app/server/survey-completion.ts",
       "app/server/tenant-db.ts",
+      "app/server/workspace-credentials.server.ts",
+      "app/server/workspace-restore.server.ts",
       "app/sessions.server.tsx",
       "app/twilio.server.ts",
       "config/base.ts",
@@ -1510,6 +1525,7 @@
       "package.json",
       "railway.worker.toml",
       "scripts/audit-twilio-webhooks.mjs",
+      "scripts/backfill-twilio-subaccount-names.mjs",
       "scripts/baselines/lint-ratchet.json",
       "scripts/baselines/relative-redirects.json",
       "scripts/baselines/route-read-role-floor.json",
@@ -1617,6 +1633,9 @@
       "scripts/lib/ci-changes-lib.mjs",
       "scripts/lib/effects-lib.mjs",
       "scripts/lib/live-environments.mjs",
+      "scripts/lib/live-workspace-numbers.mjs",
+      "scripts/lib/local-gate-plan.mjs",
+      "scripts/lib/local-gate-runner.mjs",
       "scripts/lib/local-target-guard.mjs",
       "scripts/lib/parse-api-routes.mjs",
       "scripts/lib/public-queue-order-contract.mjs",
@@ -1628,8 +1647,10 @@
       "scripts/lib/route-read-role-floor.mjs",
       "scripts/lib/schema-enums.mjs",
       "scripts/lib/sheet-body-contract.mjs",
+      "scripts/lib/twilio-prune-database-evidence.mjs",
       "scripts/lib/twilio-prune-resources.mjs",
       "scripts/lib/twilio-resource-prune-policy.mjs",
+      "scripts/lib/twilio-subaccount-name-backfill.mjs",
       "scripts/local/cloudflared-utils.mjs",
       "scripts/local/dev-local.mjs",
       "scripts/local/dev.mjs",
@@ -1659,6 +1680,7 @@
       "scripts/repair-route-exports.mjs",
       "scripts/rewrite-route-imports.mjs",
       "scripts/route-dynamic-server-imports.mjs",
+      "scripts/run-local-gate.mjs",
       "scripts/schema-transform/README.md",
       "scripts/schema-transform/apply-all.sh",
       "scripts/schema-transform/dump-baseline.sh",
@@ -1677,6 +1699,7 @@
       "scripts/twilio-resource-prune-report.mjs",
       "scripts/twilio-subaccount-inventory.mjs",
       "scripts/type-safety-baseline.json",
+      "scripts/verify-node-shards.mjs",
       "scripts/verify-route-tree.mjs",
       "server/bun.ts",
       "server/twilio-webhook-paths.ts",
@@ -2036,6 +2059,7 @@
       "test/integration-db/campaign-sms-report-external-id.test.ts",
       "test/integration-db/campaign-sms-report.test.ts",
       "test/integration-db/contact-editor-save.test.ts",
+      "test/integration-db/contact-merge.test.ts",
       "test/integration-db/dequeue-contact-assigned.test.ts",
       "test/integration-db/export-message-date-bounds.test.ts",
       "test/integration-db/inbound-ivr-prompt.test.ts",
@@ -2051,6 +2075,7 @@
       "test/integration-db/ledger.test.ts",
       "test/integration-db/media-campaign-target.test.ts",
       "test/integration-db/message-provider-send-time.test.ts",
+      "test/integration-db/number-history-live-paths.test.ts",
       "test/integration-db/number-purchase-credits.test.ts",
       "test/integration-db/number-regulatory-address.test.ts",
       "test/integration-db/number-release-credentials.test.ts",
@@ -2065,6 +2090,7 @@
       "test/integration-db/schema-type-drift.test.ts",
       "test/integration-db/scope-outreach-attempt-by-workspace.test.ts",
       "test/integration-db/script-name-unique.test.ts",
+      "test/integration-db/sim-persona-signin.test.ts",
       "test/integration-db/sms-provider-segment-billing.test.ts",
       "test/integration-db/sms-recipient-identity.test.ts",
       "test/integration-db/split-campaign-atomic.test.ts",
@@ -2077,14 +2103,17 @@
       "test/integration-db/survey-respondent-identity.test.ts",
       "test/integration-db/survey-response-columns.test.ts",
       "test/integration-db/toll-free-opt-in.test.ts",
+      "test/integration-db/twilio-subaccount-name-backfill.test.ts",
       "test/integration-db/verification-number.test.ts",
       "test/integration-db/webhook-delivery-lanes.test.ts",
+      "test/integration-db/workspace-archive-credentials.test.ts",
       "test/integration-db/workspace-feature-flags.test.ts",
       "test/integration-db/workspace-foreign-keys.test.ts",
       "test/integration-db/workspace-invitation-cancel.test.ts",
       "test/integration-db/workspace-invitation-resend.test.ts",
       "test/integration-db/workspace-ownership-transfer.test.ts",
       "test/integration-db/workspace-reference-migrations.test.ts",
+      "test/integration-db/workspace-restore.test.ts",
       "test/integration-db/workspace-unread-count.test.ts",
       "test/integration-twilio/twilio-test-credentials.test.ts",
       "test/interactive-sender-pool-cache.test.ts",
@@ -2115,6 +2144,7 @@
       "test/jobs-twilio-open-sync.route.test.ts",
       "test/ledger-drift-workflow.test.ts",
       "test/legacy-api-cross-tenant-routes.test.ts",
+      "test/local-gates.test.ts",
       "test/local-target-guard.test.ts",
       "test/logger.server.test.ts",
       "test/low-credit-notify.server.test.ts",
@@ -2142,6 +2172,7 @@
       "test/messaging-sender-pool-readiness.test.ts",
       "test/mocks/twilio-voice-sdk.ts",
       "test/no-useless-comments-rule.test.ts",
+      "test/number-history-openapi.test.ts",
       "test/number-locality.test.ts",
       "test/number-purchase-worker.test.ts",
       "test/number-release-worker.test.ts",
@@ -2264,6 +2295,7 @@
       "test/sim-profile-reconciliation.test.ts",
       "test/sim-profile-status.test.ts",
       "test/sim-runtime-context.test.ts",
+      "test/sim-sms-flow-cleanup.test.ts",
       "test/sim-task-context.test.ts",
       "test/sms-action.route.test.ts",
       "test/sms-campaign-send-mode.test.ts",
@@ -2324,6 +2356,7 @@
       "test/twilio-rest-basic-auth.test.ts",
       "test/twilio-sender-class.server.test.ts",
       "test/twilio-sender-pool.server.test.ts",
+      "test/twilio-subaccount-name-backfill.test.ts",
       "test/twilio-subaccount-reauth.server.test.ts",
       "test/twilio-toll-free-provision.server.test.ts",
       "test/twilio-usage.test.ts",
@@ -2345,9 +2378,11 @@
       "test/ui/account-security.test.tsx",
       "test/ui/add-audio-sheet.test.tsx",
       "test/ui/admin-access-result-notices.test.tsx",
+      "test/ui/admin-number-history.test.tsx",
       "test/ui/admin-pagination.test.tsx",
       "test/ui/admin-public-remediation.test.tsx",
       "test/ui/admin-system-settings.test.tsx",
+      "test/ui/admin-workspace-restore.test.tsx",
       "test/ui/agent-desktop.test.tsx",
       "test/ui/agent-startup-feedback.test.tsx",
       "test/ui/alert-tones.test.tsx",
@@ -2392,6 +2427,7 @@
       "test/ui/call-screen-live-coaching-panels.test.tsx",
       "test/ui/call-screen-questionnaire.test.tsx",
       "test/ui/call-screen-queuelist.test.tsx",
+      "test/ui/call-screen-session-timers.test.tsx",
       "test/ui/call-screen-workbench.test.tsx",
       "test/ui/call-status-polling.test.tsx",
       "test/ui/caller-id-verification-dialog.test.tsx",
@@ -2438,6 +2474,7 @@
       "test/ui/contact-details-form-values.test.tsx",
       "test/ui/contact-editor-drafts.test.tsx",
       "test/ui/contact-editor-route.test.tsx",
+      "test/ui/contact-merge.test.tsx",
       "test/ui/contact-search-dialog.test.tsx",
       "test/ui/contacts-page-a11y.test.tsx",
       "test/ui/contacts-route-outlet.test.tsx",
@@ -2475,6 +2512,7 @@
       "test/ui/navbar-user-menu.test.tsx",
       "test/ui/notice-query-history.test.tsx",
       "test/ui/number-address-badge.test.tsx",
+      "test/ui/number-history.test.tsx",
       "test/ui/number-purchase-columns.test.tsx",
       "test/ui/number-summary-list.test.tsx",
       "test/ui/numbers-table-a11y.test.tsx",
@@ -2567,7 +2605,9 @@
       "test/verify-audio-pin.route.test.ts",
       "test/verify-audio-session.route.test.ts",
       "test/verify-call-in-session.route.test.ts",
+      "test/verify-node-shards.test.ts",
       "test/verify-pin-input.route.test.ts",
+      "test/vitest-local-config.test.ts",
       "test/voicemail-email-provider.test.ts",
       "test/voicemail-media.server.test.ts",
       "test/vue-ssr-boundary.test.ts",
@@ -3734,6 +3774,26 @@
       "migrationTarget": "config.generated.env"
     },
     {
+      "key": "FLY_APP_NAME",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.fly_app_name"
+    },
+    {
       "key": "GH_TOKEN",
       "sourceKinds": [
         "github-workflow-env"
@@ -3882,6 +3942,26 @@
       "classification": "generated-deployment-value",
       "owner": "ci",
       "migrationTarget": "config.generated.integration_db_url"
+    },
+    {
+      "key": "K_SERVICE",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.k_service"
     },
     {
       "key": "LABEL",
@@ -4071,7 +4151,7 @@
         "declaration",
         "deployment"
       ],
-      "sourceCount": 32,
+      "sourceCount": 34,
       "dynamic": false,
       "classification": "secret",
       "owner": "ci",
@@ -4102,7 +4182,7 @@
         "read",
         "write"
       ],
-      "sourceCount": 26,
+      "sourceCount": 27,
       "dynamic": true,
       "classification": "generated-deployment-value",
       "owner": "app",
@@ -4770,6 +4850,26 @@
       "migrationTarget": "config.generated.railway_deployment_draining_seconds"
     },
     {
+      "key": "RAILWAY_DEPLOYMENT_ID",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.railway_deployment_id"
+    },
+    {
       "key": "RAILWAY_DOCKERFILE_PATH",
       "sourceKinds": [
         "railway-variable"
@@ -4792,21 +4892,44 @@
       "migrationTarget": "config.generated.railway_dockerfile_path"
     },
     {
+      "key": "RAILWAY_ENVIRONMENT",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.railway_environment"
+    },
+    {
       "key": "RAILWAY_ENVIRONMENT_ID",
       "sourceKinds": [
         "github-variable",
-        "github-workflow-env"
+        "github-workflow-env",
+        "runtime-read"
       ],
       "consumers": [
+        "app",
         "ci"
       ],
       "environments": [
         "shared"
       ],
       "usages": [
-        "declaration"
+        "declaration",
+        "read"
       ],
-      "sourceCount": 6,
+      "sourceCount": 7,
       "dynamic": false,
       "classification": "generated-deployment-value",
       "owner": "ci",
@@ -4829,7 +4952,7 @@
         "read",
         "write"
       ],
-      "sourceCount": 4,
+      "sourceCount": 5,
       "dynamic": false,
       "classification": "generated-deployment-value",
       "owner": "app",
@@ -4859,22 +4982,45 @@
       "key": "RAILWAY_PROJECT_ID",
       "sourceKinds": [
         "github-variable",
-        "github-workflow-env"
+        "github-workflow-env",
+        "runtime-read"
       ],
       "consumers": [
+        "app",
         "ci"
       ],
       "environments": [
         "shared"
       ],
       "usages": [
-        "declaration"
+        "declaration",
+        "read"
       ],
-      "sourceCount": 6,
+      "sourceCount": 7,
       "dynamic": false,
       "classification": "generated-deployment-value",
       "owner": "ci",
       "migrationTarget": "config.generated.railway_project_id"
+    },
+    {
+      "key": "RAILWAY_SERVICE_ID",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.railway_service_id"
     },
     {
       "key": "RAILWAY_TOKEN",
@@ -5998,7 +6144,7 @@
         "deployment",
         "read"
       ],
-      "sourceCount": 14,
+      "sourceCount": 15,
       "dynamic": true,
       "classification": "secret",
       "owner": "ci",
@@ -6124,7 +6270,7 @@
         "deployment",
         "read"
       ],
-      "sourceCount": 14,
+      "sourceCount": 15,
       "dynamic": true,
       "classification": "non-secret-config",
       "owner": "ci",
@@ -6257,6 +6403,26 @@
       "classification": "generated-deployment-value",
       "owner": "scripts",
       "migrationTarget": "config.generated.userprofile"
+    },
+    {
+      "key": "VERCEL",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.vercel"
     },
     {
       "key": "VERIFICATION_PHONE_NUMBER",

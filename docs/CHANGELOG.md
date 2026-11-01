@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Reconciled SIM personas receive working password accounts. Owner funding and member SMS keep separate browser sessions, which close when a task fails ([PR #3104](https://github.com/chester-hill-solutions/callcaster/pull/3104), [#2828](https://github.com/chester-hill-solutions/callcaster/issues/2828)).
+
 - Added: Operators can review and apply legacy workspace subaccount name backfills with exact ownership checks across dev, QA and production. Dry-run is the default; reviewed apply preserves custom labels, shared accounts and already-completed names ([#3102](https://github.com/chester-hill-solutions/callcaster/issues/3102), parent [#2168](https://github.com/chester-hill-solutions/callcaster/issues/2168)).
 
 - Added: Calling screens show elapsed session time and total connected talk time across contacts in both dialing modes. The totals remain through queue refreshes and reset on a new campaign visit; phone-width controls keep both timers readable ([#2533](https://github.com/chester-hill-solutions/callcaster/issues/2533)).

@@ -25,6 +25,7 @@ export class SimReconciliationError extends Error {
 type ReconcileRepo = {
   findUsers(email: string): Promise<Array<{ id: string; email: string; simMarker: string | null }>>;
   createUser(input: { id: string; email: string; marker: string }): Promise<void>;
+  ensureCredential?: (input: { userId: string; passwordHash: string }) => Promise<void>;
   findWorkspaces(name: string, marker: string): Promise<Array<{ id: string; name: string; simMarker: string | null }>>;
   createWorkspace(input: { id: string; name: string; marker: string }): Promise<void>;
   findMembership(workspaceId: string, userId: string): Promise<{ role: string; marker: string | null } | null>;
@@ -53,9 +54,21 @@ function safeResult(profile: ResolvedSimProfile, status: SimReconciliationStatus
   };
 }
 
+async function ensureCredential(
+  repo: ReconcileRepo,
+  userId: string,
+  credentialHash: string | undefined,
+): Promise<void> {
+  if (credentialHash !== undefined) {
+    if (!repo.ensureCredential) throw new SimReconciliationError("blocked", "SIM credential writer is unavailable");
+    await repo.ensureCredential({ userId, passwordHash: credentialHash });
+  }
+}
+
 async function reconcileWithinTransaction(
   profile: ResolvedSimProfile,
   repo: ReconcileRepo,
+  credentialHash?: string,
 ): Promise<SimReconciliationResult> {
   const users = await repo.findUsers(profile.email);
   const userRow = users[0];
@@ -67,6 +80,7 @@ async function reconcileWithinTransaction(
   if (!userRow) {
     await repo.createUser({ id: userId, email: profile.email, marker: profile.workspaceMarker });
   }
+  await ensureCredential(repo, userId, credentialHash);
 
   const markedWorkspaces = await repo.findWorkspaces(profile.workspaceName, profile.workspaceMarker);
   const sameName = await repo.findWorkspaces(profile.workspaceName, "");
@@ -103,7 +117,11 @@ async function reconcileWithinTransaction(
   return safeResult(profile, created ? "created" : repaired ? "repaired" : "reused");
 }
 
-export async function reconcileSimProfile(profile: ResolvedSimProfile, transaction: ReconcileTransaction): Promise<SimReconciliationResult> {
+export async function reconcileSimProfile(
+  profile: ResolvedSimProfile,
+  transaction: ReconcileTransaction,
+  credentialHash?: string,
+): Promise<SimReconciliationResult> {
   if ((profile.environment as string) === "production") {
     throw new SimReconciliationError("blocked", "SIM reconciliation is not allowed for production");
   }
@@ -111,7 +129,7 @@ export async function reconcileSimProfile(profile: ResolvedSimProfile, transacti
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       // The transaction keeps identity, collision, membership, and owner checks atomic.
-      return await transaction((repo) => reconcileWithinTransaction(profile, repo));
+      return await transaction((repo) => reconcileWithinTransaction(profile, repo, credentialHash));
     } catch (error) {
       if (error instanceof SimReconciliationError) throw error;
       if (attempt === 0 && isUniqueViolation(error)) continue;

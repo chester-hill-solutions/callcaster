@@ -19,8 +19,12 @@ npm run test:sim:headed
 - Sim tests live under `e2e/sim/` and end with `.sim.spec.ts`.
 - The sim config runs one worker with no retries. Never add it as a dependency
   of the normal E2E project.
-- The current profile is `sai-local`. Its workspace ID, workspace key, and
-  approved recipient are fixed in `e2e/sim/config.ts`.
+- Resolve catalog personas through `createSimRuntimeContext`. The current flow
+  uses `person-a` for owner funding and `person-b` for member SMS, in separate
+  browser contexts for the same marked workspace.
+- `e2e/sim/config.ts` is the temporary #2812 recipient/message adapter. Keep its
+  approved-recipient check. Do not hardcode a workspace ID or choose a stronger
+  persona inside a task.
 - Sender credentials and recipient values come from environment variables. Do
   not commit them, print them, attach them, or put them in traces.
 - The SMS flow creates real provider traffic. Run it only when the recipient is
@@ -35,8 +39,6 @@ any provider callback configuration are outside the Playwright config.
 Required variables:
 
 ```bash
-SIM_SENDER_EMAIL='sender@example.test'
-SIM_SENDER_PASSWORD='password'
 SIM_RECIPIENT_NAME='Saihaan Syed'
 SIM_RECIPIENT_PHONE='+16478657844'
 ```
@@ -51,10 +53,11 @@ Quote values containing spaces or shell metacharacters. Load an untracked file
 with `set -a; source .env.sim.local; set +a`. Never change the user's normal
 `.env` files automatically.
 
-The loader fails closed when the configured environment profile or recipient
-does not match the fixed approved values. Add a new environment by adding an
-explicit profile and guard; do not make workspace IDs or recipient numbers
-arbitrary command-line input for a live flow.
+Set `DEV_NAME` and `ENV` through the shared local configuration. Use the
+resolved persona credential names with the configured SecretProvider. Among
+browser tasks, only sign-in can request its persona password. Other tasks
+receive a non-secret context. The recipient adapter fails closed when the
+approved values differ. Do not accept arbitrary live destinations.
 
 ## Architecture
 
@@ -66,16 +69,17 @@ config → tasks → flow/spec
 
 ### Config
 
-`e2e/sim/config.ts` returns a typed `SimSmsConfig`:
+`createSimRuntimeContext` resolves a typed profile from the shared project
+configuration and persona catalog. `prepareSimSmsTaskContexts` checks saved
+identity, workspace, role and capabilities before browser work.
+`e2e/sim/config.ts` returns typed recipient, message and checkout inputs only.
+Keep secrets out of profiles, task inputs and artifacts.
 
-- sender login;
-- fixed workspace identity;
-- approved recipient identity;
-- message input;
-- public Stripe test-card values used only inside Checkout.
-
-Keep provider and workspace constants in the profile. Keep operator-specific
-credentials in environment variables.
+Profile reconciliation must create or repair the Better Auth credential account.
+Resolve the password only after the local runtime guard passes. Verify sign-in
+through the real auth adapter; a saved user and membership do not prove login.
+Do not clear a password locator after submit: navigation can remove the field
+and make Playwright wait until the whole flow times out.
 
 ### Tasks
 
@@ -103,8 +107,8 @@ stable external ID so reruns are diagnosable.
 ### Credit task
 
 Use `estimateMessageCredits` from `shared/pricing.ts`; do not copy pricing
-constants into the sim suite. Read the current balance before opening Stripe
-Checkout. Return without purchasing when the balance covers the operation.
+constants into the sim suite. Read the current balance before opening checkout. Return without purchasing
+when the balance covers the operation.
 
 If funding is needed, respect `MIN_CREDITS` and purchase the smallest amount
 that covers the flow. Use Stripe test mode only. Do not hard-code live payment
@@ -114,13 +118,10 @@ credentials.
 
 The spec is the orchestration layer. Keep its order explicit:
 
-```ts
-const sim = loadSaiLocalSmsConfig();
-await signInForSim(page, sim.sender);
-await uploadSimContactList({ page, testInfo, workspaceId: sim.workspace.id, contact: sim.recipient });
-await ensureSmsCredits({ page, workspaceId: sim.workspace.id, message: sim.message, stripe: sim.stripe });
-await sendSmsFromChats({ page, workspaceId: sim.workspace.id, recipientPhone: sim.recipient.phone, message: sim.message });
-```
+Resolve and preflight both personas first. In an owner browser context, sign in
+and ensure credits. Close that context. In a member context, sign in, upload the
+contact list, wait for the worker, and send through Chats. The tasks must not
+switch personas or retrieve credentials for another task.
 
 Add new flows as separate `.sim.spec.ts` files. Reuse tasks. Add a new task only
 when the operation is reusable across two or more flows or needs its own
@@ -145,7 +146,7 @@ data, auth cookies, or full phone numbers.
 
 ## Adding a new simulated operation
 
-1. Define its fixed environment profile and approved assets.
+1. Resolve its catalog persona and shared environment profile; approve its assets.
 2. Add or reuse typed config values.
 3. Implement one task per UI/product boundary.
 4. Calculate its cost from the canonical pricing module.

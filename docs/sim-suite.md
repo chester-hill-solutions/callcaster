@@ -18,7 +18,7 @@ They never reconcile, repair, audit, create resources, or read credentials.
 Catalog capabilities are a SIM allowlist. The canonical workspace role matrix
 is the real authorization floor: owner-only capabilities deny members.
 
-## Sai-local SMS flow
+## Resolved-profile SMS flow
 
 `npm run test:sim` currently runs the `sai-local` SMS proof only when these
 environment variables are set in the calling shell or secret manager:
@@ -32,29 +32,37 @@ SIM_SMS_MESSAGE="<unique test message>"
 
 The temporary compatibility adapter rejects a missing or changed approved
 recipient value. The sender email is derived from the resolved SIM persona;
-the password is retrieved only by the sign-in task through the runtime context.
+the browser password is retrieved only by the sign-in task through the runtime context.
 This prevents an environment mix-up from sending a live message to an
 unapproved number.
 
-The planned inherited configuration and secret-provider migration is defined in
-[ADR-0040](adr/0040-inherited-config-and-pluggable-secrets.md). Until ADR-0040
-Phase 5 migrates SIM, this page describes the current interface. Do not add new
-SIM-specific variables; new SIM work uses the compatibility boundary until the
-shared loader is available.
+Profiles use the shared configuration and secret-provider boundary in
+[ADR-0040](adr/0040-inherited-config-and-pluggable-secrets.md). The temporary
+recipient/message adapter remains until #2812 is complete. Do not add new
+SIM-specific variables or read dotenv files inside browser tasks.
 
 `e2e/sim/config.ts` is the temporary #2812 compatibility adapter. It is only
 used at SIM bootstrap to build typed task input. Task modules do not import it.
 
 The flow does these tasks through the product UI:
 
-1. Sign in as the configured sender.
-2. Generate a one-contact CSV and upload it through Call Lists.
-3. Wait for the worker-backed upload to complete.
-4. Read the current credit balance and calculate the SMS requirement from the
-   shared rate card.
-5. Open Stripe Checkout only when the balance is too low. It purchases the
-   smallest permitted amount that covers the flow.
-6. Send the configured SMS through Chats.
+1. Resolve `person-a` (owner) and `person-b` (member) in the same marked workspace.
+   Check identity, role and capabilities before browser work.
+2. Sign in as the owner and fund only the shortfall, subject to the minimum
+   purchase, through Stripe test checkout.
+3. Close the owner context. Sign in as the member in a separate context.
+4. Upload a one-contact CSV through Call Lists and wait for the worker.
+5. Send the approved message through Chats as the member.
+
+Among browser tasks, only sign-in can request the persona password. Other tasks
+receive a non-secret context. Profile reconciliation creates or repairs the
+credential account with the resolved password; it does not fund credits or call
+a provider. All contexts close even when a task fails.
+
+Normal CI verifies persona credentials and task access without provider traffic.
+Handset delivery remains a separate step that needs an explicit operator request.
+Local mock checkout and Twilio setup additions from the earlier candidate are
+parked separately; they are not part of the persona migration.
 
 The generated CSV and a redacted evidence record are Playwright artifacts.
 They are not committed. The local target needs a running app, worker, object

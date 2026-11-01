@@ -14,6 +14,8 @@ Earlier selected updates remain: #1724 is answered and closed as completed; #299
 
 Name backfill, 2026-11-01 UTC: #3102 is the separate Urgent child of #2168 and is In progress. The source provides reviewed plan/apply tooling, with 83 focused Node and 5 PostgreSQL cases passing. The live GET-only plan has 7 eligible dev names, 1 already correct and 30 protected records. Operational apply and release acceptance remain separate; #2029 still owns retention/repeat decisions. The inventory below includes the new child (404 open issues); this selected change is not a full Project export.
 
+SIM Stage 1 selected update, 2026-11-01 UTC: #2828 moves to Fix now after reproducing the parked checkout failure. Active draft #3104 uses the existing #3067 branch for persona sign-in repair; final CI and separate real SMS acceptance remain. This is a selected Issue and Project check, not a full Project export.
+
 ## How to use this board
 
 1. Pick from **Fix now** first (confirmed, with an exact resolution path).
@@ -41,7 +43,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 22
+## Fix now — 23
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -301,6 +303,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: After merge, verify actual Contacts search and clear on deployed dev and complete release acceptance. Local tests and browser checks use a controlled loader; they do not prove production authentication, database filtering or the full workspace shell.
 - Done when: Search contacts has a persistent accessible name, including when no contacts match.; Clear search has an explicit name and preserves the existing target size and shared styling.; Pointer, Enter and Space clear the query, reset page to 1, retain unrelated parameters and return focus to the same input.; Keep edit links, empty-state composition and shared Input/Button behavior.
 - Tracker: Included from original PR #3010 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges.
+
+### [#2828](https://github.com/chester-hill-solutions/callcaster/issues/2828) Task: migrate existing SIM SMS setup to personas
+- **IN PROGRESS** · Verdict: **Fix now** · Type: Task · Priority: unset · Effort: unset · Environment: unset · Labels: none · Assignee: @sai-sy · Updated: 2026-10-27
+- Complete persona sign-in repair in PR #3104 on the preserved #3067 branch. Additional local setup features stay parked.
+- Current behavior: Dev already has resolved owner/member profiles and task access checks. Profile reconciliation creates user and membership rows but no password credential account. The active candidate repairs that account and closes both browser contexts on failure. The earlier mock checkout and Twilio resource setup additions remain saved separately; they are not part of this PR.
+- Root cause: A saved Better Auth user and workspace membership are insufficient for password sign-in. The credential provider also needs a hashed password row in auth_account. The original broad candidate additionally changed local checkout defaults and caused 38 Stripe database failures before browser tests started; that checkout feature is now parked.
+- Resolution: Finish the single persona-focused PR with real app sign-in, rerun/repair, collision rollback and hosted-runtime controls. Request the resolved password only after the local guard. Keep the approved recipient adapter and Stripe test funding unchanged. Require local and exact-head GitHub checks; run real SMS only on a separate explicit operator request. Stage 2 and voice remain behind Stage 1 acceptance.
+- Look in: `app/lib/sim-profile-reconciliation.server.ts`, `app/server/sim-profile-reconciliation.server.ts`, `scripts/sim-profile-ensure.ts`, `e2e/sim/sms-send.sim.spec.ts`, `test/integration-db/sim-persona-signin.test.ts`
+- Existing tests: 17 real-PostgreSQL cases pass through actual app sign-in, cookie session reads, stable IDs, missing-account repair, resolved-password changes, foreign-marker protection, collision rollback and hosted-runtime refusal before password access. The 60 existing Stripe database cases also pass on the narrowed source before the final collision cases were added. Removing credential persistence makes both intended persona sign-ins fail; 11 controls remain passing. No provider traffic or deployed data changes were used.
+- Missing tests: Final local gate and exact-head GitHub CI on the narrowed candidate.; Explicit operator acceptance: owner funding and member SMS through the local product flow, with an approved recipient and redacted evidence. Handset delivery is not proved by no-traffic tests.
+- Tracker: Selected snapshot, 2026-11-01 UTC: native Task assigned @sai-sy; native Priority, Effort and Enviornment are unset. Actual Project Status In progress was read in the authenticated issue sidebar. Parent #2815 and native blocker #2827 remain open; profile/status code is already merged in #2974. The original Development link to closed #3067 is preserved; active draft #3104 uses the same branch and links this task. Do not create another SIM implementation or mark real SMS acceptance complete.
 
 ---
 
@@ -1012,7 +1025,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Needs reproduction — 17
+## Needs reproduction — 16
 
 Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, payload, trace) before coding.
 
@@ -1027,15 +1040,6 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 - Searching Pickering does not find South Pickering. PR #1675 changed rate-centre display names; it did not prove search matching.
 - Resolution: Compare the submitted locality with provider results and determine whether the provider supports partial matching before changing the search contract.
 - Look in: `app/components/phone-numbers/NumberPurchase.tsx`, `app/lib/number-locality.ts`
-
-### [#2828](https://github.com/chester-hill-solutions/callcaster/issues/2828) Task: migrate existing SIM SMS setup to personas
-- **IN PROGRESS** · Verdict: **Needs reproduction** · Type: Task · Priority: unset · Effort: unset · Environment: unset · Labels: none · Assignee: @sai-sy · Updated: 2026-10-27
-- The local SIM migration candidate is open in PR #3067, but its remote verification is not green.
-- Current behavior: PR #3067 at 43666254 has failed billing-checkout access guards and browser tests. The browser job was rerun once and failed again. The source is not merged into dev.
-- Root cause: The failed guard assertions involve expected checkout sessions and access results. This review records the failure without assigning a new source cause.
-- Resolution: Inspect the billing-checkout guard failures and compare the persisted browser failure with a passing sibling before editing policy or fixtures. Keep local mock credit fulfillment isolated and preserve no-traffic verification.
-- Look in: `test/integration-db/billing-checkout-access.test.ts`
-- Tracker: Native Task, live Project Status In progress. Continue the existing PR and issue; do not create another SIM implementation or treat the local CI report as completed remote acceptance.
 
 ### [#2902](https://github.com/chester-hill-solutions/callcaster/issues/2902) Caller-supplied forwarded host/proto widen the per-request Better Auth trusted-origin list; a wildcard host becomes a catch-all glob that switches off the CSRF…
 - Verdict: **Needs reproduction** · Type: Bug · Priority: unset · Effort: unset · Environment: unset · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-24

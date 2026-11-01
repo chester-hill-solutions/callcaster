@@ -171,6 +171,11 @@ role in an owned native Postgres fixture before applying its reset SQL, even
 when the fixture's initial superuser has a different name.
 When a configuration catalog gains a key, regenerate its reports before the
 full gate. The Node suite checks catalog and generated-summary consistency.
+During a rebase, merge the catalog against the live source reads. Preserve
+current CI inputs and remove keys whose last reader was deleted. Update dynamic
+boundary line locations only when the source file, expression and callsite count
+are unchanged; keep their approval metadata. Regenerate the reports from source
+instead of selecting one side of a generated-file conflict.
 
 The compose migration fixture grants its public schema to the `callcaster`
 role. Create disposable Postgres with that role, or create it inside the owned
@@ -880,6 +885,10 @@ After failed cleanup, test an external call close before retrying cleanup.
 Remove only the helper's error guards; preserve existing listeners.
 A direct unexpected SDK exception can still stop public `destroy`; report that
 incomplete result and stop replacement registration instead of claiming closure.
+
+Do not overlap a source-hash proof with the vendor distribution check or other
+generated-file writers. Run focused proofs after those writers stop, then
+require matching source hashes; a passing test report alone is insufficient.
 
 For long-running checks, keep head hashes, completed reports and ownership
 metadata in a persistent task artifact folder. A process handle or temporary

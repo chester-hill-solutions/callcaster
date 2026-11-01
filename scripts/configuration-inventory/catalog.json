@@ -982,6 +982,42 @@
       "classification": "non-secret-config",
       "owner": "app",
       "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "FLY_APP_NAME",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.fly_app_name"
+    },
+    {
+      "key": "K_SERVICE",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.k_service"
+    },
+    {
+      "key": "RAILWAY_DEPLOYMENT_ID",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.railway_deployment_id"
+    },
+    {
+      "key": "RAILWAY_ENVIRONMENT",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.railway_environment"
+    },
+    {
+      "key": "RAILWAY_SERVICE_ID",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.railway_service_id"
+    },
+    {
+      "key": "VERCEL",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.vercel"
     }
   ],
   "dynamicBoundaries": [
@@ -1131,7 +1167,7 @@
     },
     {
       "sourceFile": "scripts/local/sync-calling-dev.mjs",
-      "line": 200,
+      "line": 201,
       "expression": "process.env[name]",
       "status": "approved",
       "owner": "scripts",
@@ -1161,7 +1197,7 @@
     },
     {
       "sourceFile": "scripts/twilio-resource-prune-report.mjs",
-      "line": 274,
+      "line": 187,
       "expression": "process.env[name]",
       "status": "approved",
       "owner": "scripts",
