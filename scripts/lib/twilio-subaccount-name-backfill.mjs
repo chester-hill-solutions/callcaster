@@ -43,11 +43,19 @@ export function createOwnershipReader(databases) {
                        ELSE twilio_data::jsonb END AS account
               FROM workspace w
             )
-            SELECT id, name, archived_at, archive_supported,
-                   COALESCE(NULLIF(trim(account->>'sid'), ''),
-                            NULLIF(trim(account->>'account_sid'), ''),
-                            NULLIF(trim(account->>'accountSid'), '')) AS account_sid
-            FROM owners ORDER BY id
+            , ownership AS (
+              SELECT id, name, archived_at, archive_supported,
+                     ARRAY(SELECT DISTINCT sid FROM unnest(ARRAY[
+                       NULLIF(trim(account->>'sid'), ''),
+                       NULLIF(trim(account->>'account_sid'), ''),
+                       NULLIF(trim(account->>'accountSid'), '')
+                     ]) AS refs(sid) WHERE sid IS NOT NULL ORDER BY sid) AS account_sids
+              FROM owners
+            )
+            SELECT id, name, archived_at, archive_supported, account_sids,
+                   CASE WHEN cardinality(account_sids) = 1 THEN account_sids[1]
+                        ELSE NULL END AS account_sid
+            FROM ownership ORDER BY id
             `;
               return { environment, identity, workspaces };
             });
@@ -87,6 +95,14 @@ function sourceBindings(sources, environment) {
     .sort((a, b) => a.environment.localeCompare(b.environment));
 }
 
+function accountReferences(workspace) {
+  return new Set(
+    [workspace.account_sid, ...(workspace.account_sids ?? [])]
+      .filter((sid) => typeof sid === "string" && sid.trim())
+      .map((sid) => sid.trim()),
+  );
+}
+
 /** Never infer ownership from a name alone: the database SID must also match. */
 export function buildNameBackfillPlan({
   environment,
@@ -105,7 +121,8 @@ export function buildNameBackfillPlan({
   const target = sources.find((s) => s.environment === environment).workspaces;
   const entries = target
     .map((workspace) => {
-      const sid = workspace.account_sid;
+      const references = accountReferences(workspace);
+      const sid = references.size === 1 ? [...references][0] : null;
       const account = bySid.get(sid);
       const before = account?.friendlyName ?? null;
       // Accounts have a 64-character limit. Keep the identifying suffix intact.
@@ -114,20 +131,21 @@ export function buildNameBackfillPlan({
         UUID.test(before ?? "") &&
         before.toLowerCase() === workspace.id.toLowerCase();
       let reason;
-      if (!UUID.test(workspace.id) || !ACCOUNT_SID.test(sid ?? ""))
+      if (references.size > 1) reason = "Conflicting stored account IDs";
+      else if (!UUID.test(workspace.id) || !ACCOUNT_SID.test(sid ?? ""))
         reason = "Missing valid workspace or account ID";
       else if (sid === parent.sid) reason = "Parent account is protected";
       else if (workspace.archive_supported !== true)
         reason = "Workspace archive state is unavailable";
       else if (workspace.archived_at)
         reason = "Archived workspace is protected";
-      else if (target.filter((w) => w.account_sid === sid).length !== 1)
+      else if (target.filter((w) => accountReferences(w).has(sid)).length !== 1)
         reason = "Multiple target workspaces reference this account";
       else if (
         sources.some(
           (s) =>
             s.environment !== environment &&
-            s.workspaces.some((w) => w.account_sid === sid),
+            s.workspaces.some((w) => accountReferences(w).has(sid)),
         )
       )
         reason = "Another environment references this account";

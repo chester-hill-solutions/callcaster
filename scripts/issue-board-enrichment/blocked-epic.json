@@ -848,7 +848,7 @@
     "existingTests": [
       "cull-report.mjs handles 555-number test credentials, the E911 VERIFY line, cross-workspace-only blockers, and compares dates rather than strings",
       "test/cull-report-policy.test.ts confirms the three recorded workspace IDs and proves 2608141501 survives the phone-name cull rule",
-      "80 focused Node cases and 4 real-PostgreSQL cases pass. Isolated disabled ownership, pagination and name-limit guards fail their relevant tests while controls pass."
+      "83 focused Node cases and 5 real-PostgreSQL cases pass. Isolated disabled ownership, pagination and name-limit guards fail their relevant tests while controls pass."
     ],
     "missingTests": [
       "Reviewed operational apply, receipt verification and release acceptance remain for child #3102. The parent retention/repeat policy is still unrecorded."

@@ -15,17 +15,18 @@
       "docs/twilio-subaccount-name-backfill.md"
     ],
     "existingTests": [
-      "80 focused Node tests pass, including 27 new SDK/CLI cases and the existing naming, keep-list and prune-policy controls.",
-      "4 PostgreSQL tests cover stored object/JSON-text credentials, legacy reference schemas, archived owners and database URL aliases.",
-      "Disabling cross-environment protection fails three cases with 24 controls passing; a capped inventory or wrong name limit fails its own case with 26 controls passing.",
-      "A live GET-only plan found 7 eligible dev names, 1 already correct and 30 protected records; all three app/database bindings were verified."
+      "83 focused Node tests pass, including 30 new SDK/CLI cases and the existing naming, keep-list and prune-policy controls.",
+      "5 PostgreSQL tests cover stored object/JSON-text credentials, legacy reference schemas, archived owners and database URL aliases.",
+      "Disabling cross-environment protection fails four cases with 26 controls passing; a capped inventory or wrong name limit fails its own case with 29 controls passing.",
+      "A live GET-only plan found 7 eligible dev names, 1 already correct and 30 protected records; all three app/database bindings were verified.",
+      "The three hidden/conflicting SID cases fail before the review fix while 27 controls pass. The fixed reader preserves every recognized SID in both stored JSON forms and refuses conflicting target IDs."
     ],
     "missingTests": [
       "Final exact-head local and GitHub checks, operational receipt and release acceptance."
     ],
     "acceptanceCriteria": [
       "Dry-run makes no provider or database writes.",
-      "Only exact, active, unshared target owners with legacy UUID labels can be renamed.",
+      "Only exact, active, unshared target owners with consistent SID fields and legacy UUID labels can be renamed; every recognized cross-environment reference is protected.",
       "Reviewed apply rechecks ownership, preserves custom names and account status, and is idempotent.",
       "Names retain their ID suffix within the Account API limit.",
       "Save the approved dev-only operation receipts and GET-only verification; do not override protected conflicts."

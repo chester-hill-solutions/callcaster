@@ -7,9 +7,16 @@ import {
 } from "../../scripts/lib/twilio-subaccount-name-backfill.mjs";
 
 const databaseUrl = process.env.INTEGRATION_DB_URL ?? process.env.DATABASE_URL;
-const ids = [randomUUID(), randomUUID(), randomUUID()];
+const ids = [
+  randomUUID(),
+  randomUUID(),
+  randomUUID(),
+  randomUUID(),
+  randomUUID(),
+];
 const PARENT = "ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const CHILD = "ACbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const OTHER = "ACcccccccccccccccccccccccccccccccc";
 const legacySchema = "backfill_" + randomUUID().replaceAll("-", "");
 const marker = "fixture-secret-must-not-leave-query";
 let sql: ReturnType<typeof postgres>;
@@ -34,9 +41,11 @@ describe.skipIf(!databaseUrl)(
             ? { sid: CHILD }
             : index === 1
               ? { sid: " ", account_sid: CHILD }
-              : { accountSid: CHILD };
+              : index === 2
+                ? { accountSid: CHILD }
+                : { sid: OTHER, account_sid: CHILD };
         await sql`insert into workspace (id, name, twilio_data) values
-        (${id}, 'Owned backfill fixture', ${index === 1 ? JSON.stringify({ ...credentials, authToken: marker }) : sql.json({ ...credentials, authToken: marker })})`;
+        (${id}, 'Owned backfill fixture', ${index === 1 || index === 4 ? JSON.stringify({ ...credentials, authToken: marker }) : sql.json({ ...credentials, authToken: marker })})`;
       }
       await sql`update workspace set archived_at = now() where id = ${ids[1]}`;
     });
@@ -54,7 +63,7 @@ describe.skipIf(!databaseUrl)(
       try {
         const [source] = await reader.read();
         const owned = source.workspaces.filter((w: { id: string }) =>
-          ids.includes(w.id),
+          ids.slice(0, 3).includes(w.id),
         );
         expect(owned).toHaveLength(3);
         expect(
@@ -62,6 +71,7 @@ describe.skipIf(!databaseUrl)(
         ).toEqual([CHILD, CHILD, CHILD]);
         expect(Object.keys(owned[0]).sort()).toEqual([
           "account_sid",
+          "account_sids",
           "archive_supported",
           "archived_at",
           "id",
@@ -72,6 +82,30 @@ describe.skipIf(!databaseUrl)(
         expect(JSON.stringify(source)).not.toContain(
           new URL(requiredDatabaseUrl()).hostname,
         );
+      } finally {
+        await reader.close();
+      }
+    });
+
+    it("preserves conflicting SID fields in object and JSON-text storage", async () => {
+      const reader = createOwnershipReader([
+        { environment: "production", url: requiredDatabaseUrl() },
+      ]);
+      try {
+        const [source] = await reader.read();
+        const conflicting = source.workspaces.filter((w: { id: string }) =>
+          ids.slice(3).includes(w.id),
+        );
+        expect(conflicting).toHaveLength(2);
+        expect(
+          conflicting.map((w: { account_sid: string | null }) => w.account_sid),
+        ).toEqual([null, null]);
+        expect(
+          conflicting.map((w: { account_sids: string[] }) => w.account_sids),
+        ).toEqual([
+          [CHILD, OTHER],
+          [CHILD, OTHER],
+        ]);
       } finally {
         await reader.close();
       }
@@ -105,6 +139,7 @@ describe.skipIf(!databaseUrl)(
             id: ids[0],
             name: "Legacy owner",
             account_sid: CHILD,
+            account_sids: [CHILD],
             archived_at: null,
             archive_supported: false,
           },

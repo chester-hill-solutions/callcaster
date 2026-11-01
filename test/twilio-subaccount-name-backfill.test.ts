@@ -24,10 +24,12 @@ function required<T>(value: T | undefined): T {
 }
 
 function fixture() {
+  const accountSids: string[] = [];
   const workspace = {
     id: WS,
     name: "Civic Action",
     account_sid: CHILD,
+    account_sids: accountSids,
     archived_at: null,
     archive_supported: true,
   };
@@ -198,6 +200,32 @@ describe("reviewed Twilio subaccount name backfill", () => {
       "a QA reference",
       (f: ReturnType<typeof fixture>) =>
         f.sources[1].workspaces.push({ ...f.workspace, id: WS2 }),
+    ],
+    [
+      "a hidden production SID reference",
+      (f: ReturnType<typeof fixture>) =>
+        f.sources[2].workspaces.push({
+          ...f.workspace,
+          id: WS2,
+          account_sid: OTHER,
+          account_sids: [OTHER, CHILD],
+        }),
+    ],
+    [
+      "conflicting target SID fields",
+      (f: ReturnType<typeof fixture>) => {
+        f.workspace.account_sids = [CHILD, OTHER];
+      },
+    ],
+    [
+      "a hidden duplicate owner",
+      (f: ReturnType<typeof fixture>) =>
+        f.sources[0].workspaces.push({
+          ...f.workspace,
+          id: WS2,
+          account_sid: OTHER,
+          account_sids: [OTHER, CHILD],
+        }),
     ],
     [
       "two workspace owners",

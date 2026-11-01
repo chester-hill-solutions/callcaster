@@ -52,8 +52,8 @@ account, database bindings and every proposed `before` and `after` name.
 A rename requires all of these conditions:
 
 - The target source exposes archive state; the workspace is not archived and has a usable name.
-- The stored account SID belongs to exactly one workspace in the target source.
-- No other supplied environment references that SID, including archived rows.
+- All recognized SID fields agree on one account, which belongs to exactly one workspace in the target source.
+- No other supplied environment references that SID in any recognized field, including archived or conflicting legacy rows.
 - The provider account is active and belongs to the selected parent.
 - Its current label is the workspace's full UUID. A custom label is protected.
 
