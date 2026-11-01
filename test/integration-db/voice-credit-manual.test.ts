@@ -653,6 +653,54 @@ describe("manual voice funding and ownership (#2879)", () => {
       expect(await state()).toMatchObject({ credits: 96, holds: 0, ledger: 1 });
     } finally { await pending?.catch(() => undefined); await blocker.end(); }
   });
+  test("a legacy live callback cannot enter after funded ownership was checked", async () => {
+    const sibling = await addHouseholdSibling();
+    await send(); const child = await connectRecipient(); await billWithoutQueueEffects(child);
+    const parent = callSid(), later = callSid();
+    await billing.processCallStatusWebhook({ sid: parent, account_sid: accountSid, user_id: actor, campaign_id: campaignId,
+      contact_id: Number(sibling.contact), queue_id: Number(sibling.queue), status: 'completed', duration: '0' }, { workspaceId, skipBilling: true });
+    const { findVoiceReservationForCall } = await import("@/server/voice-bridge-reservation.server");
+    const { dequeueFundedVoiceAttempt } = await import("@/server/voice-attempt-queue.server");
+    const saved = await findVoiceReservationForCall(workspaceId, child.sid);
+    const url = process.env.INTEGRATION_DB_URL ?? process.env.DATABASE_URL;
+    if (!saved || !url) throw new Error('Owned reservation and database required');
+    const blocker = postgres(url, { max: 1 }), fault = `funded_callback_barrier_${randomUUID().replaceAll('-', '')}`;
+    let pending: Promise<void> | undefined, callback: ReturnType<typeof billing.processCallStatusWebhook> | undefined;
+    let callbackWaited = false, callbackDone = false;
+    try {
+      await sql.unsafe(`create function public.${fault}() returns trigger language plpgsql as $$ begin perform pg_advisory_xact_lock(hashtextextended('${fault}',0)); return new; end $$`);
+      await sql.unsafe(`create trigger ${fault} before update on public.campaign_queue for each row when (new.id = ${queueId}) execute function public.${fault}()`);
+      const [{ pid }] = await blocker`select pg_backend_pid() pid`;
+      await blocker.begin(async tx => {
+        await tx`select pg_advisory_xact_lock(hashtextextended(${fault},0))`;
+        pending = dequeueFundedVoiceAttempt(saved);
+        let completionPid: number | undefined;
+        for (const deadline = Date.now() + 3000; Date.now() < deadline;) {
+          const [row] = await sql`select pid from pg_stat_activity where datname = current_database() and ${pid} = any(pg_blocking_pids(pid))`;
+          if (row) { completionPid = Number(row.pid); break; }
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        if (!completionPid) throw new Error('Funded completion did not reach its write barrier');
+        callback = billing.processCallStatusWebhook({ sid: later, parent_call_sid: parent, account_sid: accountSid,
+          status: 'in-progress', duration: '0' }, { skipBilling: true }).finally(() => { callbackDone = true; });
+        void callback.catch(() => undefined);
+        for (const deadline = Date.now() + 3000; Date.now() < deadline && !callbackDone;) {
+          const [row] = await sql`select count(*)::int waiting from pg_stat_activity where datname = current_database() and ${completionPid} = any(pg_blocking_pids(pid))`;
+          if (row.waiting > 0) { callbackWaited = true; break; }
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      });
+      await pending; await callback;
+      expect(callbackWaited).toBe(true);
+      expect((await sql`select status, campaign_id, contact_id from public.call where sid = ${later}`)[0]).toEqual({
+        status: 'in-progress', campaign_id: String(campaignId), contact_id: sibling.contact });
+      expect(await state()).toMatchObject({ credits: 96, holds: 0, ledger: 1 });
+    } finally {
+      await pending?.catch(() => undefined); await callback?.catch(() => undefined);
+      await sql.unsafe(`drop trigger if exists ${fault} on public.campaign_queue`);
+      await sql.unsafe(`drop function if exists public.${fault}()`); await blocker.end();
+    }
+  });
   test.each(["unknown insertion", "new outreach"])("funded completion preserves household work with %s", async changed => {
     const sibling = await addHouseholdSibling();
     await send(); const child = await connectRecipient(); await billWithoutQueueEffects(child);

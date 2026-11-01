@@ -110,7 +110,9 @@ workspace fence and ordered queue locks, a reassigned primary or a member with
 a live customer or later outreach stays queued. Household rows also need trusted
 insertion or explicit-redial time before the original admission. An unknown
 historical sibling stays queued. Billing and call results retain their existing
-owners.
+owners. Known-workspace legacy Call receipts take the same workspace fence for
+their guarded update or insert. This keeps a new live customer outside the
+completion check/write interval; event publication and billing follow commit.
 
 Legacy completion callbacks use the saved Call and outreach attempt to identify
 the original queue work. A saved parent can supply a legacy child leg's queue

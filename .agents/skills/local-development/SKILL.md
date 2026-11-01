@@ -723,6 +723,10 @@ Funded queue completion must use the saved reservation actor, never today's
 assignee. Prove assignment release and a canonical claim by another actor,
 including a real workspace-lock wait. Exclude only saved provider/setup/audio
 legs when checking live customers; a later outreach still owns newer work.
+Legacy Call persistence must join the workspace fence used by its eligibility
+readers. Prove the gap with an owned write barrier and a real parent-derived
+callback. Keep that transaction short; events, billing and provider work follow
+commit, and existing transaction-bound tenant helpers own the row writes.
 
 For queue generation tests, use explicit requeue through
 `enqueueContactsForCampaign(..., { requeue: true })`. Assignment release keeps

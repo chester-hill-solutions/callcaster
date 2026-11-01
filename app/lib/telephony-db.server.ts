@@ -5,6 +5,7 @@ import {
   campaign as campaignTable,
   outreach_attempt as outreachAttemptTable,
   script as scriptTable,
+  workspace as workspaceTable,
   workspace_voice_reservation as voiceReservationTable,
 } from "@/db/schema";
 import { db } from "@/server/db";
@@ -400,8 +401,16 @@ export async function upsertCallBySid(
 ): Promise<CallRow | null> {
   const existingWorkspace = values.workspace ?? null;
   if (existingWorkspace) {
-    const updated = await updateCallBySid(existingWorkspace, values.sid, values as Partial<CallRow>);
-    if (updated) return updated;
+    return db.transaction(async tx => {
+      // Legacy callbacks can introduce a live customer. Serialize that receipt
+      // with funded admission and queue completion before either sees it.
+      await tx.select({ id: workspaceTable.id }).from(workspaceTable)
+        .where(eq(workspaceTable.id, existingWorkspace)).for("no key update");
+      const tdb = createTenantDb(existingWorkspace, tx);
+      const updated = await updateCallBySid(existingWorkspace, values.sid, values as Partial<CallRow>, { tdb });
+      if (updated) return updated;
+      return insertCallForWorkspace(existingWorkspace, values, { tdb });
+    });
   }
 
   const [row] = await db
