@@ -654,7 +654,7 @@
   {
     "issueNumber": 2828,
     "verdict": "fix-now",
-    "summary": "Complete persona sign-in repair in the preserved #3067 branch. Additional local setup features stay parked.",
+    "summary": "Complete persona sign-in repair in PR #3104 on the preserved #3067 branch. Additional local setup features stay parked.",
     "currentBehavior": "Dev already has resolved owner/member profiles and task access checks. Profile reconciliation creates user and membership rows but no password credential account. The active candidate repairs that account and closes both browser contexts on failure. The earlier mock checkout and Twilio resource setup additions remain saved separately; they are not part of this PR.",
     "rootCause": "A saved Better Auth user and workspace membership are insufficient for password sign-in. The credential provider also needs a hashed password row in auth_account. The original broad candidate additionally changed local checkout defaults and caused 38 Stripe database failures before browser tests started; that checkout feature is now parked.",
     "resolution": "Finish the single persona-focused PR with real app sign-in, rerun/repair, collision rollback and hosted-runtime controls. Request the resolved password only after the local guard. Keep the approved recipient adapter and Stripe test funding unchanged. Require local and exact-head GitHub checks; run real SMS only on a separate explicit operator request. Stage 2 and voice remain behind Stage 1 acceptance.",
@@ -665,7 +665,7 @@
       "e2e/sim/sms-send.sim.spec.ts",
       "test/integration-db/sim-persona-signin.test.ts"
     ],
-    "trackerRecommendation": "Selected snapshot, 2026-11-01 UTC: native Task assigned @sai-sy; native Priority, Effort and Enviornment are unset. Actual Project Status In progress was read in the authenticated issue sidebar. Parent #2815 and native blocker #2827 remain open; profile/status code is already merged in #2974. Existing Development link to #3067 is preserved. Do not create another SIM implementation or mark real SMS acceptance complete.",
+    "trackerRecommendation": "Selected snapshot, 2026-11-01 UTC: native Task assigned @sai-sy; native Priority, Effort and Enviornment are unset. Actual Project Status In progress was read in the authenticated issue sidebar. Parent #2815 and native blocker #2827 remain open; profile/status code is already merged in #2974. The original Development link to closed #3067 is preserved; active draft #3104 uses the same branch and links this task. Do not create another SIM implementation or mark real SMS acceptance complete.",
     "existingTests": [
       "17 real-PostgreSQL cases pass through actual app sign-in, cookie session reads, stable IDs, missing-account repair, resolved-password changes, foreign-marker protection, collision rollback and hosted-runtime refusal before password access. The 60 existing Stripe database cases also pass on the narrowed source before the final collision cases were added. Removing credential persistence makes both intended persona sign-ins fail; 11 controls remain passing. No provider traffic or deployed data changes were used."
     ],
