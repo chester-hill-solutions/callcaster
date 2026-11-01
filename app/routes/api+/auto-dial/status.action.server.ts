@@ -45,6 +45,7 @@ import { bindPredictiveConferenceEvent, claimFirstPredictiveRecipient } from "@/
 import { createOriginalVoiceAccountClient } from "@/lib/voice-original-account.server";
 import { handleBoundVoiceAudioParticipant } from "@/lib/voice-audio-participant.server";
 import { isRetiredVoiceAudioSource } from "@/server/voice-audio-classification.server";
+import { requestDialerStopForAgentHangup } from "@/server/voice-dialer-stop.server";
 import { normalizeVerifiedVoiceParams } from "@/lib/twilio/verified-voice-params";
 
 type TwilioClient = Twilio.Twilio;
@@ -193,7 +194,10 @@ async function handleFundedConferenceEvent(
         await handlePredictiveParticipantJoin(event, context.call);
       } else if (isParticipantLeave(event)) {
         const owned = context.setup || await handlePredictiveParticipantLeave(event, context.call);
-        if (owned && isParticipantHangup(event)) await handleConferenceParticipantHangup(event, context.call, twilio);
+        if (owned && isParticipantHangup(event)) {
+          if (context.setup && !await requestDialerStopForAgentHangup(context.reservation, context.call.sid)) return;
+          await handleConferenceParticipantHangup(event, context.call, twilio);
+        }
       }
 }
 

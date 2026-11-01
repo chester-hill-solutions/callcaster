@@ -1,7 +1,8 @@
 import { and, eq, isNotNull, or } from "drizzle-orm";
-import { call, campaign, handset_session, user, workspace, workspace_voice_reservation as reservations } from "@/db/schema";
+import { call, campaign, handset_session, workspace, workspace_voice_reservation as reservations } from "@/db/schema";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
-import { getUserRole, WORKSPACE_MEMBERSHIP_ROLES } from "@/lib/workspace-membership.server";
+import { lockVoiceWorkspaceMember as lockVoiceAudioMember } from "./voice-workspace-member.server";
+export { lockVoiceWorkspaceMember as lockVoiceAudioMember } from "./voice-workspace-member.server";
 import { checkSchedule } from "@/lib/database/campaign.server";
 import { getHandsetNumberForWorkspace } from "@/lib/database/workspace.server";
 import { resolveCallerIdUsability } from "@/lib/caller-id-usability.server";
@@ -15,22 +16,12 @@ import { predictiveConferenceCallbackUrl } from "./predictive-conference-reserva
 import type { VoiceReservation } from "./voice-credit-reservation.server";
 import { hasActiveVoiceAudioCustomer, hasFundedAgentVoice } from "./voice-audio-classification.server";
 import { readManualVoiceAudioTopology } from "./voice-audio-manual-topology.server";
-
-export async function lockVoiceAudioMember(tx: CreditTransaction, args: Pick<VoiceAudioConnectionInput, "workspaceId" | "userId">, allowDisabledWorkspace = false) {
-  const [owner] = await tx.select().from(workspace).where(eq(workspace.id, args.workspaceId)).for("no key update");
-  if (!owner || owner.archived_at) return voiceAudioRefusal("workspace_not_found");
-  if (owner.disabled && !allowDisabledWorkspace) return voiceAudioRefusal("workspace_unavailable");
-  const tdb = createTenantDb(args.workspaceId, tx);
-  const membership = await getUserRole({ user: { id: args.userId }, workspaceId: args.workspaceId, tdb });
-  const [actor] = await tx.select({ access: user.access_level, numbers: user.verified_audio_numbers }).from(user).where(eq(user.id, args.userId));
-  if (!actor || actor.access === "disabled" || !membership || !WORKSPACE_MEMBERSHIP_ROLES.some((r) => r === membership.role))
-    return voiceAudioRefusal("agent_not_found");
-  return { ok: true as const, owner, actor, tdb };
-}
+import { hasPendingDialerStop } from "./voice-dialer-intent.server";
 
 export async function lockVoiceAudioActor(tx: CreditTransaction, args: Pick<VoiceAudioConnectionInput, "workspaceId" | "userId">) {
   const member = await lockVoiceAudioMember(tx, args);
   if (!member.ok) return member;
+  if (await hasPendingDialerStop(tx, args.workspaceId, args.userId)) return voiceAudioRefusal("connection_pending");
   const credentials = readTwilioWorkspaceCredentials(member.owner.twilio_data);
   if (!credentials) return voiceAudioRefusal("caller_id_unavailable");
   return { ...member, accountSid: credentials.sid };

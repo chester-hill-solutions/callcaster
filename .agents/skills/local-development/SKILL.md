@@ -291,6 +291,17 @@ retain known terminal intents so a later read cannot revive them.
 Admission fences block new operations. Keep an explicit Check for an already
 submitted Start on its captured request even when the server reports busy.
 
+For provider Stop cleanup, persist observed closure through the canonical
+surviving Call context. Original reservation campaign, queue and outreach IDs
+can point at deleted data; copying them into an upsert can restore invalid
+foreign keys. Keep final duration and debit ownership in normal billing.
+Bound cleanup batches and retain pending work after a partial provider failure.
+Test a nonterminal callback with missing or zero duration before Stop, then run
+recovery before the final receipt. Clear unproved Call duration fields when
+recording Stop closure; retain the reservation's confirmed final duration.
+An empty browser journal is not proof of idle before current discovery finishes.
+Keep in-flight Stop requests alive on unload and retire refused nonces after acceptance.
+
 For manual customer recovery, retire automatic discovery in the local command
 itself. Next can run while the FSM is already idle, so an effect that waits for
 a state change is not a command fence. Restore the exact editable outreach

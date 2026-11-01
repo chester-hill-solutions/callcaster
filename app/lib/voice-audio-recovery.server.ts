@@ -42,7 +42,7 @@ export async function recoverVoiceAudioConnectionCall(row: VoiceAudioConnection,
   return physical.sid;
 }
 
-async function reconcileAudio(row: VoiceAudioConnection): Promise<"closed" | "expired" | "pending"> {
+export async function reconcileAudio(row: VoiceAudioConnection): Promise<"closed" | "expired" | "pending"> {
   if (hasUnfinishedVoiceAudioConferenceStop(row)) {
     const stopped = await attemptVoiceAudioConferenceStop(row);
     if (!stopped) return "pending";

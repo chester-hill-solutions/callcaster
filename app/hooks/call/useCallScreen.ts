@@ -10,7 +10,6 @@ import {
 import { toast } from "sonner";
 import {
   handleCall,
-  handleConference,
   releaseCallSession,
 } from "@/lib/callscreenActions";
 import { useWorkspaceRealtime, useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
@@ -251,7 +250,8 @@ export function useCallScreen() {
   }, [hasAccess, navigate, workspaceId]);
 
   const { begin, conference, setConference, isLoading: isStartingConference, disabledReason: startDisabledReason,
-    awaitingReceipt: awaitingStartReceipt, pendingStartIntentId } = useStartConferenceAndDial(
+    awaitingReceipt: awaitingStartReceipt, pendingStartIntentId, stop: handleConferenceEnd,
+    stopPending: dialerStopPending, isStopping: isStoppingDialer, error: dialerError, hasSession: hasDialerSession } = useStartConferenceAndDial(
     {
       userId: user.id,
       campaignId: campaign?.id?.toString() || "",
@@ -261,6 +261,8 @@ export function useCallScreen() {
       audioSource: phoneSource,
       showError: showStartError,
       recovery: predictiveRecovery,
+      dialerRecovery: campaign?.dial_type === "predictive" ? agentAudio.state.dialerRecovery : null,
+      currentVerified: agentAudio.state.currentVerified && !agentAudio.state.restoring,
     },
   );
 
@@ -360,7 +362,8 @@ export function useCallScreen() {
   const callSid = customerCallSid;
   const logicalDuration = useCallDuration(displayState);
   const liveCustomer = displayState === "dialing" || displayState === "connected";
-  const pendingCallRequest = Boolean(pendingStartIntentId) || manualAudioDial.state.pending;
+  const dialerNeedsStop = dialerStopPending || hasDialerSession && !conference && !awaitingStartReceipt;
+  const pendingCallRequest = Boolean(pendingStartIntentId) || dialerNeedsStop || manualAudioDial.state.pending;
   const customerRecoveryPending = agentAudio.state.customerPending && !callSid && !conference && !pendingCallRequest;
   const audioStartDisabledReason = agentAudioStartReason({ joined: hasJoined, ready: agentAudio.ready,
     pendingCustomer: agentAudio.state.customerPending || pendingCallRequest || Boolean(manualAudioDial.state.error),
@@ -418,7 +421,6 @@ export function useCallScreen() {
     if (args.audioSource) void manualAudioDial.resource.begin(args);
     else startLegacyCall(args);
   };
-  const { handleConferenceEnd } = handleConference({ begin });
 
   const queueFlow = useCampaignQueueFlow({
     campaign: campaign ?? null,
@@ -611,11 +613,15 @@ export function useCallScreen() {
 
   const callControls = {
     awaitingCustomerReceipt: (manualAudioDial.state.pending && !callSid) || Boolean(pendingStartIntentId) || customerRecoveryPending,
-    manualDialError: manualAudioDial.state.error ?? (awaitingStartReceipt ? "The dialer request is not confirmed. Check this request before starting another session."
-      : customerRecoveryPending ? "An existing call needs confirmation. Check the call before dialing another contact." : manualSubject.error ?? recoveredSubject.error),
-    isCheckingManualDial: manualAudioDial.state.sending || isStartingConference,
+    manualDialError: manualAudioDial.state.error ?? (dialerStopPending ? dialerError ?? "Stop is pending. Stay on this screen until it is confirmed."
+      : dialerError ?? (awaitingStartReceipt ? "The dialer request is not confirmed. Check this request before starting another session."
+      : customerRecoveryPending ? "An existing call needs confirmation. Check the call before dialing another contact." : manualSubject.error ?? recoveredSubject.error)),
+    dialerStopPending: dialerNeedsStop,
+    hasDialerSession,
+    isCheckingManualDial: manualAudioDial.state.sending || isStartingConference || isStoppingDialer,
     onCheckManualDial: () => {
-      if (manualAudioDial.state.pending) void manualAudioDial.resource.retry(beginDial);
+      if (dialerNeedsStop) void handleConferenceEnd();
+      else if (manualAudioDial.state.pending) void manualAudioDial.resource.retry(beginDial);
       else if (awaitingStartReceipt) void begin();
       else void agentAudio.resource.refresh();
     },

@@ -32,13 +32,14 @@ export function normalizeProviderStatus(providerStatus: string | null | undefine
 }
 
 /** Terminal statuses that should trigger HANG_UP or FAIL in the call state machine. */
-const TERMINAL_STATUSES = new Set<CallStatusEnum>([
+export const TERMINAL_CALL_STATUSES: readonly CallStatusEnum[] = [
   "completed",
   "failed",
   "no-answer",
   "busy",
   "canceled",
-]);
+];
+const TERMINAL_STATUSES = new Set<CallStatusEnum>(TERMINAL_CALL_STATUSES);
 
 /** Statuses that mean "connected" for the UI state machine. */
 const CONNECTED_STATUSES = new Set<CallStatusEnum>(["in-progress"]);

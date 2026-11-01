@@ -78,7 +78,7 @@ async function settleSavedVoiceReservation(reservation: VoiceReservation) {
   return true;
 }
 
-async function reconcileVoiceReservation(reservation: VoiceReservation) {
+export async function reconcileVoiceReservation(reservation: VoiceReservation) {
   if (!reservation.send_started_at && reservation.state === "reserved") {
     return await releaseUnsentVoiceReservation(reservation, "not_sent") ? "released" : "pending";
   }

@@ -38,6 +38,10 @@ let dialer: typeof import("@/lib/auto-dial.server");
 let start: typeof import("@/lib/auto-dial-start.server");
 let core: typeof import("@/server/voice-credit-reservation.server");
 const sid = () => `CA${randomUUID().replaceAll("-", "")}`;
+vi.mock("@/lib/auth.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/auth.server")>(),
+  getSession: async () => ({ user: { id: actor }, headers: new Headers() }),
+}));
 
 describe("predictive and conference funding (#2879)", () => {
   beforeAll(async () => {
@@ -80,6 +84,7 @@ describe("predictive and conference funding (#2879)", () => {
     await sql`delete from public.job where workspace_id = ${workspaceId}::uuid`;
     await sql`delete from public.transaction_history where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.call where workspace = ${workspaceId}::uuid`;
+    await sql`delete from public.workspace_voice_dialer_intent where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.outreach_attempt where workspace = ${workspaceId}::uuid`;
     await sql`update public.workspace set credits = 100 where id = ${workspaceId}::uuid`;
@@ -105,6 +110,46 @@ describe("predictive and conference funding (#2879)", () => {
   });
   const turn = () => dialer.runAutoDialerTurn({ user_id: actor, campaign_id: campaignId, workspace_id: workspaceId, conference_id: room });
   const setup = (dialIntentId?: string) => start.startAutoDialConference({ userId: actor, campaignId, workspaceId, callerId: from, selectedDevice: "computer", dialIntentId });
+  test.each([false, true])("a captured Stop blocks only its delayed Start, later new intent: %s", async freshIntent => {
+    const stoppedIntent = randomUUID(), conferenceName = `${actor}~${stoppedIntent}`;
+    provider.conferenceList.mockResolvedValue([]);
+    const { action } = await import("@/routes/api+/auto-dial/end.action.server");
+    const before = await state();
+    const args = { ...routeArgs(new Request("https://predictive-credit.example.test/api/auto-dial/end", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspaceId, conferenceName, dial_intent_id: stoppedIntent, campaignId }),
+    })) };
+    const stopped = await asRouteResponse(action(args));
+    expect(stopped.status).toBe(200);
+    await expect(stopped.json()).resolves.toMatchObject({ success: true });
+    expect(await state()).toEqual(before); expect(provider.create).not.toHaveBeenCalled();
+    const later = await setup(freshIntent ? randomUUID() : stoppedIntent);
+    if (freshIntent) {
+      expect(later.ok).toBe(true); expect(provider.create).toHaveBeenCalledTimes(1);
+    } else {
+      expect(provider.create).not.toHaveBeenCalled(); expect(later.ok).toBe(false);
+    }
+  });
+  test("a captured browser Stop ends its accepted setup and returns the uncalled contact before a new Start", async () => {
+    const intent = randomUUID(), started = await setup(intent); expect(started.ok).toBe(true);
+    const physical = await provider.create.mock.results[0].value;
+    provider.fetch.mockResolvedValue(physical); provider.conferenceList.mockResolvedValue([]);
+    provider.update.mockImplementation(async (id: string, values: { status: string }) => {
+      expect(id).toBe(physical.sid); physical.status = values.status; physical.endTime = new Date(); return physical;
+    });
+    const { action } = await import("@/routes/api+/auto-dial/end.action.server");
+    const args = { ...routeArgs(new Request("https://predictive-credit.example.test/api/auto-dial/end", { method: "POST",
+      headers: { "Content-Type": "application/json", "X-Callcaster-Audio-Actor": actor },
+      body: JSON.stringify({ workspaceId, campaignId, dial_intent_id: intent }),
+    })) };
+    const response = await asRouteResponse(action(args)); expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ stop_state: "stopped", intent_id: intent });
+    expect(physical.status).toBe("canceled"); expect(await state()).toEqual({ credits: 100, holds: 0, ledger: 0 });
+    const [old] = await sql`select queue_id from public.workspace_voice_reservation where setup_sid = ${physical.sid}`;
+    const [queue] = await sql`select queue_state, assigned_to_user_id from public.campaign_queue where id = ${old.queue_id}`;
+    expect(queue).toMatchObject({ queue_state: "queued", assigned_to_user_id: null });
+    expect(await setup(randomUUID())).toMatchObject({ ok: true }); expect(provider.create).toHaveBeenCalledTimes(2);
+  });
   async function state() {
     const [row] = await sql`select credits,
       (select count(*)::int from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid and state in ('reserved','creating','active')) holds,
@@ -141,6 +186,34 @@ describe("predictive and conference funding (#2879)", () => {
     return { AccountSid: accountSid, CallSid: agent.setupSid, ConferenceSid: "CF00000000000000000000000000005879",
       FriendlyName: agent.conferenceName, StatusCallbackEvent: "participant-join", Timestamp: new Date().toISOString() };
   }
+  test("a genuine browser-agent hangup saves Stop before failed room I/O and blocks late sends", async () => {
+    const agent = await connectAgent();
+    provider.conferenceList.mockImplementation(async () => {
+      const [control] = await sql`select stop_requested_at from public.workspace_voice_dialer_intent
+        where workspace = ${workspaceId}::uuid and conference_id = ${agent.conferenceName}`;
+      expect(control.stop_requested_at).not.toBeNull(); throw new Error("Owned room cleanup unavailable");
+    });
+    expect((await signedRoute(agent.url, { ...joinParams(agent), StatusCallbackEvent: "participant-leave",
+      ReasonParticipantLeft: "participant_hung_up" })).status).toBe(500);
+    provider.conferenceList.mockResolvedValue([{ sid: "CF00000000000000000000000000005879", accountSid,
+      friendlyName: agent.conferenceName, status: "in-progress" }]);
+    expect(await dialer.runAutoDialerTurn({ workspace_id: workspaceId, user_id: actor, campaign_id: campaignId,
+      conference_id: agent.conferenceName })).toMatchObject({ success: false, failureKind: "stopped" });
+    expect((await signedRoute(agent.url, joinParams(agent))).status).toBe(200);
+    expect(provider.create).toHaveBeenCalledTimes(1); expect((await state()).ledger).toBe(0);
+  });
+  test("terminal browser-agent status saves Stop even when conference leave is missing", async () => {
+    const agent = await connectAgent(), sent = provider.create.mock.calls[0][0];
+    expect((await statusCallback(sent.statusCallback, agent.setupSid, sent.to)).status).toBe(200);
+    const [control] = await sql`select stop_requested_at from public.workspace_voice_dialer_intent
+      where workspace = ${workspaceId}::uuid and conference_id = ${agent.conferenceName}`;
+    expect(control.stop_requested_at).not.toBeNull();
+    provider.conferenceList.mockResolvedValue([{ sid: "CF00000000000000000000000000005879", accountSid,
+      friendlyName: agent.conferenceName, status: "in-progress" }]);
+    expect(await dialer.runAutoDialerTurn({ workspace_id: workspaceId, user_id: actor, campaign_id: campaignId,
+      conference_id: agent.conferenceName })).toMatchObject({ success: false, failureKind: "stopped" });
+    expect(provider.create).toHaveBeenCalledTimes(1);
+  });
   test('legacy funded browser answers share one human owner and keep the extra contact queued', async () => {
     await turn(); await turn();
     const roots = await sql`select id, provider_sid, recipient, voice_url, queue_id from public.workspace_voice_reservation

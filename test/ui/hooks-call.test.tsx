@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createMockTwilioCall } from "./hooks-test-helpers";
 
@@ -20,6 +20,7 @@ vi.mock("@/lib/services/hooks-api", async (importOriginal) => ({
 
 describe("call hooks", () => {
   beforeEach(() => {
+    localStorage.clear();
     vi.clearAllMocks();
     resetTwilioVoiceSdkMock();
     vi.stubGlobal(
@@ -30,7 +31,9 @@ describe("call hooks", () => {
     );
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    cleanup();
+    await act(async () => {});
     vi.unstubAllGlobals();
     // Restore real timers here rather than at the end of each fake-timer
     // test body: a mid-test assertion failure would otherwise skip the
@@ -112,27 +115,19 @@ describe("call hooks", () => {
       conferenceName: "conf",
     } as any);
 
-    const ok = renderHook(() =>
-      useStartConferenceAndDial({
-        userId: "u",
-        campaignId: "c",
-        workspaceId: "w",
-        callerId: "cid",
-        selectedDevice: "d",
-      }),
-    );
-    await act(async () => {
-      await ok.result.current.begin();
-    });
+    const options = { currentVerified: true, userId: "u", campaignId: "42", workspaceId: "10000000-0000-4000-8000-000000000001",
+      callerId: "+16135550101", selectedDevice: "computer" };
+    const ok = renderHook(() => useStartConferenceAndDial(options));
+    await act(async () => { await ok.result.current.begin(); });
     expect(ok.result.current.conference).toBe("conf");
+    // An accepted session cannot send another Start before its captured Stop.
+    await act(async () => { await ok.result.current.begin(); });
+    expect(api.startConferenceAndDial).toHaveBeenCalledTimes(1);
 
-    vi.mocked(api.startConferenceAndDial).mockResolvedValueOnce({
-      creditsError: true,
-    } as any);
-    await act(async () => {
-      await ok.result.current.begin();
-    });
-    expect(ok.result.current.creditsError).toBe(true);
+    vi.mocked(api.startConferenceAndDial).mockResolvedValueOnce({ success: false, creditsError: true });
+    const credit = renderHook(() => useStartConferenceAndDial({ ...options, userId: "credit-agent" }));
+    await act(async () => { await credit.result.current.begin(); });
+    expect(credit.result.current.creditsError).toBe(true);
 
     const bad = renderHook(() =>
       useStartConferenceAndDial({

@@ -1,4 +1,4 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import useCallRoom from "@/hooks/call/useCallRoom";
 import { useAgentAudioConnection } from "@/hooks/call/useAgentAudioConnection";
@@ -11,13 +11,13 @@ import { current, intent, owner } from "../helpers/voice-audio-current-fixture";
 import { recoveredContact, recoveredCustomer as customer, recovery } from "../helpers/predictive-recovery-fixture";
 
 let listener: ((event: MessageEvent<string>) => void) | undefined;
-const options = { userId: owner.userId, workspaceId: owner.workspaceId, campaignId: "42", callerId: "+16135550100", selectedDevice: "+16135550123" };
+const options = { currentVerified: true, userId: owner.userId, workspaceId: owner.workspaceId, campaignId: "42", callerId: "+16135550100", selectedDevice: "+16135550123" };
 beforeEach(() => {
   localStorage.clear();
   vi.stubGlobal("fetch", vi.fn(async () => Response.json({ success: true })));
   vi.spyOn(events, "subscribeToWorkspaceEventSource").mockImplementation((_url, callback) => { listener = callback; return () => { listener = undefined; }; });
 });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(async () => { cleanup(); await act(async () => {}); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 function emit(patch: Record<string, unknown> = {}) {
   act(() => listener?.(new MessageEvent("workspace_event", { data: JSON.stringify({ id: 1, workspace_id: owner.workspaceId,
     event_type: "predictive_broadcast", created_at: "2026-10-31T12:00:00Z", payload: { ...customer,

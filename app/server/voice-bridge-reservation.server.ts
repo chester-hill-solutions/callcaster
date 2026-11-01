@@ -1,5 +1,5 @@
 import { and, eq, gt, inArray, isNull, notInArray, notExists, or, sql } from "drizzle-orm";
-import { call, campaign_queue, workspace_voice_audio_connection as audioConnections, workspace_voice_reservation as reservations } from "@/db/schema";
+import { call, campaign_queue, workspace, workspace_voice_audio_connection as audioConnections, workspace_voice_reservation as reservations } from "@/db/schema";
 import { db } from "@/server/db";
 import { normalizeProviderStatus, isTerminalStatus } from "@/lib/call-status";
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
@@ -10,9 +10,16 @@ import type { DeferredEmit } from "@/lib/campaign-queue-db.server";
 import { requeueCampaignQueueById } from "@/lib/campaign-queue-updates.server";
 import { hasVoiceSetup, matchesVoiceSetupRoot } from "@/lib/voice-bridge-identity";
 import { armVoiceDialRecording } from "./voice-recording-operation.server";
+import { requestDialerAgentStopInTransaction } from "./voice-dialer-stop.server";
 
 export type VoiceBridgeUrls = { voiceUrl: string; statusCallback: string; recipientStatusCallback: string; recipientVoiceUrl?: string; continuationUrl?: string };
 const TERMINAL = ["completed", "failed", "busy", "no-answer", "canceled"];
+
+async function lockDialerSetupWorkspace(tx: CreditTransaction, reservationId: string) {
+  const [row] = await tx.select({ workspace: reservations.workspace, intent: reservations.dialer_intent_id })
+    .from(reservations).where(eq(reservations.id, reservationId)).limit(1);
+  if (row?.intent) await tx.select({ id: workspace.id }).from(workspace).where(eq(workspace.id, row.workspace)).for("no key update");
+}
 
 export async function startVoiceBridgeReservation(reservation: VoiceReservation, urls: VoiceBridgeUrls) {
   return startVoiceBridgeReservationInTransaction(db, reservation, urls);
@@ -81,6 +88,7 @@ async function saveSetupStatus(tx: CreditTransaction, row: VoiceReservation, cal
     eq(call.sid, callSid), eq(call.workspace, row.workspace), or(isNull(call.status), notInArray(call.status, TERMINAL)),
   ));
   if (!isTerminalStatus(status)) return row;
+  if (row.dialer_intent_id) await requestDialerAgentStopInTransaction(tx, row, callSid);
   const [saved] = await tx.update(reservations).set({
     setup_terminal_at: sql`coalesce(${reservations.setup_terminal_at}, clock_timestamp())`,
     setup_terminal_status: sql`coalesce(${reservations.setup_terminal_status}, ${status})`,
@@ -99,6 +107,7 @@ async function bindSetup(tx: CreditTransaction, args: VoiceBridgeSetupCallback, 
   if (!/^[0-9a-f-]{36}$/i.test(args.reservationId) || !/^CA[0-9a-f]{32}$/i.test(args.callSid)) {
     throw new Error("Invalid voice setup callback identity");
   }
+  await lockDialerSetupWorkspace(tx, args.reservationId);
   const [row] = await tx.select().from(reservations).where(eq(reservations.id, args.reservationId)).for("update");
   if (!row || !matchesSetup(row, args) || (row.state === "released" && row.setup_sid !== args.callSid)) {
     throw new Error("Voice setup callback does not match its dispatch");
@@ -155,6 +164,7 @@ export async function observeVoiceBridgeSetupStatus(reservation: VoiceReservatio
   sid: string; accountSid: string; to: string; from: string; direction: string; status: string; parentCallSid: string | null;
 }) {
   return setupTransaction(async (tx, deferEmit) => {
+    await lockDialerSetupWorkspace(tx, reservation.id);
     const [row] = await tx.select().from(reservations).where(and(
       eq(reservations.id, reservation.id), eq(reservations.workspace, reservation.workspace),
       eq(reservations.lease_token, reservation.lease_token),

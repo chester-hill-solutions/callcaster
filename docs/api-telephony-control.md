@@ -172,7 +172,7 @@ Use `GET /api/connect-phone-device?workspaceId=…&current=1` to recover without
 a usable browser journal. Omit all connection and intent IDs. The response
 contains `workspace_id`, `user_id`, `active`, `pending`, `recovery_required`
 and `customer_pending`, plus `predictive: { revision, customer }` and nullable
-`manual`. The audio roles contain the current submitted intent
+`manual`, plus nullable `dialer` session control. The audio roles contain the current submitted intent
 and its connection, or null. Discovery reads under the workspace/actor lock;
 it sends no provider command and does not change control ownership. It keeps
 old-account resources visible if credentials or phone verification change.
@@ -303,23 +303,41 @@ still control settlement, so repeated callbacks do not add another debit.
 
 ## Auto-dial
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| POST | `/api/auto-dial` | Start auto-dial session |
-| POST | `/api/auto-dial/end` | End auto-dial session |
-| POST | `/api/auto-dial/dialer` | **Internal** predictive dial worker (service role) |
+Captured Stop is in development under #2879. Send JSON
+`{ "workspaceId": "…", "campaignId": 42, "dial_intent_id": "…" }` to
+`POST /api/auto-dial/end`, with the original Start UUID. An optional
+`conferenceName` checks the accepted room; it does not select another room.
+New clients send `X-Callcaster-Audio-Actor` to reject a changed signed-in actor.
+Cancellation is stored under the funding workspace lock before provider I/O.
+The same delayed Start cannot send a call. A new Start UUID is separate.
 
-`POST /api/auto-dial/end` accepts JSON `{ "workspaceId": "...", "conferenceName": "..." }`.
-`conferenceName` is optional. When supplied, it must be a name generated for the
-signed-in user (`<user-id>~<session-id>`); an invalid name returns 400. Without a
-name, the route also finds that user's active conferences in the workspace's
-Twilio account, including conferences with no active call rows. Other users'
-conference names are excluded. Workspace access is required in both cases.
+HTTP 200 with `stop_state: "stopped"` confirms the captured request ended.
+HTTP 202 with `stop_state: "pending"` keeps durable cleanup and the same
+request for retry. It does not confirm that every call ended. Cleanup verifies
+the original account, room and call identities. Unknown provider creation
+retains its hold until a signed receipt or verified history resolves it.
+Cleanup runs in bounded batches and retries through the existing voice worker.
+Actual closure receipts retain surviving Call links when campaign data was
+removed. Stop does not invent final duration or perform a separate debit.
 
-A successful response is `{ "success": true }`. If a conference cannot be
-completed, the route returns 502 and the call screen keeps the device available
-for retry. Predictive Leave waits for this response before local teardown and
-does not reset the campaign queue.
+The call screen saves the full Start request before POST. Explicit Check uses
+that same request after a missing reply, selection change or reload. Mount
+never starts a customer. Stop remains available while Start is pending. The
+screen keeps Stop pending until its exact HTTP 200 acknowledgement; a room
+ended event does not clear it. Leaving sends the captured Stop with keepalive.
+A failed or timed-out response retains the same Stop for retry. Predictive
+Leave does not hang up an unrelated SDK Call or reset the campaign queue.
+
+Current audio discovery includes nullable `dialer` with workspace, user,
+campaign, Start `intent_id`, room and `dialer_state` (`active` or `stopping`).
+This control can recover an idle room without a browser journal. It does not
+adopt a customer or start another call. Ambiguous session controls are refused.
+A genuine current-agent hangup saves Stop before room cleanup. A retired audio
+source cannot use that callback to stop its replacement.
+
+Workspace-only Stop and the old optional room scan are no longer accepted.
+A captured workspace, campaign and Start UUID are required. Physical call and
+media acceptance for the full feature remains outstanding in the draft.
 
 ## Inbound queue (session CRUD)
 

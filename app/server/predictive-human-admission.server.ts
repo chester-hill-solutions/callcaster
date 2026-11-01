@@ -7,6 +7,7 @@ import { logger } from "@/lib/logger.server";
 import { db } from "./db";
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
 import type { VoiceReservation } from "./voice-credit-reservation.server";
+import { dialerReservationIsStopped } from "./voice-dialer-intent.server";
 
 export type HumanAdmissionEvents = Array<() => Promise<void>>;
 
@@ -43,6 +44,7 @@ async function refuseExtraHuman(tx: CreditTransaction, owner: VoiceReservation, 
 
 /** The caller holds workspace and fresh reservation locks through instruction commit. */
 export async function claimPredictiveHumanInTransaction(tx: CreditTransaction, owner: VoiceReservation, publish: HumanAdmissionEvents) {
+  if (await dialerReservationIsStopped(tx, owner)) return false;
   if (owner.kind !== "staffed" || !owner.user_id || !owner.provider_sid || !owner.conference_id || owner.human_state ||
     ["released", "settled"].includes(owner.state) || owner.terminal_status) return false;
   const [current] = await tx.select().from(call).where(and(eq(call.workspace, owner.workspace), eq(call.sid, owner.provider_sid))).for("update");

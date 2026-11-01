@@ -21,10 +21,11 @@ import { repeatedConferenceStart, type PredictiveStartIntent } from "./predictiv
 import type { VerifiedVoiceAudioCustomerIntent } from "./voice-audio-customer-admission.server";
 import { voiceRecordingCallbackUrl } from "@/lib/voice-recording";
 import { findBusyPredictiveHuman } from "./predictive-human-admission.server";
+import { bindDialerStartIntent, checkDialerRoomIntent, dialerStartOwner } from "./voice-dialer-intent.server";
 export { replayPredictiveConferenceStart } from "./predictive-start-replay.server";
 
 type CoreRefusal = Extract<Awaited<ReturnType<typeof reserveVoiceCreditsInTransaction>>, { ok: false }>;
-type PredictiveRefusal = CoreRefusal | { ok: false; reason: "campaign_not_found" | "campaign_deferred" | "campaign_stopped" | "queue_pending" | "outside_window" | "queue_empty" }
+type PredictiveRefusal = CoreRefusal | { ok: false; reason: "campaign_not_found" | "campaign_deferred" | "campaign_stopped" | "queue_pending" | "outside_window" | "queue_empty" | "dialer_stopped" }
   | { ok: false; reason: "caller_id_unavailable"; message: string };
 class AdmissionRollback extends Error {
   constructor(readonly result: PredictiveRefusal) { super(result.reason); }
@@ -32,6 +33,7 @@ class AdmissionRollback extends Error {
 export type PredictiveVoiceAdmissionInput = {
   workspaceId: string; campaignId: number; userId: string; conferenceId: string; accountSid: string;
   operationId?: string;
+  dialerIntentId?: string;
   /** Initial Start identity; an adopted source does not create this agent leg. */
   setup?: PredictiveStartIntent;
   audioSource?: VerifiedVoiceAudioCustomerIntent;
@@ -71,6 +73,11 @@ async function admitInTransaction(tx: CreditTransaction, input: PredictiveVoiceA
   if (input.setup) {
     const replay = await repeatedConferenceStart(tx, { ...input, setup: input.setup });
     if (replay) return replay;
+    input = { ...input, dialerIntentId: dialerStartOwner({ ...input, setup: input.setup }).intentId };
+  } else {
+    const control = await checkDialerRoomIntent(tx, input);
+    if (control && "ok" in control) return control;
+    input = { ...input, dialerIntentId: control?.intent_id };
   }
   if (input.audioSource && input.audioSource.mode !== "predictive") return { ok: false, reason: "audio_source_unavailable" } as const;
   const tdb = createTenantDb(input.workspaceId, tx);
@@ -127,6 +134,7 @@ async function fundClaimedRecipient(
     if (input.setup && input.setup.callerId !== from) throw new AdmissionRollback({ ok: false, reason: "caller_id_unavailable", message: "Caller ID does not match this campaign" });
     const admitted = await reserveVoiceCreditsInTransaction(tx, { workspaceId: input.workspaceId, accountSid: input.accountSid,
       kind: "staffed", to, from, campaignId: input.campaignId, contactId: contact.contact_id, queueId: contact.queue_id,
+      dialerIntentId: input.dialerIntentId,
       expectedQueueGeneration: queue.dispatch_generation, userId: input.userId, conferenceId: input.conferenceId,
       setupTo: input.audioSource ? undefined : input.setup?.to, audioSource: input.audioSource,
       predictiveOperationId: input.operationId, operationKey: input.setup?.intentKey ?? (input.operationId ? `predictive-operation:${input.operationId}`
@@ -147,5 +155,6 @@ async function fundClaimedRecipient(
       statusCallback: voiceBridgeUrl(urls.statusCallback, admitted.reservation.id, "setup"),
       recipientVoiceUrl: urls.voiceUrl, recipientStatusCallback: urls.statusCallback,
     }) : await startVoiceReservationInTransaction(tx, admitted.reservation, urls, input.audioSource?.proof);
+    if (input.setup) await bindDialerStartIntent(tx, { ...input, setup: input.setup }, reservation);
     return { ok: true, reservation, urls, contact } as const;
 }

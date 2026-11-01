@@ -23,7 +23,7 @@ describe("current actor-owned audio recovery (#2879)", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Set-Cookie")).toBe("audio-session=refreshed");
     await expect(response.json()).resolves.toEqual({ workspace_id: workspaceId, user_id: actor,
-      active: null, pending: null, recovery_required: false, customer_pending: false, predictive: { revision: "0", customer: null }, manual: null });
+      active: null, pending: null, recovery_required: false, customer_pending: false, predictive: { revision: "0", customer: null }, manual: null, dialer: null });
     expect(await state()).toEqual(before);
     expect(web.create).not.toHaveBeenCalled(); expect(web.fetch).not.toHaveBeenCalled(); expect(web.update).not.toHaveBeenCalled();
   });
@@ -107,7 +107,7 @@ describe("current actor-owned audio recovery (#2879)", () => {
       web.userId = otherActor;
       const response = await current(); expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ workspace_id: workspaceId, user_id: otherActor,
-        active: null, pending: null, recovery_required: false, customer_pending: false, predictive: { revision: "0", customer: null }, manual: null });
+        active: null, pending: null, recovery_required: false, customer_pending: false, predictive: { revision: "0", customer: null }, manual: null, dialer: null });
     } finally { await sql`delete from public.workspace_member where id = ${memberId}`; }
   });
 

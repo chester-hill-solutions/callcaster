@@ -41,7 +41,7 @@ export const API_SURFACE_CORE: readonly ApiSurfaceCore[] = [
   { path: "/api/auth/token", routeModule: "app/routes/api+/auth/token.route.tsx", authClass: "publicForm", authVia: "action:rateLimitedPostAuth", operations: [{ method: "POST", handler: "action" }] },
   { path: "/api/auth/verify-email", routeModule: "app/routes/api+/auth/verify-email.route.tsx", authClass: "publicForm", authVia: "action:rateLimitedPostAuth", operations: [{ method: "POST", handler: "action" }] },
   { path: "/api/auto-dial/:roomId", routeModule: "app/routes/api+/auto-dial/$roomId.route.tsx", authClass: "twilioSignature", authVia: "action:requireTwilioSignature", operations: [{ method: "POST", handler: "action" }] },
-  { path: "/api/auto-dial/end", routeModule: "app/routes/api+/auto-dial/end.route.tsx", authClass: null, authVia: "action:verifyAuth", operations: [{ method: "POST", handler: "action" }] },
+  { path: "/api/auto-dial/end", routeModule: "app/routes/api+/auto-dial/end.route.tsx", authClass: null, authVia: "action:unrecognised", operations: [{ method: "POST", handler: "action" }] },
   { path: "/api/auto-dial/status", routeModule: "app/routes/api+/auto-dial/status.route.tsx", authClass: "twilioSignature", authVia: "action:requireTwilioSignature", operations: [{ method: "POST", handler: "action" }] },
   { path: "/api/call", routeModule: "app/routes/api+/call.tsx", authClass: "twilioSignature", authVia: "action:requireTwilioSignature", operations: [{ method: "POST", handler: "action" }] },
   { path: "/api/call-status", routeModule: "app/routes/api+/call-status.tsx", authClass: "twilioSignature", authVia: "action:requireTwilioSignature", operations: [{ method: "POST", handler: "action" }] },

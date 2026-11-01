@@ -12,7 +12,8 @@ vi.hoisted(() => { process.env.TZ = "UTC"; process.env.BASE_URL = "https://audio
 export type ApiPhysical = { sid: string; accountSid: string; to: string; from: string; direction: string; parentCallSid: string | null;
   status: string; duration: string | null; dateCreated: Date; dateUpdated: Date; endTime: Date | null; voiceUrl: string; statusCallback: string };
 
-const web = vi.hoisted(() => ({ userId: "", accountSid: "", authenticated: true, create: vi.fn(), fetch: vi.fn(), update: vi.fn(), records: new Map<string, ApiPhysical>() }));
+const web = vi.hoisted(() => ({ userId: "", accountSid: "", authenticated: true, create: vi.fn(), fetch: vi.fn(), update: vi.fn(),
+  list: vi.fn(), events: vi.fn(), records: new Map<string, ApiPhysical>() }));
 
 const rooms = vi.hoisted(() => ({ fetch: vi.fn(), update: vi.fn(), list: vi.fn(), participant: vi.fn(), records: new Map<string, { sid: string; accountSid: string; friendlyName: string; status: string }>() }));
 
@@ -29,7 +30,8 @@ vi.mock("@/lib/auth.server", async (importOriginal) => ({
 vi.mock("@/lib/database/workspace.server", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/database/workspace.server")>(),
   createWorkspaceTwilioInstance: async () => ({ accountSid: web.accountSid,
-    calls: Object.assign((id: string) => ({ fetch: () => web.fetch(id), update: (args: { status: string }) => web.update(id, args) }), { create: web.create }),
+    calls: Object.assign((id: string) => ({ fetch: () => web.fetch(id), update: (args: { status: string }) => web.update(id, args),
+      events: { list: () => web.events(id) } }), { create: web.create, list: web.list }),
     conferences: Object.assign((id: string) => ({ fetch: () => rooms.fetch(id), update: (args: { status: string }) => rooms.update(id, args),
       participants: (callSid: string) => ({ fetch: () => rooms.participant(id, callSid) }) }), { list: rooms.list }),
   }),
@@ -285,6 +287,7 @@ export function useOwnedAudioFixture() {
       web.records.set(physical.sid, physical); return physical;
     });
     web.fetch.mockReset().mockImplementation(async (id: string) => { const physical = web.records.get(id); if (!physical) throw new Error("Owned audio API call required"); return physical; });
+    web.list.mockReset().mockResolvedValue([]); web.events.mockReset().mockResolvedValue([]);
     web.update.mockReset().mockImplementation(async (id: string, args: { status: string }) => {
       const physical = web.records.get(id); if (!physical) throw new Error("Owned audio API call required");
       physical.status = args.status; physical.endTime = new Date(); return physical;
@@ -297,6 +300,7 @@ export function useOwnedAudioFixture() {
     await sql`delete from public.workspace_voice_audio_intent where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.workspace_voice_audio_connection where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.call where workspace = ${workspaceId}::uuid`;
+    await sql`delete from public.workspace_voice_dialer_intent where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.handset_session where workspace_id = ${workspaceId}::uuid`;
     await sql`update public.workspace set credits = 100, disabled = false, archived_at = null,

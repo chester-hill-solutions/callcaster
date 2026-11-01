@@ -44,4 +44,7 @@ describe("call-screen audio during React Router server rendering", () => {
   test("renders manual dial before browser storage or media exists", () => {
     expect(view.renderManualDial()).toBe("<p>Ready to dial</p>");
   });
+  test("renders predictive Start and Stop before browser storage or network exists", () => {
+    expect(view.renderPredictiveDialer()).toBe("<p>Ready to start</p>");
+  });
 });

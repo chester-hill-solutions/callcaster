@@ -1,5 +1,5 @@
 import { and, eq, isNull, or, sql } from "drizzle-orm";
-import { campaign, campaign_queue, workspace_voice_reservation as reservations, workspace_voice_audio_connection as audioConnections } from "@/db/schema";
+import { campaign, campaign_queue, workspace, workspace_voice_reservation as reservations, workspace_voice_audio_connection as audioConnections } from "@/db/schema";
 import { db } from "@/server/db";
 import type { VoiceReservation } from "./voice-credit-reservation.server";
 import { persistReservedVoiceCall } from "./voice-reservation-callback.server";
@@ -8,6 +8,7 @@ import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
 import { persistVoiceAudioCall } from "./voice-audio-call-record.server";
 import { voiceAudioParticipantLabel, voiceAudioStartsMuted } from "@/lib/voice-audio-connection";
+import { dialerReservationIsStopped } from "./voice-dialer-intent.server";
 
 type ConferenceBindingInput = {
   reservationId: string; requestUrl: string; accountSid: string; callSid: string; conferenceId: string; conferenceSid: string;
@@ -66,11 +67,14 @@ export async function bindPredictiveConferenceEvent(input: ConferenceBindingInpu
 /** The initial recipient has already been claimed and funded before agent setup. */
 export async function claimFirstPredictiveRecipient(reservation: VoiceReservation, setupSid: string) {
   return db.transaction(async (tx) => {
+    await tx.select({ id: workspace.id }).from(workspace).where(eq(workspace.id, reservation.workspace)).for("no key update");
     const [current] = await tx.select().from(reservations).where(and(
       eq(reservations.id, reservation.id), eq(reservations.workspace, reservation.workspace),
     )).for("update");
     if (!current || !current.conference_id || current.setup_sid !== setupSid || !current.conference_sid ||
         current.state !== "creating" || current.provider_sid || current.recipient_instruction_issued_at || current.recipient_refused_at || current.setup_terminal_at) return null;
+    if (await dialerReservationIsStopped(tx, current))
+      return { send: false as const, reservation: await refuseRecipient(tx, current, "Captured dialer Stop blocks the first customer") };
     const [savedCampaign] = await tx.select().from(campaign).where(and(
       eq(campaign.id, current.campaign_id ?? 0), eq(campaign.workspace, current.workspace),
     )).for("update");

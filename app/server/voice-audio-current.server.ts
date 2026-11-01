@@ -12,6 +12,7 @@ import type { VoiceAudioConnection } from "./voice-audio-connection.server";
 import type { TenantDb } from "./tenant-db";
 import { readPredictiveCustomerRecovery } from "./predictive-customer-current.server";
 import { readManualCustomerRecovery } from "./manual-customer-current.server";
+import { readCurrentDialer } from "./voice-dialer-current.server";
 
 async function currentIntent(tdb: TenantDb, row: VoiceAudioConnection | undefined) {
   if (!row) return null;
@@ -38,9 +39,10 @@ export function readCurrentOwnedVoiceAudio(args: { workspaceId: string; userId: 
       await hasPendingVoiceAudioConferenceStop(member.tdb, args.userId) || await hasUnresolvedVoiceAudioPromotion(member.tdb, args.userId);
     const predictive = await readPredictiveCustomerRecovery(member.tdb, args.userId);
     const manual = await readManualCustomerRecovery(member.tdb, args.userId);
-    if (!predictive || !manual) return voiceAudioRefusal("stale_audio");
+    const control = await readCurrentDialer(member.tdb, args.userId);
+    if (!predictive || !manual || !control.ok) return voiceAudioRefusal("stale_audio");
     const current = voiceAudioCurrentSnapshotSchema.safeParse({ workspace_id: args.workspaceId, user_id: args.userId, predictive, manual: manual.customer,
-      active: activeIntent, pending: pendingIntent, recovery_required: recoveryRequired,
+      dialer: control.dialer, active: activeIntent, pending: pendingIntent, recovery_required: recoveryRequired || control.dialer?.dialer_state === "stopping",
       customer_pending: await hasFundedAgentVoice(member.tdb, args.userId) });
     return current.success ? { ok: true as const, current: current.data } : voiceAudioRefusal("stale_audio");
   });

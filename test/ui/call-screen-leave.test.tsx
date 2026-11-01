@@ -2,8 +2,19 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { createMemoryRouter, MemoryRouter, RouterProvider, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { CallScreenLayoutProps } from "@/hooks/call/useCallScreen";
-import { handleConference, releaseCallSession } from "@/lib/callscreenActions";
+import { releaseCallSession } from "@/lib/callscreenActions";
 import { CallScreenLayout } from "@/components/call/CallScreen.Layout";
+
+import { PredictiveDialer } from "@/lib/predictive-dialer";
+import { memoryStorage } from "../helpers/voice-audio-current-fixture";
+const owner = { workspaceId: "10000000-0000-4000-8000-000000000001", userId: "leave-agent", campaignId: "1" };
+const intentId = "20000000-0000-4000-8000-000000000001";
+const disposals: Array<() => void> = [];
+function stopped(state = "stopped") {
+  return Response.json({ success: true, workspace_id: owner.workspaceId, user_id: owner.userId, campaign_id: 1,
+    intent_id: intentId, conference_id: "agent~campaign", stop_state: state }, { status: state === "stopped" ? 200 : 202 });
+}
+afterEach(async () => { cleanup(); disposals.splice(0).forEach(dispose => dispose()); await act(async () => {}); });
 
 const mocks = vi.hoisted(() => ({ showError: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { error: mocks.showError } }));
@@ -32,10 +43,14 @@ function setup(
     render(<MemoryRouter><CallScreenLayout {...props} /></MemoryRouter>);
   },
 ) {
+  const dialer = new PredictiveDialer(owner, memoryStorage());
+  disposals.push(dialer.mount());
+  if (dialType === "predictive") dialer.recover({ workspace_id: owner.workspaceId, user_id: owner.userId, campaign_id: 1,
+    intent_id: intentId, conference_id: "agent~campaign", dialer_state: "active" });
   const controls = {
     hangUp: vi.fn(),
     setConference: vi.fn(),
-    handleConferenceEnd: handleConference({ begin: vi.fn() }).handleConferenceEnd,
+    handleConferenceEnd: dialer.stop,
     activeCall,
     conference: "agent~campaign",
     disposition: "",
@@ -51,7 +66,7 @@ function setup(
     credits: 100,
     count: 1,
     completed: 0,
-    workspaceId: "workspace-1",
+    workspaceId: owner.workspaceId,
     hasAccess: true,
     verifiedNumbers: [],
     device,
@@ -64,7 +79,7 @@ function setup(
     phoneVerification: {},
   } as unknown as CallScreenLayoutProps;
   renderScreen(props);
-  return { ...controls, device, navigate, requeueContacts };
+  return { ...controls, dialer, device, navigate, requeueContacts };
 }
 
 function confirmLeave() {
@@ -100,11 +115,10 @@ describe("Leave Campaign", () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(screen.getByText(/conference and predictive dialer will stop/i)).toBeInTheDocument();
     fireEvent.click(confirm);
-    expect(fetchMock).toHaveBeenCalledWith("/api/auto-dial/end", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspaceId: "workspace-1", conferenceName: "agent~campaign" }),
-    });
+    expect(fetchMock).toHaveBeenCalledWith("/api/auto-dial/end", expect.objectContaining({
+      method: "POST", headers: expect.objectContaining({ "X-Callcaster-Audio-Actor": owner.userId }),
+      body: JSON.stringify({ workspaceId: owner.workspaceId, campaignId: "1", dial_intent_id: intentId, conferenceName: "agent~campaign" }),
+    }));
     expect(confirm).toBeDisabled();
     expect(controls.navigate).not.toHaveBeenCalled();
     expect(controls.device.destroy).not.toHaveBeenCalled();
@@ -112,9 +126,9 @@ describe("Leave Campaign", () => {
     expect(controls.requeueContacts).not.toHaveBeenCalled();
     fireEvent.click(confirm);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    await act(async () => pending.resolve(Response.json({ success: true })));
+    await act(async () => pending.resolve(stopped()));
     await waitFor(() => expect(controls.navigate).toHaveBeenCalledWith(-1));
-    expect(controls.setConference).toHaveBeenCalledWith(null);
+    expect(controls.dialer.getSnapshot().conference).toBeNull();
     expect(controls.device.destroy).not.toHaveBeenCalled();
     expect(controls.hangUp).not.toHaveBeenCalled();
     expect(controls.requeueContacts).not.toHaveBeenCalled();
@@ -125,7 +139,7 @@ describe("Leave Campaign", () => {
     else fetchMock.mockResolvedValueOnce(failure === "http"
       ? Response.json({ error: "Could not stop" }, { status: 502 })
       : Response.json({ error: "still running" }));
-    fetchMock.mockResolvedValueOnce(Response.json({ success: true }));
+    fetchMock.mockResolvedValueOnce(stopped());
     const controls = setup();
     const confirm = confirmLeave();
     fireEvent.click(confirm);
@@ -139,6 +153,19 @@ describe("Leave Campaign", () => {
     fireEvent.click(confirm);
     await waitFor(() => expect(controls.navigate).toHaveBeenCalledWith(-1));
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  test("202 keeps Leave on screen and retries the same session without hanging up an unrelated SDK Call", async () => {
+    fetchMock.mockResolvedValueOnce(stopped("pending")).mockResolvedValueOnce(stopped());
+    const controls = setup("predictive", { parameters: { CallSid: "CA_UNRELATED_INCOMING" } });
+    const confirm = confirmLeave(); fireEvent.click(confirm);
+    await waitFor(() => expect(confirm).toBeEnabled());
+    expect(controls.navigate).not.toHaveBeenCalled(); expect(controls.hangUp).not.toHaveBeenCalled();
+    expect(controls.dialer.getSnapshot().stopPending).toBe(true);
+    fireEvent.click(confirm); await waitFor(() => expect(controls.navigate).toHaveBeenCalledWith(-1));
+    expect(fetchMock.mock.calls[1][1]?.body).toBe(fetchMock.mock.calls[0][1]?.body);
+    expect(controls.hangUp).not.toHaveBeenCalled(); expect(controls.requeueContacts).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auto-dial/end", "/api/auto-dial/end"]);
   });
 
   test("Cancel preserves predictive calls, device and queue", () => {

@@ -31,51 +31,6 @@ export async function releaseCallSession(campaignId: number): Promise<void> {
   }
 }
 
-export const handleConference = ({ begin }:{begin:() => void}) => {
-  const handleConferenceStart = () => {
-    begin();
-  };
-
-  const handleConferenceEnd = async ({ activeCall, setConference, workspaceId, conferenceName }:{activeCall:{ parameters: Record<string, unknown> } | null, setConference:() => void, workspaceId:string, conferenceName?: string | null}) => {
-    const response = await fetch("/api/auto-dial/end", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspaceId, ...(conferenceName ? { conferenceName } : {}) }),
-    });
-    if (!response.ok) {
-      throw new Error("Could not stop the predictive conference");
-    }
-    const result: unknown = await response.json();
-    if (!isObject(result) || result.success !== true) {
-      throw new Error("Could not confirm that the predictive conference stopped");
-    }
-    const callSid = activeCall?.parameters?.CallSid;
-    if (typeof callSid === "string" && callSid) {
-      try {
-        const response = await fetch(`/api/hangup`, {
-          method: "POST",
-          body: JSON.stringify({
-            callSid: callSid,
-            workspaceId,
-          }),
-          headers: { "Content-Type": "application/json" },
-        });
-
-        if (!response.ok) {
-          logger.error("Failed to hang up conference call", {
-            callSid: callSid,
-            status: response.status,
-          });
-        }
-      } catch (error) {
-        logger.error("Failed to hang up conference call", error);
-      }
-    }
-    setConference();
-  };
-  return { handleConferenceStart, handleConferenceEnd };
-};
-
 export const handleCall = ({ submit }:{submit:FetcherWithComponents<unknown>["submit"]}) => {
   const startCall = (args: StartCallArgs) => {
     const fields = manualDialFields(args);

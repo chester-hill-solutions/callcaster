@@ -216,6 +216,7 @@ export async function runAutoDialerTurn(
       prepareSend: input.continuation?.prepareSend,
     });
     if (!admitted.ok) {
+      if (admitted.reason === "dialer_stopped") return { success: false, failureKind: "stopped", error: "The captured dialer session was stopped" };
       if (admitted.reason === "queue_empty") {
         if (!audioSource) await completeAllConferences(twilioClient, conferenceId);
         await recheckCampaignCompletion({ campaignId: campaign_id, workspaceId: workspace_id, exec: tdb, reason: "auto_dial_drain" });

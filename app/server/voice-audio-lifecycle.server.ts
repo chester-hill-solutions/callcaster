@@ -13,6 +13,7 @@ import { hasActiveVoiceAudioCustomer } from "./voice-audio-classification.server
 import { withVoiceAudioConnection, type VoiceAudioConnection } from "./voice-audio-connection.server";
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
 import { persistVoiceAudioCall } from "./voice-audio-call-record.server";
+import { requestVoiceAudioConferenceStopInTransaction } from "./voice-audio-stop.server";
 
 type OwnedInput = { workspaceId: string; userId: string; connectionId: string; controlIntentId?: string };
 const RECOVERY_LEASE_MS = 5 * 60_000;
@@ -144,6 +145,7 @@ export async function observeVoiceAudioStatus(row: VoiceAudioConnection, status:
   return withVoiceAudioConnection(row, async (tx, current) => {
     if (!row.provider_sid || row.provider_sid !== current.provider_sid) throw new VoiceAudioBindingError("Agent audio status does not match its accepted leg");
     const terminal = isTerminalStatus(normalized);
+    if (terminal) await requestVoiceAudioConferenceStopInTransaction(tx, current, row.provider_sid, true);
     const [saved] = await tx.update(connections).set({
       terminal_at: current.terminal_at ?? (terminal ? new Date() : null), terminal_status: current.terminal_status ?? (terminal ? normalized : null),
       state: current.terminal_at || terminal ? terminalAudioState(current) : current.state, updated_at: new Date(),

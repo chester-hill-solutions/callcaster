@@ -5,6 +5,7 @@ import type { CreditTransaction } from "./outbound-credit-reservations.server";
 import { voiceAudioSourceRetirementWhere } from "./voice-audio-classification.server";
 import { withVoiceAudioConnection, type VoiceAudioConnection } from "./voice-audio-connection.server";
 import { closeManualVoiceAudioTopology } from "./voice-audio-manual-topology.server";
+import { requestDialerRoomStop } from "./voice-dialer-stop.server";
 
 export function hasUnfinishedVoiceAudioConferenceStop(row: VoiceAudioConnection) {
   return Boolean(row.conference_stop_requested_at && !row.conference_stopped_at);
@@ -23,8 +24,14 @@ async function ownsConferenceEnd(tx: CreditTransaction, row: VoiceAudioConnectio
 
 /** The workspace lock orders source retirement and this irreversible room intent. */
 export async function requestVoiceAudioConferenceStop(owner: VoiceAudioConnection, callSid: string) {
-  return withVoiceAudioConnection(owner, async (tx, current) => {
+  return withVoiceAudioConnection(owner, (tx, current) => requestVoiceAudioConferenceStopInTransaction(tx, current, callSid));
+}
+
+export async function requestVoiceAudioConferenceStopInTransaction(tx: CreditTransaction, current: VoiceAudioConnection, callSid: string, onlyDialer = false) {
     if (!await ownsConferenceEnd(tx, current, callSid)) return null;
+    const dialer = callSid !== current.customer_sid ? await requestDialerRoomStop(tx, { workspaceId: current.workspace,
+      userId: current.user_id, accountSid: current.account_sid, conferenceId: current.conference_id }) : null;
+    if (onlyDialer && !dialer) return null;
     if (!/^CF[0-9a-f]{32}$/i.test(current.conference_sid ?? "")) throw new VoiceAudioBindingError("Owned conference SID is missing");
     if (current.conference_stop_requested_at) return current;
     const [saved] = await tx.update(connections).set({ conference_stop_requested_at: new Date(), conference_stop_call_sid: callSid,
@@ -33,7 +40,6 @@ export async function requestVoiceAudioConferenceStop(owner: VoiceAudioConnectio
     }).where(eq(connections.id, current.id)).returning();
     if (!saved) throw new Error("Owned conference stop was not saved");
     return saved;
-  });
 }
 
 /** A worker can finish the same saved room; it cannot inherit another lease. */

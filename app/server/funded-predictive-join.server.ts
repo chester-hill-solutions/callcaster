@@ -9,6 +9,7 @@ import type { CreditTransaction } from "./outbound-credit-reservations.server";
 import type { VoiceReservation } from "./voice-credit-reservation.server";
 import { matchesFundedHumanCall } from "./predictive-human-admission.server";
 import { observePredictiveHumanPresence } from "./predictive-human-presence.server";
+import { dialerReservationIsStopped } from "./voice-dialer-intent.server";
 
 async function lockJoin(tx: CreditTransaction, owner: VoiceReservation, event: ParticipantJoinEvent) {
   await tx.select({ id: workspace.id }).from(workspace).where(eq(workspace.id, owner.workspace)).for("no key update");
@@ -18,6 +19,7 @@ async function lockJoin(tx: CreditTransaction, owner: VoiceReservation, event: P
   if (!reservation || !reservation.provider_sid || !reservation.conference_id || reservation.provider_sid !== event.callSid || reservation.kind !== "staffed" ||
     reservation.account_sid !== event.accountSid || reservation.conference_id !== event.conferenceRef ||
     ["released", "settled"].includes(reservation.state) || isTerminalStatus(normalizeProviderStatus(reservation.terminal_status))) return null;
+  if (await dialerReservationIsStopped(tx, reservation)) return null;
   const [current] = await tx.select().from(call).where(and(
     eq(call.workspace, owner.workspace), eq(call.sid, reservation.provider_sid),
   )).for("update");

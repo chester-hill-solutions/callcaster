@@ -14,6 +14,7 @@ import { hasMinRole } from "@/lib/workspace-route.server";
 import type { DataPlaneAuthContextValue } from "@/lib/route-context.server";
 import { apiWriteRateLimitResponse } from "@/lib/api-write-rate-limit.server";
 import { phoneAudioSourceFields, requirePhoneAudioSource } from "@/lib/schemas/api/phone-audio-source";
+import { VOICE_AUDIO_ACTOR_HEADER } from "@/lib/voice-audio-connection";
 
 const dialerStartBodySchema = z.object({
   caller_id: z.string().min(1),
@@ -86,6 +87,8 @@ export const action = defineAction({
     if (agentUserId instanceof Response) {
       return agentUserId;
     }
+    const expectedActor = request.headers.get(VOICE_AUDIO_ACTOR_HEADER);
+    if (expectedActor && expectedActor !== agentUserId) return jsonError("The signed-in actor changed", 409);
 
     const result = await startAutoDialConference({
       userId: agentUserId,

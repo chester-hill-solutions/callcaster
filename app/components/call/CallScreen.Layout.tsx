@@ -106,7 +106,6 @@ export function CallScreenLayout({
     displayState,
     displayColor,
     conference,
-    setConference,
     disposition,
     setDisposition,
     recentCall,
@@ -177,13 +176,9 @@ export function CallScreenLayout({
 
   const endPredictiveConference = async () => {
     try {
-      await handleConferenceEnd({
-        activeCall,
-        setConference: () => setConference(null),
-        workspaceId,
-        conferenceName: conference,
-      });
-      return true;
+      const stopped = await handleConferenceEnd();
+      if (!stopped) toast.error("Stop is not confirmed. Stay on this screen and retry Stop.");
+      return stopped;
     } catch {
       toast.error("Could not stop the predictive conference. Stay on this screen and try again.");
       return false;
@@ -198,7 +193,7 @@ export function CallScreenLayout({
       if (campaign.dial_type === "predictive") {
         if (!(await endPredictiveConference())) return;
       }
-      if (activeCall) await hangUp();
+      if (campaign.dial_type !== "predictive" && activeCall) await hangUp();
       if (campaign.dial_type !== "predictive") await requeueContacts();
       await navigate(-1);
     } catch {
@@ -411,7 +406,9 @@ export function CallScreenLayout({
       {callControls.manualDialError ? (
         <div className="space-y-2 p-4" role="status">
           <p>{callControls.manualDialError}</p>
-          <Button type="button" variant="outline" disabled={callControls.isCheckingManualDial} onClick={callControls.onCheckManualDial}>Check call request</Button>
+          <Button type="button" variant="outline" disabled={callControls.isCheckingManualDial} onClick={callControls.onCheckManualDial}>
+            {callControls.dialerStopPending ? "Retry Stop" : "Check call request"}
+          </Button>
         </div>
       ) : null}
       <CallWorkbench
@@ -438,6 +435,7 @@ export function CallScreenLayout({
             isStartingConference={isStartingConference}
             startDisabledReason={startDisabledReason}
             awaitingCustomerReceipt={callControls.awaitingCustomerReceipt}
+            hasDialerSession={callControls.hasDialerSession}
             nextRecipient={nextRecipient}
             questionContact={questionContact}
             activeCall={activeCall as unknown as ActiveCall}

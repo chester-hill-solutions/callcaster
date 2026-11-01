@@ -719,7 +719,7 @@ describe("useCallScreen", () => {
     callerId = "";
     const { useCallScreen } = await import("@/hooks/call/useCallScreen");
     const { result, rerender } = renderHook(() => useCallScreen());
-    expect(result.current.callControls.startDisabledReason).toBe("Set caller ID in Setup");
+    await waitFor(() => expect(result.current.callControls.startDisabledReason).toBe("Set caller ID in Setup"));
     callerId = "+15550000001";
     rerender();
     expect(result.current.callControls.startDisabledReason).toBe("Join this campaign");
@@ -738,6 +738,7 @@ describe("useCallScreen", () => {
     const layout = () => <MemoryRouter><CallScreenLayout {...result.current}
       dialogControls={{ ...result.current.dialogControls, isDialogOpen: false, isErrorDialogOpen: false }}
     /></MemoryRouter>;
+    await waitFor(() => expect(result.current.callControls.startDisabledReason).toBe("Set caller ID in Setup"));
     const view = render(layout());
     expect(screen.getByRole("button", { name: "Set caller ID in Setup" })).toBeDisabled();
     callerId = "+15550000001";
@@ -750,7 +751,7 @@ describe("useCallScreen", () => {
       dialogControls={{ ...result.current.dialogControls, isDialogOpen: false, isErrorDialogOpen: false }}
       callControls={{ ...result.current.callControls, isStartingConference: true }}
     /></MemoryRouter>);
-    expect(screen.getByRole("button", { name: "Starting…" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Stop Dialing" })).toBeEnabled();
   });
 
   test("keyboard DTMF ignores keypresses from editable fields", async () => {

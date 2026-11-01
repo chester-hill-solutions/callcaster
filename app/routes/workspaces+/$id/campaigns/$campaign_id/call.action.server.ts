@@ -2,7 +2,6 @@ import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { releaseAssignedQueueForUser } from "@/lib/campaign-queue-db.server";
 import {
   handleCall,
-  handleConference,
   handleContact,
   handleQueue,
 } from "@/lib/callscreenActions";

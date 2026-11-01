@@ -1975,17 +1975,11 @@
     },
     "/api/auto-dial/end": {
       "post": {
-        "operationId": "postAuto_dial_end",
-        "summary": "POST /api/auto-dial/end",
-        "description": "",
-        "tags": [
-          "Dialer",
-          "User API"
-        ],
+        "operationId": "stopCapturedDialerSession",
+        "summary": "Stop one captured dialer Start request",
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "session",
-        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
         "security": [
           {
             "sessionCookie": []
@@ -1994,26 +1988,177 @@
             "secureSessionCookie": []
           }
         ],
+        "parameters": [
+          {
+            "name": "X-Callcaster-Audio-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Must match the signed-in session actor; this is a precondition, never caller-supplied authority."
+          }
+        ],
+        "description": "Capture the original workspace, campaign and dial_intent_id before Start. Stop saves cancellation under the funding workspace lock before provider I/O, even if Start has not reached admission. The same delayed Start cannot create a call. Retry the same Stop until stop_state is stopped; HTTP 202 means cleanup remains pending and does not authorize leaving or clearing the captured request. Cleanup uses the saved original account and exact resources, retains unknown provider creates and credit holds for recovery, and cannot stop a newer Start. A new explicit Start intent remains separate. Stop does not fabricate call outcomes, debit credits or advance another queue generation.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "additionalProperties": false,
+                "required": [
+                  "workspaceId",
+                  "campaignId",
+                  "dial_intent_id"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "campaignId": {
+                    "oneOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$"
+                      }
+                    ]
+                  },
+                  "dial_intent_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "conferenceName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Optional captured room precondition after Start is accepted. It never selects a different room."
+                  }
+                }
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "This captured request is stopped",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": true
+                  "required": [
+                    "success",
+                    "workspace_id",
+                    "user_id",
+                    "campaign_id",
+                    "intent_id",
+                    "conference_id",
+                    "stop_state"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "workspace_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "campaign_id": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "intent_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "conference_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "nullable": true
+                    },
+                    "stop_state": {
+                      "type": "string",
+                      "enum": [
+                        "stopped"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Stop is durable; owned provider cleanup is pending",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "workspace_id",
+                    "user_id",
+                    "campaign_id",
+                    "intent_id",
+                    "conference_id",
+                    "stop_state"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "workspace_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "campaign_id": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "intent_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "conference_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "nullable": true
+                    },
+                    "stop_state": {
+                      "type": "string",
+                      "enum": [
+                        "pending"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid captured Stop identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -2023,17 +2168,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
-          "403": {
-            "description": "Forbidden",
+          "404": {
+            "description": "Workspace, campaign or owned request not found",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The captured actor or room changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -4844,7 +4999,8 @@
                         "recovery_required",
                         "customer_pending",
                         "predictive",
-                        "manual"
+                        "manual",
+                        "dialer"
                       ],
                       "properties": {
                         "workspace_id": {
@@ -5602,6 +5758,50 @@
                                   "nullable": true
                                 }
                               }
+                            }
+                          }
+                        },
+                        "dialer": {
+                          "type": "object",
+                          "nullable": true,
+                          "required": [
+                            "workspace_id",
+                            "user_id",
+                            "campaign_id",
+                            "intent_id",
+                            "conference_id",
+                            "dialer_state"
+                          ],
+                          "description": "Exact active or stopping dialer Start control, including when no human customer is joined. It is separate from the customer lifecycle and never authorizes a new call. Ambiguous controls are refused.",
+                          "properties": {
+                            "workspace_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "user_id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "campaign_id": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "intent_id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "Keep this UUID for retries of the same audio change."
+                            },
+                            "conference_id": {
+                              "type": "string",
+                              "minLength": 1,
+                              "nullable": true
+                            },
+                            "dialer_state": {
+                              "type": "string",
+                              "enum": [
+                                "active",
+                                "stopping"
+                              ]
                             }
                           }
                         }
@@ -11268,6 +11468,18 @@
           },
           {
             "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Callcaster-Audio-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "When supplied, must match the resolved agent actor. Saved browser requests use this precondition across session changes."
           }
         ],
         "description": "Authenticated caller+ session or workspace API key. API keys must supply `agentUserId` for a verified caller in the workspace. Reserve four available credits for the first eligible recipient before provider dispatch. Paired `audio_connection_id` and `audio_generation`, a stable `dial_intent_id` and the verified phone as `selected_device` reuse confirmed phone audio: Start calls only the recorded AMD customer and returns the saved conference plus real customer `callSid`. Connect never starts a customer. Accepted retries return the saved identity before mutable phone/campaign/queue checks. Predictive fanout and continuation retain one hold per customer and the first phone callback. Customer departure and queue drain do not close the persistent phone room. New legacy setup is refused while owned audio is unresolved; otherwise legacy setup and the first recipient share the same hold. Voice starts share a limit of 120 requests per minute per authenticated user or API key, across dial, IVR, device connection and voice test calls. A 429 response includes Retry-After in seconds; changing agentUserId does not reset an API key's budget.",

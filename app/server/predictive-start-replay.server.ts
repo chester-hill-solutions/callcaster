@@ -5,6 +5,7 @@ import { persistReservedVoiceCall } from "./voice-reservation-callback.server";
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
 import type { VoiceAudioCustomerIntent } from "./voice-audio-customer-admission.server";
 import type { VoiceReservation } from "./voice-credit-reservation.server";
+import { checkDialerStartIntent } from "./voice-dialer-intent.server";
 
 export type PredictiveStartIntent = { to: string; callerId: string; intentKey: string };
 export type PredictiveConferenceStartIdentity = {
@@ -31,6 +32,8 @@ export async function replayPredictiveConferenceStart(input: PredictiveConferenc
 
 /** Accepted identity is independent of current phone, campaign and queue readiness. */
 export async function repeatedConferenceStart(tx: CreditTransaction, input: PredictiveConferenceStartIdentity) {
+  const stopped = await checkDialerStartIntent(tx, input);
+  if (stopped) return stopped;
   const [row] = await tx.select().from(reservations).where(and(
     eq(reservations.workspace, input.workspaceId), eq(reservations.operation_key, input.setup.intentKey),
   )).limit(1);

@@ -102,6 +102,7 @@ function admissionFailure(
     const messages: Partial<Record<typeof refusal.reason, string>> = {
       queue_empty: "No queued contacts", outside_window: "No contacts within recipient calling hours",
       campaign_deferred: "Campaign is not currently active", campaign_stopped: "Campaign is not currently active",
+      dialer_stopped: "This dialer request was stopped. Start a new session.",
     };
     return { ok: false, status: 409, error: messages[refusal.reason] ?? "A call is awaiting completion or recovery" };
 

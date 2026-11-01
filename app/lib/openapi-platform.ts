@@ -14,11 +14,13 @@ import {
 import { handsetPathOverrides } from "@/lib/openapi-handset";
 import { voiceAudioPathOverrides } from "@/lib/openapi-voice-audio";
 import { manualDialPathOverrides } from "@/lib/openapi-manual-dial";
+import { dialerStopPathOverrides } from "@/lib/openapi-dialer-stop";
 
 export const platformPathOverrides = {
   ...handsetPathOverrides,
   ...voiceAudioPathOverrides,
   ...manualDialPathOverrides,
+  ...dialerStopPathOverrides,
   "/api/workspaces/{workspaceId}/conversations": {
     get: {
       operationId: "getWorkspaces_workspaceId_conversations",
@@ -277,6 +279,8 @@ export const platformPathOverrides = {
       tags: ["Platform API", "Dialer", "Telephony"],
       "x-callcaster-capability": "calls.start",
       security: apiKeyOrSessionSecurity,
+      parameters: [{ name: "X-Callcaster-Audio-Actor", in: "header", required: false, schema: { type: "string", minLength: 1 },
+        description: "When supplied, must match the resolved agent actor. Saved browser requests use this precondition across session changes." }],
       description:
         "Authenticated caller+ session or workspace API key. API keys must supply `agentUserId` for a verified caller in the workspace. Reserve four available credits for the first eligible recipient before provider dispatch. Paired `audio_connection_id` and `audio_generation`, a stable `dial_intent_id` and the verified phone as `selected_device` reuse confirmed phone audio: Start calls only the recorded AMD customer and returns the saved conference plus real customer `callSid`. Connect never starts a customer. Accepted retries return the saved identity before mutable phone/campaign/queue checks. Predictive fanout and continuation retain one hold per customer and the first phone callback. Customer departure and queue drain do not close the persistent phone room. New legacy setup is refused while owned audio is unresolved; otherwise legacy setup and the first recipient share the same hold. Voice starts share a limit of 120 requests per minute per authenticated user or API key, across dial, IVR, device connection and voice test calls. A 429 response includes Retry-After in seconds; changing agentUserId does not reset an API key's budget.",
       requestBody: {

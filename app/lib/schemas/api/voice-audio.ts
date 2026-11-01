@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { VALID_CALL_STATUSES } from "@/lib/call-status";
+import { voiceDialerCurrentSchema } from "./voice-dialer-stop";
 
 const callSid = z.string().regex(/^CA[0-9a-f]{32}$/i);
 
@@ -139,7 +140,12 @@ export const voiceAudioCurrentSnapshotSchema = z.object({
   predictive: predictiveCustomerRecoverySchema,
   // Older servers omit manual recovery. Keep their busy gate while they roll out.
   manual: manualCustomerRecoverySchema.nullable().optional().default(null),
+  dialer: voiceDialerCurrentSchema.nullable().optional().default(null),
 }).superRefine((value, ctx) => {
+  if (value.dialer && (value.dialer.workspace_id !== value.workspace_id || value.dialer.user_id !== value.user_id ||
+    value.predictive.customer && (value.predictive.customer.campaign_id !== value.dialer.campaign_id ||
+      value.predictive.customer.conference_id !== value.dialer.conference_id)))
+    ctx.addIssue({ code: "custom", message: "Recovered dialer does not match this current actor and room", path: ["dialer"] });
   if (!matchesCurrentPredictiveOwner(value))
     ctx.addIssue({ code: "custom", message: "Recovered customer does not match this current actor", path: ["predictive"] });
   if (!matchesCurrentManualOwner(value))

@@ -12,6 +12,7 @@ import { admitVoiceAudioCustomerSource, hasUnresolvedVoiceAudioSource, voiceAudi
 import type { VoiceAudioCustomerSourceProof } from "./voice-audio-customer-source.server";
 import type { VoiceCustomerRecordingIntent } from "@/lib/voice-recording";
 import { voiceCustomerRecordingSendFields } from "./voice-customer-recording.server";
+import { hasPendingDialerStop } from "./voice-dialer-intent.server";
 
 export type VoiceReservation = typeof reservations.$inferSelect;
 export type VoiceDispatchUrls = { voiceUrl: string; statusCallback: string; customerRecording?: VoiceCustomerRecordingIntent };
@@ -42,6 +43,7 @@ export type VoiceReservationInput = {
   setupClientIdentity?: string | null;
   conferenceId?: string | null;
   predictiveOperationId?: string | null;
+  dialerIntentId?: string | null;
   audioSource?: VerifiedVoiceAudioCustomerIntent;
   /** Runs database work only, after funding succeeds and inside its transaction. */
   prepareOutreach?: (tx: CreditTransaction) => Promise<number>;
@@ -68,7 +70,7 @@ async function resolveQueueOperation(tx: CreditTransaction, args: VoiceReservati
 }
 
 type VoiceIntentInput = Pick<VoiceReservationInput,
-  "workspaceId" | "to" | "from" | "campaignId" | "contactId" | "queueId" | "userId" | "setupTo" | "setupClientIdentity" | "outreachAttemptId" | "operationKey" | "conferenceId" | "predictiveOperationId"> & { audioSource?: VoiceAudioCustomerIntent };
+  "workspaceId" | "to" | "from" | "campaignId" | "contactId" | "queueId" | "userId" | "setupTo" | "setupClientIdentity" | "outreachAttemptId" | "operationKey" | "conferenceId" | "predictiveOperationId" | "dialerIntentId"> & { audioSource?: VoiceAudioCustomerIntent };
 
 function sameAudioSource(existing: VoiceReservation, args: VoiceIntentInput) {
   if (!args.audioSource) return existing.audio_connection_id === null && existing.conference_id === (args.conferenceId ?? null);
@@ -81,7 +83,7 @@ function sameVoiceContext(existing: VoiceReservation, args: VoiceIntentInput) {
   return existing.campaign_id === (args.campaignId ?? null) && existing.contact_id === (args.contactId ?? null) &&
     existing.queue_id === (args.queueId ?? null) && existing.user_id === (args.userId ?? null) &&
     existing.setup_to === (args.setupTo ?? null) && existing.setup_client_identity === (args.setupClientIdentity ?? null) &&
-    existing.requested_outreach_attempt_id === (args.outreachAttemptId ?? null);
+    existing.requested_outreach_attempt_id === (args.outreachAttemptId ?? null) && existing.dialer_intent_id === (args.dialerIntentId ?? null);
 }
 
 async function findRepeatedOperation(tx: CreditTransaction, args: VoiceIntentInput & { accountSid?: string }, operationKey: string | undefined) {
@@ -134,6 +136,8 @@ export async function reserveVoiceCreditsInTransaction(tx: CreditTransaction, ar
   if (!queue.ok) return queue;
   const replay = await findRepeatedOperation(tx, args, queue.operationKey);
   if (replay) return replay;
+  if (args.kind === "staffed" && args.userId && await hasPendingDialerStop(tx, args.workspaceId, args.userId))
+    return { ok: false as const, reason: "dispatch_in_progress" as const };
   if (!queue.queued) return { ok: false as const, reason: "queue_not_queued" as const };
   if (args.queueId != null) {
     const [pending] = await tx.select({ id: reservations.id }).from(reservations).where(and(
@@ -156,6 +160,7 @@ export async function reserveVoiceCreditsInTransaction(tx: CreditTransaction, ar
     setup_client_identity: args.setupClientIdentity,
     ...source.fields,
     predictive_operation_id: args.predictiveOperationId,
+    dialer_intent_id: args.dialerIntentId,
     lease_token: randomUUID(), lease_expires_at: new Date(Date.now() + LEASE_MS),
     // Admission may wait for a workspace lock. Record the real insertion
     // time, not the transaction start, for explicit-redial duplicate checks.

@@ -20,6 +20,7 @@ export interface StartConferenceParams {
   campaign_id: string;
   selected_device: string;
   dial_intent_id?: string;
+  actor_id?: string;
   audioSource?: VoiceAudioSourceIdentity;
 }
 
@@ -178,7 +179,7 @@ export async function startConferenceAndDial(params: StartConferenceParams): Pro
       `/api/workspaces/${encodeURIComponent(workspace_id)}/campaigns/${encodeURIComponent(campaign_id)}/dialer/start`,
       {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(params.actor_id ? { 'X-Callcaster-Audio-Actor': params.actor_id } : {}) },
       body: JSON.stringify({
         caller_id,
         selected_device,

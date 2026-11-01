@@ -83,13 +83,17 @@ const manualCustomer = { type: "object", nullable: true,
         audio_connection_id: { type: "string", format: "uuid", nullable: true }, audio_generation: { type: "integer", minimum: 1, nullable: true } } },
   },
 };
-const currentSnapshot = { type: "object", required: ["workspace_id", "user_id", "active", "pending", "recovery_required", "customer_pending", "predictive", "manual"], properties: {
+const currentSnapshot = { type: "object", required: ["workspace_id", "user_id", "active", "pending", "recovery_required", "customer_pending", "predictive", "manual", "dialer"], properties: {
   workspace_id: workspaceId, user_id: { type: "string", minLength: 1 },
   active: { ...intentSnapshot, nullable: true }, pending: { ...intentSnapshot, nullable: true },
   recovery_required: { type: "boolean", description: "Unresolved physical cleanup, room stop or promotion blocks new audio work." },
   customer_pending: { type: "boolean", description: "An unresolved staffed customer reservation blocks another Start until its customer owner is confirmed. This does not prove that a human joined." },
   predictive: predictiveRecovery,
   manual: manualCustomer,
+  dialer: { type: "object", nullable: true, required: ["workspace_id", "user_id", "campaign_id", "intent_id", "conference_id", "dialer_state"],
+    description: "Exact active or stopping dialer Start control, including when no human customer is joined. It is separate from the customer lifecycle and never authorizes a new call. Ambiguous controls are refused.",
+    properties: { workspace_id: workspaceId, user_id: { type: "string", minLength: 1 }, campaign_id: { type: "integer", minimum: 1 },
+      intent_id: intentId, conference_id: { type: "string", minLength: 1, nullable: true }, dialer_state: { type: "string", enum: ["active", "stopping"] } } },
 } };
 
 /** One owned audio operation covers session control and signed provider callbacks. */
