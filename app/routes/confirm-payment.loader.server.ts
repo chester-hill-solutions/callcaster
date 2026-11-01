@@ -26,11 +26,10 @@ export const loader = defineLoader({
     }
 
     const nextUrl = url.pathname + (url.search ?? "");
-    const { user } = await verifyAuth(request, nextUrl);
+    await verifyAuth(request, nextUrl);
 
     const result = await confirmStripeCheckoutSessionForRedirect({
       sessionId,
-      userId: user.id,
     });
 
     if (result.ok) {

@@ -654,24 +654,24 @@
   {
     "issueNumber": 2828,
     "verdict": "fix-now",
-    "summary": "Resume the preserved SIM SMS candidate in #3067; checkout failures are reproduced and the cause is confirmed.",
-    "currentBehavior": "PR #3067 was closed without merge and its original branch is preserved. The branch is now rebased onto dev. The old guards and E2E jobs both failed during Stripe database tests, before browser tests started. The current candidate separates owner funding from member SMS, and verifies local checkout access and one-time credit fulfillment.",
-    "rootCause": "Stripe contract suites inherited the new local mock-checkout default. The reproduced candidate failed 38 of 60 real-database cases. Selecting the Stripe environment explicitly restores those contracts without weakening Admin access. Local checkout reads also need the workspace billing role check.",
-    "resolution": "Continue the existing branch and PR as the single active draft. Verify local mock and Stripe checkout separately, keep the released-number filter, and require local and exact-head GitHub checks before merge. Run a real SMS only after a separate explicit operator request; keep Stage 2 and voice work behind Stage 1 acceptance.",
+    "summary": "Complete persona sign-in repair in the preserved #3067 branch. Additional local setup features stay parked.",
+    "currentBehavior": "Dev already has resolved owner/member profiles and task access checks. Profile reconciliation creates user and membership rows but no password credential account. The active candidate repairs that account and closes both browser contexts on failure. The earlier mock checkout and Twilio resource setup additions remain saved separately; they are not part of this PR.",
+    "rootCause": "A saved Better Auth user and workspace membership are insufficient for password sign-in. The credential provider also needs a hashed password row in auth_account. The original broad candidate additionally changed local checkout defaults and caused 38 Stripe database failures before browser tests started; that checkout feature is now parked.",
+    "resolution": "Finish the single persona-focused PR with real app sign-in, rerun/repair, collision rollback and hosted-runtime controls. Request the resolved password only after the local guard. Keep the approved recipient adapter and Stripe test funding unchanged. Require local and exact-head GitHub checks; run real SMS only on a separate explicit operator request. Stage 2 and voice remain behind Stage 1 acceptance.",
     "lookIn": [
+      "app/lib/sim-profile-reconciliation.server.ts",
+      "app/server/sim-profile-reconciliation.server.ts",
+      "scripts/sim-profile-ensure.ts",
       "e2e/sim/sms-send.sim.spec.ts",
-      "e2e/sim/preflight.ts",
-      "app/lib/platform-billing.server.ts",
-      "test/integration-db/billing-checkout-access.test.ts",
-      "test/integration-db/billing-local-checkout.test.ts"
+      "test/integration-db/sim-persona-signin.test.ts"
     ],
     "trackerRecommendation": "Selected snapshot, 2026-11-01 UTC: native Task assigned @sai-sy; native Priority, Effort and Enviornment are unset. Actual Project Status In progress was read in the authenticated issue sidebar. Parent #2815 and native blocker #2827 remain open; profile/status code is already merged in #2974. Existing Development link to #3067 is preserved. Do not create another SIM implementation or mark real SMS acceptance complete.",
     "existingTests": [
-      "Rebased source: 38 failing and 22 passing Stripe database cases reproduce the original checkout-mode mismatch. After explicit Stripe selection and local access checks: all 73 database cases, 121 focused Node cases and 6 UI cases pass without skips. No provider traffic or deployed data changes were used."
+      "17 real-PostgreSQL cases pass through actual app sign-in, cookie session reads, stable IDs, missing-account repair, resolved-password changes, foreign-marker protection, collision rollback and hosted-runtime refusal before password access. The 60 existing Stripe database cases also pass on the narrowed source before the final collision cases were added. Removing credential persistence makes both intended persona sign-ins fail; 11 controls remain passing. No provider traffic or deployed data changes were used."
     ],
     "missingTests": [
-      "Final local gate and exact-head GitHub CI on the resumed candidate.",
-      "Explicit operator acceptance: owner funding and member SMS through the local product flow, with approved recipient and redacted evidence. Handset delivery is not proved by no-traffic tests."
+      "Final local gate and exact-head GitHub CI on the narrowed candidate.",
+      "Explicit operator acceptance: owner funding and member SMS through the local product flow, with an approved recipient and redacted evidence. Handset delivery is not proved by no-traffic tests."
     ]
   }
 ]

@@ -23,7 +23,7 @@ describe("loadProjectConfig", () => {
       local: { environment: "local", storage: { endpoint: "https://storage.example.test", host: "storage.example.test" } },
     });
     expect(config.storage).toMatchObject({ endpoint: "https://storage.example.test", host: "storage.example.test" });
-    expect(config.services.app).toEqual({ enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] });
+    expect(config.services.app).toEqual({ enabled: true, trafficPolicy: "disabled", secrets: [] });
   });
 
   it("returns a deeply immutable resolved configuration", () => {

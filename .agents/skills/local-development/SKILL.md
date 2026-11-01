@@ -176,9 +176,6 @@ current CI inputs and remove keys whose last reader was deleted. Update dynamic
 boundary line locations only when the source file, expression and callsite count
 are unchanged; keep their approval metadata. Regenerate the reports from source
 instead of selecting one side of a generated-file conflict.
-For checkout tests, select the intended environment before importing billing.
-Local uses mock checkout; dev, QA and production use Stripe. Verify both modes
-with real membership rows and ledger writes, with provider traffic isolated.
 
 The compose migration fixture grants its public schema to the `callcaster`
 role. Create disposable Postgres with that role, or create it inside the owned

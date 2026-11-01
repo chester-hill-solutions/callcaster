@@ -30,10 +30,10 @@ describe("ProjectConfig schema", () => {
     expect(config.runtime.mode).toBe("development");
     expect(config.secretProvider).toBe("dotenv");
     expect(config.services).toEqual({
-      app: { enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [{ name: "DATABASE_URL" }] },
-      worker: { enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] },
-      "media-stream": { enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] },
-      sim: { enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] },
+      app: { enabled: true, trafficPolicy: "disabled", secrets: [{ name: "DATABASE_URL" }] },
+      worker: { enabled: true, trafficPolicy: "disabled", secrets: [] },
+      "media-stream": { enabled: true, trafficPolicy: "disabled", secrets: [] },
+      sim: { enabled: true, trafficPolicy: "disabled", secrets: [] },
     });
   });
 
@@ -67,35 +67,6 @@ describe("ProjectConfig schema", () => {
     expect(() => parseProjectConfig({ ...valid, environment: "dev", secretProvider: "dotenv" })).toThrow(
       /not valid for dev/,
     );
-  });
-
-  it("allows mock checkout only in local and resolves Stripe in every hosted environment", () => {
-    expect(
-      parseProjectConfig({
-        ...valid,
-        environment: "local",
-        services: { app: { checkoutProvider: "mock" } },
-      }).services.app.checkoutProvider,
-    ).toBe("mock");
-    for (const environment of ["dev", "qa", "production"] as const) {
-      expect(
-        parseProjectConfig({ ...valid, environment }).services.app
-          .checkoutProvider,
-      ).toBe("stripe");
-      expect(() =>
-        parseProjectConfig({
-          ...valid,
-          environment,
-          services: { app: { checkoutProvider: "mock" } },
-        }),
-      ).toThrow(/only valid for local/);
-    }
-    expect(() =>
-      parseProjectConfig({
-        ...valid,
-        services: { app: { checkoutProvider: "fake" } },
-      }),
-    ).toThrow(ConfigValidationError);
   });
 
   it("rejects invalid URL/host combinations and unknown service keys", () => {

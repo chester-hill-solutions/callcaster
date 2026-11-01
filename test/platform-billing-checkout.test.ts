@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-vi.stubEnv("ENV", "dev");
-vi.stubEnv("NODE_ENV", "test");
-
 vi.mock("@/lib/env.server", async (importOriginal) => {
   const handler = { get: (_target: unknown, prop: string) => () => `test-${prop}` };
   return {

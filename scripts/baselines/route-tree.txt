@@ -148,7 +148,6 @@ launch
 listening
 members
 message-segment-calculator
-mock-checkout/:sessionId
 new
 numbers
 onboarding

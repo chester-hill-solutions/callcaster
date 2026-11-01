@@ -11,7 +11,7 @@ try {
   context = await createSimRuntimeContext({ personaKey: args[1] });
   const { reconcileSimProfileInDatabase } = await import("../app/server/sim-profile-reconciliation.server");
   const { SimReconciliationError } = await import("../app/lib/sim-profile-reconciliation.server");
-  const result = await reconcileSimProfileInDatabase(context.profile, await context.getCredential());
+  const result = await reconcileSimProfileInDatabase(context.profile, context.getCredential);
   console.log(JSON.stringify(result));
 } catch (error) {
   if (context && error instanceof Error && error.name === "SimReconciliationError") {

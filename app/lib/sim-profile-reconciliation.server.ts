@@ -59,7 +59,8 @@ async function ensureCredential(
   userId: string,
   credentialHash: string | undefined,
 ): Promise<void> {
-  if (credentialHash && repo.ensureCredential) {
+  if (credentialHash !== undefined) {
+    if (!repo.ensureCredential) throw new SimReconciliationError("blocked", "SIM credential writer is unavailable");
     await repo.ensureCredential({ userId, passwordHash: credentialHash });
   }
 }

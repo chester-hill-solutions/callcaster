@@ -6,7 +6,7 @@ import { cancelScheduledMessage, sendMessage } from "@/lib/chat-sms.server";
 import { linkContactToConversation } from "@/lib/database/chat-contact-link.server";
 import { getEffectiveWorkspaceTwilioPortalConfigForWorkspace } from "@/lib/database/workspace.server";
 import { parseChatSenderSelection } from "@/lib/sms-campaign-send-mode";
-import { and, eq, or } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   workspace_number as workspaceNumberTable,
 } from "@/db/schema";
@@ -172,7 +172,7 @@ export const action = defineAction({
 
     try {
       const workspaceNumbers = await tdb.workspace_number.findMany({
-        where: and(eq(workspaceNumberTable.status, "active"), or(eq(workspaceNumberTable.type, "rented"), eq(workspaceNumberTable.type, "sim_existing"))),
+        where: and(eq(workspaceNumberTable.type, "rented"), eq(workspaceNumberTable.status, "active")),
         columns: { phone_number: true },
       });
       const fromKey = getConversationPhoneKey(fromNumber);

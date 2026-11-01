@@ -1,9 +1,6 @@
 import Stripe from "stripe";
 import { eq } from "drizzle-orm";
-import {
-  transaction_history as transactionHistoryTable,
-  workspace as workspaceTable,
-} from "@/db/schema";
+import { transaction_history as transactionHistoryTable, workspace as workspaceTable } from "@/db/schema";
 import { createStripeContact } from "@/lib/database/stripe.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { MemberRole } from "@/lib/member-role";
@@ -27,57 +24,6 @@ import { adminDb } from "@/server/admin-db";
 import { createTenantDb } from "@/server/tenant-db";
 import { db } from "@/server/db";
 import { STRIPE_CLIENT_OPTIONS } from "@/lib/stripe-client-options";
-import { checkoutProvider } from "../../config/server-runtime";
-
-type CheckoutRecord = {
-  id: string;
-  url: string;
-  status: "open" | "complete";
-  payment_status: "unpaid" | "paid";
-  metadata: { workspaceId: string; creditAmount: string };
-};
-const localCheckoutSessions = new Map<string, CheckoutRecord>();
-
-function retrieveCheckoutSession(
-  sessionId: string,
-): Promise<Stripe.Checkout.Session | CheckoutRecord> {
-  if (checkoutProvider === "mock") {
-    const session = localCheckoutSessions.get(sessionId);
-    if (!session) throw new Error("Checkout session not found");
-    return Promise.resolve(session);
-  }
-  return createStripeClient().checkout.sessions.retrieve(sessionId);
-}
-
-/** Complete a local mock session only after the local checkout UI is submitted. */
-export async function completeLocalMockCheckout(args: {
-  userId: string;
-  sessionId: string;
-}) {
-  if (checkoutProvider !== "mock") return { ok: false as const, status: 404 };
-  const session = localCheckoutSessions.get(args.sessionId);
-  if (!session) return { ok: false as const, status: 404 };
-  await requireWorkspaceAccess({
-    user: { id: args.userId },
-    workspaceId: session.metadata.workspaceId,
-    minRole: MemberRole.Admin,
-  });
-  session.status = "complete";
-  session.payment_status = "paid";
-  return { ok: true as const, workspaceId: session.metadata.workspaceId };
-}
-
-export async function getLocalMockCheckout(args: { userId: string; sessionId: string }) {
-  if (checkoutProvider !== "mock") return null;
-  const session = localCheckoutSessions.get(args.sessionId);
-  if (!session) return null;
-  await requireWorkspaceAccess({
-    user: { id: args.userId },
-    workspaceId: session.metadata.workspaceId,
-    minRole: MemberRole.Admin,
-  });
-  return { creditAmount: Number(session.metadata.creditAmount) };
-}
 
 export const billingPricing = billingPricingSchema.parse({
   credit_price_cad: CREDIT_PRICE_CAD,
@@ -91,18 +37,11 @@ function createStripeClient() {
 
 async function ensureStripeCustomer(
   workspaceId: string,
-): Promise<
-  | { ok: true; stripeCustomerId: string }
-  | { ok: false; error: string; status: number }
-> {
+): Promise<{ ok: true; stripeCustomerId: string } | { ok: false; error: string; status: number }> {
   const [workspace] = await adminDb
-    .select({
-      stripe_id: workspaceTable.stripe_id,
-      stripe_customer_conflict: workspaceTable.stripe_customer_conflict,
+    .select({ stripe_id: workspaceTable.stripe_id, stripe_customer_conflict: workspaceTable.stripe_customer_conflict,
       stripe_customer_creation: workspaceTable.stripe_customer_creation,
-      stripe_customer_creation_completed_id:
-        workspaceTable.stripe_customer_creation_completed_id,
-    })
+      stripe_customer_creation_completed_id: workspaceTable.stripe_customer_creation_completed_id })
     .from(workspaceTable)
     .where(eq(workspaceTable.id, workspaceId))
     .limit(1);
@@ -117,12 +56,8 @@ async function ensureStripeCustomer(
 
   let stripeCustomerId = workspace.stripe_id ?? null;
 
-  if (
-    !stripeCustomerId ||
-    workspace.stripe_customer_conflict ||
-    (workspace.stripe_customer_creation &&
-      workspace.stripe_customer_creation_completed_id !== stripeCustomerId)
-  ) {
+  if (!stripeCustomerId || workspace.stripe_customer_conflict ||
+      (workspace.stripe_customer_creation && workspace.stripe_customer_creation_completed_id !== stripeCustomerId)) {
     try {
       const customer = await createStripeContact({
         workspace_id: workspaceId,
@@ -141,7 +76,10 @@ async function ensureStripeCustomer(
   return { ok: true, stripeCustomerId };
 }
 
-export async function getWorkspaceBilling(userId: string, workspaceId: string) {
+export async function getWorkspaceBilling(
+    userId: string,
+  workspaceId: string,
+) {
   await requireWorkspaceAccess({
     user: { id: userId },
     workspaceId,
@@ -199,64 +137,43 @@ export async function createBillingCheckoutSession(args: {
     };
   }
 
-  const customerResult =
-    checkoutProvider === "stripe"
-      ? await ensureStripeCustomer(workspaceId)
-      : null;
-  if (customerResult && !customerResult.ok) return customerResult;
-  const stripeCustomerId = customerResult?.ok
-    ? customerResult.stripeCustomerId
-    : undefined;
-  if (checkoutProvider === "stripe" && !stripeCustomerId) {
-    return {
-      ok: false as const,
-      error: "Billing is not ready for this workspace yet.",
-      status: 400,
-    };
+  const customerResult = await ensureStripeCustomer(workspaceId);
+  if (!customerResult.ok) {
+    return customerResult;
   }
 
   try {
     const baseUrl = new URL(requestUrl).origin;
+    const stripe = createStripeClient();
     const priceInCents = Math.round(amount * CREDIT_PRICE_CAD * 100);
-    const metadata = { workspaceId, creditAmount: String(amount) };
-    const session = await (checkoutProvider === "mock"
-      ? (() => {
-          const id = `mock_${crypto.randomUUID()}`;
-          const record: CheckoutRecord = {
-            id,
-            url: `${baseUrl}/mock-checkout/${id}`,
-            status: "open",
-            payment_status: "unpaid",
-            metadata,
-          };
-          localCheckoutSessions.set(id, record);
-          return Promise.resolve(record);
-        })()
-      : createStripeClient().checkout.sessions.create({
-          customer: stripeCustomerId,
-          payment_method_types: ["card"],
-          line_items: [
-            {
-              price_data: {
-                currency: "cad",
-                product_data: {
-                  // The count is in the line name, not the quantity (#1981): the
-                  // receipt then reads "12,500 workspace credits" instead of
-                  // "Workspace credits × 1", and no Stripe Checkout quantity
-                  // ceiling is ever hit (packages go up to 25,000 credits).
-                  name: `${formatCredits(amount)} workspace credits`,
-                },
-                unit_amount: priceInCents,
-                tax_behavior: "exclusive",
-              },
-              quantity: 1,
+    const session = await stripe.checkout.sessions.create({
+      customer: customerResult.stripeCustomerId,
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: "cad",
+            product_data: {
+              // The count is in the line name, not the quantity (#1981): the
+              // receipt then reads "12,500 workspace credits" instead of
+              // "Workspace credits × 1", and no Stripe Checkout quantity
+              // ceiling is ever hit (packages go up to 25,000 credits).
+              name: `${formatCredits(amount)} workspace credits`,
             },
-          ],
-          mode: "payment",
-          success_url: `${baseUrl}/confirm-payment?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${baseUrl}/workspaces/${workspaceId}/billing?payment_status=canceled`,
-          metadata,
-        }));
+            unit_amount: priceInCents,
+            tax_behavior: "exclusive",
+          },
+          quantity: 1,
+        },
+      ],
+      mode: "payment",
+      success_url: `${baseUrl}/confirm-payment?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/workspaces/${workspaceId}/billing?payment_status=canceled`,
+      metadata: {
+        workspaceId,
+        creditAmount: String(amount),
+      },
+    });
 
     if (!session.url || !session.id) {
       return {
@@ -283,7 +200,10 @@ export async function createBillingCheckoutSession(args: {
 }
 
 export type BillingSessionPollStatus =
-  "open" | "complete" | "expired" | "unknown";
+  | "open"
+  | "complete"
+  | "expired"
+  | "unknown";
 
 export async function pollBillingCheckoutSession(args: {
   userId: string;
@@ -298,12 +218,11 @@ export async function pollBillingCheckoutSession(args: {
     minRole: MemberRole.Admin,
   });
 
+  const stripe = createStripeClient();
   let session: Stripe.Checkout.Session;
 
   try {
-    session = (await retrieveCheckoutSession(
-      sessionId,
-    )) as Stripe.Checkout.Session;
+    session = await stripe.checkout.sessions.retrieve(sessionId);
   } catch (error) {
     logger.error("pollBillingCheckoutSession retrieve error", error);
     return {
@@ -374,13 +293,13 @@ export async function pollBillingCheckoutSession(args: {
 
 export async function confirmStripeCheckoutSessionForRedirect(args: {
   sessionId: string;
-  userId?: string;
 }) {
   const { sessionId } = args;
+  const stripe = createStripeClient();
   let fallbackWorkspaceId: string | null = null;
 
   try {
-    const session = await retrieveCheckoutSession(sessionId);
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
 
     // Capture the workspace before any throw below: it is what lets the caller
     // redirect the user back to their own billing page instead of dumping them
@@ -401,11 +320,6 @@ export async function confirmStripeCheckoutSessionForRedirect(args: {
 
     if (!workspaceId || !creditAmount) {
       throw new Error("Invalid session metadata");
-    }
-
-    if (checkoutProvider === "mock") {
-      if (!args.userId) throw new Error("Authentication required");
-      await requireWorkspaceAccess({ user: { id: args.userId }, workspaceId });
     }
 
     await insertTransactionHistoryIdempotent(db, {

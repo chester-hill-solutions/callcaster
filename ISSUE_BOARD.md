@@ -14,7 +14,7 @@ Earlier selected updates remain: #1724 is answered and closed as completed; #299
 
 Name backfill, 2026-11-01 UTC: #3102 is the separate Urgent child of #2168 and is In progress. The source provides reviewed plan/apply tooling, with 83 focused Node and 5 PostgreSQL cases passing. The live GET-only plan has 7 eligible dev names, 1 already correct and 30 protected records. Operational apply and release acceptance remain separate; #2029 still owns retention/repeat decisions. The inventory below includes the new child (404 open issues); this selected change is not a full Project export.
 
-SIM Stage 1 selected update, 2026-11-01 UTC: #2828 moves to Fix now after reproducing the checkout-mode failure. The existing #3067 branch is resumed; final CI and separate real SMS acceptance remain. This is a selected Issue and Project check, not a full Project export.
+SIM Stage 1 selected update, 2026-11-01 UTC: #2828 moves to Fix now after reproducing the parked checkout failure. The existing #3067 branch now contains only persona sign-in repair; final CI and separate real SMS acceptance remain. This is a selected Issue and Project check, not a full Project export.
 
 ## How to use this board
 
@@ -304,18 +304,18 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Search contacts has a persistent accessible name, including when no contacts match.; Clear search has an explicit name and preserves the existing target size and shared styling.; Pointer, Enter and Space clear the query, reset page to 1, retain unrelated parameters and return focus to the same input.; Keep edit links, empty-state composition and shared Input/Button behavior.
 - Tracker: Included from original PR #3010 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges.
 
----
-
 ### [#2828](https://github.com/chester-hill-solutions/callcaster/issues/2828) Task: migrate existing SIM SMS setup to personas
 - **IN PROGRESS** · Verdict: **Fix now** · Type: Task · Priority: unset · Effort: unset · Environment: unset · Labels: none · Assignee: @sai-sy · Updated: 2026-10-27
-- Resume the preserved SIM SMS candidate in #3067; checkout failures are reproduced and the cause is confirmed.
-- Current behavior: PR #3067 was closed without merge and its original branch is preserved. The branch is now rebased onto dev. The old guards and E2E jobs both failed during Stripe database tests, before browser tests started. The current candidate separates owner funding from member SMS, and verifies local checkout access and one-time credit fulfillment.
-- Root cause: Stripe contract suites inherited the new local mock-checkout default. The reproduced candidate failed 38 of 60 real-database cases. Selecting the Stripe environment explicitly restores those contracts without weakening Admin access. Local checkout reads also need the workspace billing role check.
-- Resolution: Continue the existing branch and PR as the single active draft. Verify local mock and Stripe checkout separately, keep the released-number filter, and require local and exact-head GitHub checks before merge. Run a real SMS only after a separate explicit operator request; keep Stage 2 and voice work behind Stage 1 acceptance.
-- Look in: `e2e/sim/sms-send.sim.spec.ts`, `e2e/sim/preflight.ts`, `app/lib/platform-billing.server.ts`, `test/integration-db/billing-checkout-access.test.ts`, `test/integration-db/billing-local-checkout.test.ts`
-- Existing tests: Rebased source: 38 failing and 22 passing Stripe database cases reproduce the original checkout-mode mismatch. After explicit Stripe selection and local access checks: all 73 database cases, 121 focused Node cases and 6 UI cases pass without skips. No provider traffic or deployed data changes were used.
-- Missing tests: Final local gate and exact-head GitHub CI on the resumed candidate.; Explicit operator acceptance: owner funding and member SMS through the local product flow, with approved recipient and redacted evidence. Handset delivery is not proved by no-traffic tests.
+- Complete persona sign-in repair in the preserved #3067 branch. Additional local setup features stay parked.
+- Current behavior: Dev already has resolved owner/member profiles and task access checks. Profile reconciliation creates user and membership rows but no password credential account. The active candidate repairs that account and closes both browser contexts on failure. The earlier mock checkout and Twilio resource setup additions remain saved separately; they are not part of this PR.
+- Root cause: A saved Better Auth user and workspace membership are insufficient for password sign-in. The credential provider also needs a hashed password row in auth_account. The original broad candidate additionally changed local checkout defaults and caused 38 Stripe database failures before browser tests started; that checkout feature is now parked.
+- Resolution: Finish the single persona-focused PR with real app sign-in, rerun/repair, collision rollback and hosted-runtime controls. Request the resolved password only after the local guard. Keep the approved recipient adapter and Stripe test funding unchanged. Require local and exact-head GitHub checks; run real SMS only on a separate explicit operator request. Stage 2 and voice remain behind Stage 1 acceptance.
+- Look in: `app/lib/sim-profile-reconciliation.server.ts`, `app/server/sim-profile-reconciliation.server.ts`, `scripts/sim-profile-ensure.ts`, `e2e/sim/sms-send.sim.spec.ts`, `test/integration-db/sim-persona-signin.test.ts`
+- Existing tests: 17 real-PostgreSQL cases pass through actual app sign-in, cookie session reads, stable IDs, missing-account repair, resolved-password changes, foreign-marker protection, collision rollback and hosted-runtime refusal before password access. The 60 existing Stripe database cases also pass on the narrowed source before the final collision cases were added. Removing credential persistence makes both intended persona sign-ins fail; 11 controls remain passing. No provider traffic or deployed data changes were used.
+- Missing tests: Final local gate and exact-head GitHub CI on the narrowed candidate.; Explicit operator acceptance: owner funding and member SMS through the local product flow, with an approved recipient and redacted evidence. Handset delivery is not proved by no-traffic tests.
 - Tracker: Selected snapshot, 2026-11-01 UTC: native Task assigned @sai-sy; native Priority, Effort and Enviornment are unset. Actual Project Status In progress was read in the authenticated issue sidebar. Parent #2815 and native blocker #2827 remain open; profile/status code is already merged in #2974. Existing Development link to #3067 is preserved. Do not create another SIM implementation or mark real SMS acceptance complete.
+
+---
 
 ## Verify and close — 65
 

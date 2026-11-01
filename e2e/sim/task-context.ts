@@ -1,5 +1,4 @@
 import type { SimRuntimeContext } from "./runtime-context";
-import type { ProjectConfig } from "../../config/schema";
 import type { ResolvedSimProfile } from "./personas";
 
 export type SimTaskCapability =
@@ -23,15 +22,13 @@ export type SimTaskContext = Readonly<{
   flow: "sms-send";
 }>;
 
-export type SimSignInTaskContext = Omit<SimTaskContext, "runtime"> &
-  Readonly<{
-    runtime: SimRuntimeContext;
-  }>;
+export type SimSignInTaskContext = Omit<SimTaskContext, "runtime"> & Readonly<{
+  runtime: SimRuntimeContext;
+}>;
 
 export type SimSmsTaskInput = Readonly<{
   recipient: Readonly<{ name: string; phone: string }>;
   message: string;
-  checkoutProvider: ProjectConfig["services"]["app"]["checkoutProvider"];
   stripe: Readonly<{ cardNumber: string; expiry: string; cvc: string }>;
 }>;
 
@@ -46,37 +43,25 @@ export const simTaskDefinitions = Object.freeze({
   },
   credits: {
     name: "ensure-sms-credits",
-    requires: {
-      workspaceRole: "owner",
-      capabilities: ["billing.purchaseTestCredits"],
-    },
+    requires: { workspaceRole: "owner", capabilities: ["billing.purchaseTestCredits"] },
   },
   sms: {
     name: "send-sms",
     requires: { workspaceRole: "member", capabilities: ["message.send"] },
   },
-} as const satisfies Record<
-  string,
-  Readonly<{ name: string; requires: SimTaskRequirement }>
->);
+} as const satisfies Record<string, Readonly<{ name: string; requires: SimTaskRequirement }>>);
 
 export function assertTaskRequirement(
   context: Pick<SimTaskContext, "profile">,
   requirement: SimTaskRequirement,
 ): void {
   const roleRank = { member: 1, owner: 2 } as const;
-  if (
-    roleRank[context.profile.expectedRole] < roleRank[requirement.workspaceRole]
-  ) {
-    throw new Error(
-      `SIM task access denied: ${requirement.workspaceRole} role is required`,
-    );
+  if (roleRank[context.profile.expectedRole] < roleRank[requirement.workspaceRole]) {
+    throw new Error(`SIM task access denied: ${requirement.workspaceRole} role is required`);
   }
   for (const capability of requirement.capabilities) {
     if (!context.profile.capabilities.includes(capability)) {
-      throw new Error(
-        `SIM task access denied: capability '${capability}' is not declared`,
-      );
+      throw new Error(`SIM task access denied: capability '${capability}' is not declared`);
     }
   }
 }
@@ -88,10 +73,7 @@ export function createSimTaskContext(args: {
 }): SimTaskContext {
   const context = {
     profile: args.runtime.profile,
-    runtime: Object.freeze({
-      profile: args.runtime.profile,
-      providerName: args.runtime.providerName,
-    }),
+    runtime: Object.freeze({ profile: args.runtime.profile, providerName: args.runtime.providerName }),
     workspaceId: args.workspaceId,
     flow: args.flow ?? "sms-send",
   } as const;

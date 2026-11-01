@@ -134,7 +134,6 @@ suite("canonical Stripe customer uses real database claims and SDK requests (#21
 
   beforeAll(async () => {
     if (!databaseUrl) throw new Error("Stripe race tests require a database URL");
-    vi.stubEnv("ENV", "dev");
     vi.stubEnv("DATABASE_URL", databaseUrl);
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_customer_race_fixture");
     client = postgres(databaseUrl, { max: 1 });

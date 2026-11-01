@@ -11,7 +11,7 @@ export default defineConfig({
   reporter: [["list"], ["html", { open: "never", outputFolder: "sim-playwright-report" }]],
   use: {
     baseURL: "http://127.0.0.1:3000",
-    trace: "off",
+    trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
     ...devices["Desktop Chrome"],

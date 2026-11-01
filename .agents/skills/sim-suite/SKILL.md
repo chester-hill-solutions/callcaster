@@ -75,6 +75,12 @@ identity, workspace, role and capabilities before browser work.
 `e2e/sim/config.ts` returns typed recipient, message and checkout inputs only.
 Keep secrets out of profiles, task inputs and artifacts.
 
+Profile reconciliation must create or repair the Better Auth credential account.
+Resolve the password only after the local runtime guard passes. Verify sign-in
+through the real auth adapter; a saved user and membership do not prove login.
+Do not clear a password locator after submit: navigation can remove the field
+and make Playwright wait until the whole flow times out.
+
 ### Tasks
 
 Tasks are small, reusable browser operations. They must complete one product
@@ -105,9 +111,8 @@ constants into the sim suite. Read the current balance before opening checkout. 
 when the balance covers the operation.
 
 If funding is needed, respect `MIN_CREDITS` and purchase the smallest amount
-that covers the flow. Local uses local test checkout with real one-time ledger
-fulfillment. Deployed profiles use Stripe test mode only. Production refuses
-mock checkout. Do not hard-code live payment credentials.
+that covers the flow. Use Stripe test mode only. Do not hard-code live payment
+credentials.
 
 ## Flow orchestration
 

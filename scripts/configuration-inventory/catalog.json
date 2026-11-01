@@ -237,16 +237,16 @@
       "migrationTarget": "config.services.scripts"
     },
     {
+      "key": "E2E_STRIPE_SESSION",
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
+    },
+    {
       "key": "E2E_TEST",
       "classification": "non-secret-config",
       "owner": "app",
       "migrationTarget": "config.services.app"
-    },
-    {
-      "key": "FLY_APP_NAME",
-      "classification": "generated-deployment-value",
-      "owner": "app",
-      "migrationTarget": "config.generated.fly_app_name"
     },
     {
       "key": "ELEVENLABS_API_KEY",
@@ -301,12 +301,6 @@
       "classification": "generated-deployment-value",
       "owner": "ci",
       "migrationTarget": "config.generated.integration_db_url"
-    },
-    {
-      "key": "K_SERVICE",
-      "classification": "generated-deployment-value",
-      "owner": "app",
-      "migrationTarget": "config.generated.k_service"
     },
     {
       "key": "LABEL",
@@ -555,12 +549,6 @@
       "migrationTarget": "config.generated.railway_deployment_draining_seconds"
     },
     {
-      "key": "RAILWAY_DEPLOYMENT_ID",
-      "classification": "generated-deployment-value",
-      "owner": "app",
-      "migrationTarget": "config.generated.railway_deployment_id"
-    },
-    {
       "key": "RAILWAY_DOCKERFILE_PATH",
       "classification": "generated-deployment-value",
       "owner": "deployment",
@@ -571,12 +559,6 @@
       "classification": "generated-deployment-value",
       "owner": "ci",
       "migrationTarget": "config.generated.railway_environment_id"
-    },
-    {
-      "key": "RAILWAY_ENVIRONMENT",
-      "classification": "generated-deployment-value",
-      "owner": "app",
-      "migrationTarget": "config.generated.railway_environment"
     },
     {
       "key": "RAILWAY_ENVIRONMENT_NAME",
@@ -595,12 +577,6 @@
       "classification": "generated-deployment-value",
       "owner": "ci",
       "migrationTarget": "config.generated.railway_project_id"
-    },
-    {
-      "key": "RAILWAY_SERVICE_ID",
-      "classification": "generated-deployment-value",
-      "owner": "app",
-      "migrationTarget": "config.generated.railway_service_id"
     },
     {
       "key": "RAILWAY_TOKEN",
@@ -996,12 +972,6 @@
       "migrationTarget": "config.services.scripts"
     },
     {
-      "key": "VERCEL",
-      "classification": "generated-deployment-value",
-      "owner": "app",
-      "migrationTarget": "config.generated.vercel"
-    },
-    {
       "key": "VITE_DEV_HOST",
       "classification": "generated-deployment-value",
       "owner": "local-tooling",
@@ -1012,6 +982,42 @@
       "classification": "non-secret-config",
       "owner": "app",
       "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "FLY_APP_NAME",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.fly_app_name"
+    },
+    {
+      "key": "K_SERVICE",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.k_service"
+    },
+    {
+      "key": "RAILWAY_DEPLOYMENT_ID",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.railway_deployment_id"
+    },
+    {
+      "key": "RAILWAY_ENVIRONMENT",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.railway_environment"
+    },
+    {
+      "key": "RAILWAY_SERVICE_ID",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.railway_service_id"
+    },
+    {
+      "key": "VERCEL",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.vercel"
     }
   ],
   "dynamicBoundaries": [
@@ -1074,7 +1080,7 @@
     },
     {
       "sourceFile": "e2e/sim/config.ts",
-      "line": 19,
+      "line": 16,
       "expression": "process.env[name]",
       "status": "approved",
       "owner": "sim",

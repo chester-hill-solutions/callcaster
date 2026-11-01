@@ -123,7 +123,6 @@ export const ServiceSliceSchema = z
     bucket: z.string().min(1).optional(),
     region: z.string().min(1).optional(),
     trafficPolicy: z.enum(simTrafficPolicies).default("disabled"),
-    checkoutProvider: z.enum(["stripe", "mock"]).default("stripe"),
     secrets: z.array(SecretReferenceSchema).default([]),
   })
   .strict()
@@ -166,17 +165,17 @@ const projectConfigObjectSchema = z
       .default({}),
     services: z
       .object({
-        app: ServiceSliceSchema.default({ enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] }),
-        worker: ServiceSliceSchema.default({ enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] }),
-        "media-stream": ServiceSliceSchema.default({ enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] }),
-        sim: ServiceSliceSchema.default({ enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] }),
+        app: ServiceSliceSchema.default({ enabled: true, trafficPolicy: "disabled", secrets: [] }),
+        worker: ServiceSliceSchema.default({ enabled: true, trafficPolicy: "disabled", secrets: [] }),
+        "media-stream": ServiceSliceSchema.default({ enabled: true, trafficPolicy: "disabled", secrets: [] }),
+        sim: ServiceSliceSchema.default({ enabled: true, trafficPolicy: "disabled", secrets: [] }),
       })
       .strict()
       .default({
-        app: { enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] },
-        worker: { enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] },
-        "media-stream": { enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] },
-        sim: { enabled: true, trafficPolicy: "disabled", checkoutProvider: "stripe", secrets: [] },
+        app: { enabled: true, trafficPolicy: "disabled", secrets: [] },
+        worker: { enabled: true, trafficPolicy: "disabled", secrets: [] },
+        "media-stream": { enabled: true, trafficPolicy: "disabled", secrets: [] },
+        sim: { enabled: true, trafficPolicy: "disabled", secrets: [] },
       }),
   })
   .strict();
@@ -190,7 +189,6 @@ const serviceOverlaySchema = z
     bucket: z.string().min(1).optional(),
     region: z.string().min(1).optional(),
     trafficPolicy: z.enum(simTrafficPolicies).optional(),
-    checkoutProvider: z.enum(["stripe", "mock"]).optional(),
     secrets: z.array(SecretReferenceSchema).optional(),
   })
   .strict()
@@ -257,17 +255,6 @@ export const ProjectConfigSchema = z
         code: "custom",
         path: ["secretProvider"],
         message: `secret provider '${config.secretProvider}' is not valid for ${config.environment}`,
-      });
-    }
-
-    if (
-      config.services.app.checkoutProvider === "mock" &&
-      config.environment !== "local"
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["services", "app", "checkoutProvider"],
-        message: "mock checkout is only valid for local",
       });
     }
 

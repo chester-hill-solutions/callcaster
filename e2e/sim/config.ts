@@ -1,12 +1,9 @@
 import type { TestInfo } from "@playwright/test";
 import type { SimSmsTaskInput } from "./task-context";
-import { loadProjectConfig } from "../../config/load";
 
 export const SIM_BASE_URL_FALLBACK = "http://127.0.0.1:3000";
 
-export function createSimBrowserContextOptions(
-  testInfo: Pick<TestInfo, "project">,
-): { baseURL: string } {
+export function createSimBrowserContextOptions(testInfo: Pick<TestInfo, "project">): { baseURL: string } {
   return { baseURL: testInfo.project.use.baseURL ?? SIM_BASE_URL_FALLBACK };
 }
 
@@ -37,7 +34,6 @@ export function loadSimSmsCompatibilityInput(): SimSmsTaskInput {
       phone: exact("SIM_RECIPIENT_PHONE", APPROVED_RECIPIENT.recipientPhone),
     },
     message: process.env.SIM_SMS_MESSAGE?.trim() || "CallCaster SIM SMS check",
-    checkoutProvider: loadProjectConfig("local").services.app.checkoutProvider,
     stripe: {
       cardNumber: "4242424242424242",
       expiry: "12/34",

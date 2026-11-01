@@ -3,7 +3,7 @@ import { releaseNumberForWorkspace } from "@/lib/number-release.server";
  * Workspace-related database functions
  */
 import type Twilio from "twilio";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   audience,
   campaign,
@@ -148,28 +148,6 @@ export function twilioAccountToPersistableJson(account: unknown): Record<string,
     }
   }
   return out;
-}
-
-export async function getSimProvisioningWorkspace(workspaceId: string, marker: string) {
-  return adminDb.query.workspace.findFirst({
-    where: and(eq(workspace.id, workspaceId), eq(workspace.sim_marker, marker)),
-    columns: { id: true, name: true, sim_marker: true, key: true, token: true },
-  });
-}
-
-export async function persistSimWorkspaceApiKey(workspaceId: string, key: string, secret: string): Promise<void> {
-  await adminDb.update(workspace).set({ key, token: secret }).where(eq(workspace.id, workspaceId));
-  invalidateWorkspaceTwilioData(workspaceId);
-}
-
-export async function getSimTwilioReadinessBits(workspaceId: string, marker: string) {
-  const [row] = await adminDb.select({
-    subaccount: sql`(${workspace.twilio_data}::jsonb)->>'sid' <> '' and (${workspace.twilio_data}::jsonb)->>'authToken' <> ''`,
-    apiKey: sql`${workspace.key} <> '' and ${workspace.token} <> ''`,
-    messagingService: sql`(${workspace.twilio_data}::jsonb)->'onboarding'->'messagingService'->>'serviceSid' <> ''`,
-    keyRecovery: sql`(${workspace.twilio_data}::jsonb)->>'simTwilioKeyProvisioning' = 'pending'`,
-  }).from(workspace).where(and(eq(workspace.id, workspaceId), eq(workspace.sim_marker, marker))).limit(1);
-  return row ?? null;
 }
 
 export async function getWorkspaceInfo({
