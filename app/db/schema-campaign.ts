@@ -144,7 +144,7 @@ export const campaign_queue = pgTable(
     dequeued_reason: text(),
     dispatch_generation: uuid().notNull().defaultRandom(),
     voice_reservation_id: uuid(),
-    redial_requested_at: timestamp({ withTimezone: true, mode: "date" }),
+    redial_requested_at: timestamp({ withTimezone: true, mode: "date" }).default(sql`clock_timestamp()`),
     workspace: uuid().notNull(),
   },
   (table) => [unique("campaign_queue_campaign_contact_unique").on(table.campaign_id, table.contact_id)],

@@ -60,6 +60,8 @@ function belongsToLegacyAttempt(workspaceId: string, owner: LegacyOwner) {
 }
 
 async function eligibleLegacyEntry(tdb: TenantDb, row: typeof campaign_queue.$inferSelect, owner: LegacyOwner) {
+  const savedPrimary = row.id === owner.queueId && row.contact_id === owner.contactId;
+  if (!savedPrimary && row.redial_requested_at === null) return false;
   if (row.voice_reservation_id || assignedElsewhere(row, owner.actorId)) return false;
   if (wasDequeued(row)) return true;
   if (row.queue_state !== null && !["queued", "assigned"].includes(row.queue_state)) return false;

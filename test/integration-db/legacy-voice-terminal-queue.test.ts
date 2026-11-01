@@ -128,6 +128,27 @@ describe("legacy voice terminal queue ownership", () => {
     await resultRows(f);
   });
 
+  test.each(['primary', 'household'])("a historical %s without an intent timestamp keeps uncertain ownership queued", async target => {
+    const f = await legacyAttempt(target === 'household');
+    if (target === 'primary') await sql`update public.call set queue_id = null where sid = ${f.callSid}`;
+    const queueId = target === 'primary' ? f.queue.id : f.sibling?.queue;
+    if (!queueId) throw new Error('Owned historical queue required');
+    await sql`update public.campaign_queue set redial_requested_at = null where id = ${queueId}`;
+    const [before] = await sql`select * from public.campaign_queue where id = ${queueId}`;
+    await finish(f);
+    expect((await sql`select * from public.campaign_queue where id = ${queueId}`)[0]).toEqual(before);
+    if (target === 'household') expect((await sql`select queue_state from public.campaign_queue where id = ${f.queue.id}`)[0].queue_state).toBe('dequeued');
+    await resultRows(f);
+  });
+
+  test("a historical primary with its saved queue ID still completes without an intent timestamp", async () => {
+    const f = await legacyAttempt();
+    await sql`update public.campaign_queue set redial_requested_at = null where id = ${f.queue.id}`;
+    await finish(f);
+    expect((await sql`select queue_state from public.campaign_queue where id = ${f.queue.id}`)[0].queue_state).toBe('dequeued');
+    await resultRows(f);
+  });
+
   test("outreach inserted by an older transaction still completes earlier queue work", async () => {
     const url = process.env.INTEGRATION_DB_URL ?? process.env.DATABASE_URL;
     if (!url) throw new Error('Owned fixture URL required');

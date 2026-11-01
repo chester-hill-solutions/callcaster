@@ -113,7 +113,10 @@ New queue rows and outreach attempts use database insertion time, so a transacti
 that starts earlier cannot backdate replacement work. A later explicit requeue,
 reservation, outreach attempt or live customer keeps that row queued. Missing
 original outreach or unresolved parent ownership never borrows the current
-assignee. Eligible household members created before the original attempt still
+assignee. A historical row without the intent timestamp needs its exact saved
+primary queue ID; unbound primary rows and household siblings stay queued for
+operator review. New rows receive the existing intent timestamp on insertion.
+Eligible household members created before the original attempt still
 advance; newer or live members stay queued. Call billing and the original
 outreach result continue through their canonical owners. Legacy Hang Up waits
 for a confirmed terminal Call before queue completion. Predictive continuation

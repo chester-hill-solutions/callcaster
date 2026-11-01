@@ -794,6 +794,9 @@ Postgres `now()` is the transaction start time. An insertion-order ownership
 cutoff needs `clock_timestamp()` on both compared insert events. Test an older
 transaction that inserts a replacement later, and an older transaction that
 inserts the original outreach after its queue. Keep applied migrations intact.
+A new default does not repair historical values. Preserve unknown intent
+timestamps and require saved ownership before old rows can advance. Test a
+delayed callback across a real upgrade after the replacement was already made.
 Keep real database I/O on real timers when testing a provider deadline. Signal
 that the provider read has started, await its bounded rejection, then release
 the late response. Faking all timers can stall the SQL client's socket work and
