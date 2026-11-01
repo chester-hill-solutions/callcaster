@@ -1,6 +1,8 @@
 # Stripe environments
 
-This is the current read-only audit for #2700, checked on 2026-11-01 UTC. It records the deployed setup. The owner has not yet confirmed the intended sandbox parent, and no configuration was changed by this audit.
+This is the read-only audit for #2700, checked on 2026-11-01 UTC. It records the deployed setup; no configuration was changed.
+
+**Human-only task.** The user directed the agent to skip #2700. The human owner must complete sandbox setup, customer-reference review and acceptance. Do not ask for another account choice or CLI login, and do not treat this audit as completed setup. #1981 and #1983 remain blocked.
 
 ## Account map
 
@@ -41,7 +43,7 @@ All valid customer IDs resolved in their current account. There were no missing 
 
 A new dev sandbox needs a customer-reference plan. The existing IDs belong to the current account and must not be reused blindly in another account. Preserve workspace billing history; review the mapping before switching the app and worker. Do not delete or reset customer history to make a test pass.
 
-## Remaining work
+## Remaining work for the human owner
 
 1. Confirm which live account will own the dedicated dev sandbox. The current production account is the proposed parent, not an approved change.
 2. Authorize the Stripe CLI for that live account and inspect its sandboxes. The current CLI profile cannot list them. A failed list is not evidence that none exist.

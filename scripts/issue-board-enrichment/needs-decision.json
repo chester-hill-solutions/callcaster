@@ -55,7 +55,7 @@
     ],
     "size": "S-M",
     "risk": "high",
-    "trackerRecommendation": "Ops task with a rollback plan. The possible dependency on #1329 was dropped when #1329 closed as not planned on 2026-10-17; re-check current account ownership before the transfer.",
+    "trackerRecommendation": "Selected snapshot, 2026-11-01 UTC: actual Project Status Backlog. Native Type Task, Priority Urgent, Effort unset, Enviornment unset; assignee @wra-sol. No parent. Children: none. Native open blockers: none. An operator must confirm source/target ownership, billing and callbacks before the production number transfer. No transfer was made.",
     "blockedBy": []
   },
   {
@@ -439,7 +439,7 @@
     "blockedBy": [],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Needs decision, and it is a short one. The engineering is a console exercise; what is genuinely unresolved is the safety rule, and getting that wrong breaks a dev workspace in a way nobody notices until later. If the answer is 'a reference check first', that is worth filing as its own small issue, because it makes every future clean-up safe and is more valuable than this particular release."
+    "trackerRecommendation": "Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Task, Priority Urgent, Effort Medium, Enviornment unset; assignee @wra-sol. Parent #1165 (open). Children: #2168 (open). Native open blockers: #1320. The in-use and repeat-policy decisions are still unrecorded. Status on-dev does not resolve this decision. #1320 is an open native blocker."
   },
   {
     "issueNumber": 2036,
@@ -1055,7 +1055,7 @@
     ],
     "size": "L",
     "risk": "high",
-    "trackerRecommendation": "Native Bug, Priority High, Effort Medium. Project Status remains In progress. Children #3085, #3088 and #3091 are on-dev. Keep this parent open for its remaining requirements.",
+    "trackerRecommendation": "Selected snapshot, 2026-11-01 UTC: actual Project Status In progress. Native Type Bug, Priority High, Effort Medium, Enviornment unset; assignee none. No parent. Children: #3085 (open), #3088 (open), #3091 (open). Native open blockers: none. Children #3085, #3088 and #3091 are on-dev. Preserve #2089 consent and ambiguity protection. Keep parent open for its remaining requirements; CMS work remains deferred under #2677.",
     "existingTests": [
       "The #3085 focused real-database run passes 50 cases, including cross-audience reuse, concurrent imports, formatted phones, opt-out preservation, workspace isolation, replay/recovery, manual-SMS identity and download messages. The original implementation fails four regression cases.",
       "Full npm run ci:local passes on clean 030d8bd45cec1ab46243489322ce0306f4181d9a in 698.38 seconds: 6,153 Node tests with three existing skips, 34 Bun tests and 1,568 UI tests. All guards, typecheck, lint, build, bundle and codegen checks pass. Start/end commit and source hashes match.",
@@ -1081,6 +1081,6 @@
     ],
     "size": "M",
     "risk": "high",
-    "trackerRecommendation": "Native Feature, Priority High, Effort Medium, Project Status Backlog. Preserve the native #2216 dependency until its required verification is done."
+    "trackerRecommendation": "Selected snapshot, 2026-11-01 UTC: actual Project Status Backlog. Native Type Feature, Priority High, Effort Medium, Enviornment prod; assignee none. No parent. Children: none. Native open blockers: #2216. The verification code has landed, but signup volume, trial-credit policy and deliberate production configuration still need decisions. Do not change SIGNUP_OPEN in this task."
   }
 ]
