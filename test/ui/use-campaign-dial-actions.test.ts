@@ -227,7 +227,7 @@ describe("useCampaignDequeueActions", () => {
     expect(saveData).toHaveBeenCalledTimes(1);
     expect(dequeue).toHaveBeenCalledWith({ contact: nextRecipient });
     expect(fetchMore).toHaveBeenCalledWith({ householdMap: { h1: [nextRecipient] } });
-    expect(handleNextNumber).toHaveBeenCalledWith(false);
+    expect(handleNextNumber).toHaveBeenCalledWith(false, nextRecipient);
     // NEXT (not HANG_UP): advancing the queue must not park the FSM in
     // "completed" from idle — the next dial flashed that stale outcome (#1220).
     expect(send).toHaveBeenCalledWith({ type: "NEXT" });

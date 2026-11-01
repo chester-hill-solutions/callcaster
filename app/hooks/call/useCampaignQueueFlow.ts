@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { handleContact, handleQueue } from "@/lib/callscreenActions";
 import { advanceQueueEntry } from "@/lib/queue-advance-client";
@@ -50,7 +50,7 @@ export function useCampaignQueueFlow({
 }: UseCampaignQueueFlowOptions) {
   const pageScope = JSON.stringify([workspaceId, userId, campaign?.id]);
   const pageOwner = useMemo(() => ({ scope: pageScope, active: false, epoch: 0 }), [pageScope]);
-  const scope = JSON.stringify([workspaceId, userId, campaign?.id, questionContact?.id, questionContact?.dispatch_generation, customerCallSid]);
+  const scope = JSON.stringify([workspaceId, userId, campaign?.id, questionContact?.id, questionContact?.dispatch_generation, questionContact?.voice_reservation_id, customerCallSid]);
   const owner = useMemo(() => ({ scope, active: false, posting: false, epoch: 0 }), [scope]);
   const [postingOwner, setPostingOwner] = useState<typeof owner | null>(null);
   /**
@@ -82,12 +82,14 @@ export function useCampaignQueueFlow({
     owner.posting = true; setPostingOwner(owner);
     const result = await advanceQueueEntry({ workspace_id: workspaceId, campaign_id: campaign.id,
       contact_id: contact.contact.id, queue_id: contact.id, dispatch_generation: contact.dispatch_generation,
-      household: groupByHousehold, ...(customerCallSid ? { call_sid: customerCallSid } : {}) }, userId);
+      voice_reservation_id: contact.voice_reservation_id, household: groupByHousehold,
+      ...(groupByHousehold && contact.advance_snapshot ? { household_snapshot: contact.advance_snapshot } : {}),
+      ...(customerCallSid ? { call_sid: customerCallSid } : {}) }, userId);
     if (!isCurrentQueue() || owner.epoch !== epoch) return false;
     owner.posting = false; setPostingOwner(null);
     if (!result.ok) { toast.error(result.error); return false; }
-    if (result.advanceState !== "superseded")
-      setQueue(current => current.filter(row => row.id !== contact.id || row.dispatch_generation !== contact.dispatch_generation));
+    setQueue(current => current.filter(row => !result.removedEntries.some(entry => row.id === entry.queue_id &&
+      row.contact_id === entry.contact_id && row.dispatch_generation === entry.dispatch_generation && row.voice_reservation_id === entry.voice_reservation_id)));
     return true;
   }, [campaign, owner, isCurrentQueue, questionContact, workspaceId, groupByHousehold, customerCallSid, userId, setQueue]);
 
@@ -109,30 +111,34 @@ export function useCampaignQueueFlow({
     await batch.fetchMore(args);
   }, [campaign, workspaceId, pageOwner, setQueue]);
 
+  const selection = useRef({ activeCallSid, hangUp, nextNumber, queue, householdMap, nextRecipient, groupByHousehold, setUpdate });
+  /**
+   * @effect Keep post-acknowledgement selection on the latest committed queue.
+   * @effect-deps activeCallSid, hangUp, nextNumber, queue, householdMap, nextRecipient, groupByHousehold, setUpdate.
+   * @effect-side-effects Replace a callback snapshot; no queue or provider writes.
+   * @effect-why-not-loader Realtime queue changes can arrive while Save and Next waits.
+   */
+  useLayoutEffect(() => {
+    selection.current = { activeCallSid, hangUp, nextNumber, queue, householdMap, nextRecipient, groupByHousehold, setUpdate };
+  }, [activeCallSid, hangUp, nextNumber, queue, householdMap, nextRecipient, groupByHousehold, setUpdate]);
+
   const handleNextNumber = useCallback(
-    (skipHousehold = false) => {
-      if (activeCallSid) {
-        hangUp();
+    (skipHousehold = false, completedContact?: QueueItem) => {
+      if (!pageOwner.active) return;
+      const current = selection.current;
+      if (!completedContact && current.activeCallSid) {
+        current.hangUp();
       }
-      nextNumber({
+      current.nextNumber({
         skipHousehold,
-        queue,
-        householdMap,
-        nextRecipient,
-        groupByHousehold,
+        queue: current.queue,
+        householdMap: current.householdMap,
+        nextRecipient: completedContact ?? current.nextRecipient,
+        groupByHousehold: current.groupByHousehold,
       });
-      setUpdate(null);
+      current.setUpdate(null);
     },
-    [
-      activeCallSid,
-      hangUp,
-      nextNumber,
-      queue,
-      householdMap,
-      nextRecipient,
-      groupByHousehold,
-      setUpdate,
-    ],
+    [pageOwner],
   );
 
   return {

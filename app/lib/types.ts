@@ -5,6 +5,8 @@ export type { WorkspaceTwilioSyncSnapshot, WorkspaceTwilioSyncStatus } from "@/l
 import type { AccountInstance } from "twilio/lib/rest/api/v2010/account";
 import type { CallCoachingHydration } from "@/hooks/call/useCallCoaching";
 import type { WorkspaceOnboardingGoal } from "@/lib/workspace-onboarding-goals";
+import type { CampaignQueueState, QueueItem } from "@/lib/call-queue-types";
+export type { CampaignQueueState, QueueItem } from "@/lib/call-queue-types";
 import type { TollFreeOptInType } from "@/lib/toll-free-opt-in";
 export {
   WORKSPACE_ONBOARDING_GOAL_VALUES,
@@ -118,14 +120,6 @@ export interface SurveyAnswerData {
   answer_value: string;
 }
 export type Script = Tables<"script">;
-export type CampaignQueueState = Tables<"campaign_queue"> & {
-  assigned_to_user_id?: string | null;
-  provider_status?: string | null;
-  queue_state?: string | null;
-};
-export type QueueItem = CampaignQueueState & {
-  contact: Contact;
-};
 export type CampaignQueue = CampaignQueueState;
 export type Call = Tables<"call">;
 export type User = Tables<"user"> | null;

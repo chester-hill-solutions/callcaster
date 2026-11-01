@@ -54,7 +54,7 @@ export const action = defineAction({
         logger.info("queue.dequeue_conflict", { contactId: contact_id, workspaceId, userId: auth.user.id });
         return routeData({ error: message, code: result.reason }, { status: 409 });
       }
-      return routeData({ success: true, dequeued: result.dequeued, advance_state: result.advance_state, ...body, user_id: auth.user.id });
+      return routeData({ success: true, dequeued: result.dequeued, advance_state: result.advance_state, removed_entries: result.removed_entries, ...body, user_id: auth.user.id });
     }
 
     if (request.method === "DELETE") {

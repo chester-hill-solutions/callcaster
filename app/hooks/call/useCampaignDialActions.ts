@@ -126,7 +126,7 @@ type UseCampaignDequeueActionsOptions = {
   isCurrentQueue: () => boolean;
   fetchMore: (args: { householdMap: Record<string, QueueItem[]> }) => Promise<void>;
   householdMap: Record<string, QueueItem[]>;
-  handleNextNumber: (skipHousehold?: boolean) => void;
+  handleNextNumber: (skipHousehold?: boolean, completedContact?: QueueItem) => void;
   setRecentAttempt: (attempt: OutreachAttempt | null) => void;
   setUpdate: (update: Record<string, unknown> | null) => void;
 };
@@ -147,7 +147,7 @@ export function useCampaignDequeueActions({
   setUpdate,
 }: UseCampaignDequeueActionsOptions) {
   return useCallback(async () => {
-    if (!campaign || !questionContact) return;
+    if (!campaign || !questionContact || !isCurrentQueue()) return;
 
     if (campaign.dial_type === "predictive") {
       send({ type: "HANG_UP" });
@@ -158,7 +158,7 @@ export function useCampaignDequeueActions({
       saveData();
       if (!await dequeue({ contact: questionContact }) || !isCurrentQueue()) return;
       fetchMore({ householdMap });
-      handleNextNumber(campaign?.group_household_queue || false);
+      handleNextNumber(campaign?.group_household_queue || false, questionContact);
       // NEXT resets a finished call to idle; HANG_UP here parked the FSM in
       // "completed" even from idle, which the next dial then flashed (#1220).
       send({ type: "NEXT" });

@@ -8155,7 +8155,7 @@
             "secureSessionCookie": []
           }
         ],
-        "description": "Session or bearer session only. Capture workspace, campaign, contact, queue ID and dispatch generation before sending Save and Next. X-Callcaster-Audio-Actor must match the authenticated user; it grants no authority. A customer Call SID must belong to that actor and contact and be terminal. A current funded attempt can dequeue only its own queue generation and reservation. An old terminal customer can finish its view with advance_state=superseded while newer queue work remains unchanged. A legacy completed customer without a saved funding owner also returns superseded; this command does not infer its queue ownership. Idle stale skips return 409. All HTTP 200 variants echo the captured request and actor. Remove a local queue row only for dequeued or already_dequeued, never for superseded. Unknown replies keep the current form; retry the same request. This control does not settle customer billing or start another call.",
+        "description": "Session or bearer session only. Capture workspace, campaign, contact, queue ID and dispatch generation before sending Save and Next. X-Callcaster-Audio-Actor must match the authenticated user; it grants no authority. A customer Call SID must belong to that actor and contact and be terminal. A current funded attempt can dequeue only its own queue generation and reservation. An old terminal customer can finish its view with advance_state=superseded while newer queue work remains unchanged. A legacy completed customer without a saved funding owner also returns superseded; this command does not infer its queue ownership. Idle stale skips return 409. All HTTP 200 variants echo the captured request and actor. Capture voice_reservation_id too, including null. A household action requires the server-provided household_snapshot, including members outside the visible page. Each sibling must still match its captured row, generation, reservation and household; live or newer sibling work stays queued. Remove local rows only when their full identities occur in removed_entries. Superseded returns an empty list. Unknown replies keep the current form; retry the same request. This control does not settle customer billing or start another call.",
         "parameters": [
           {
             "name": "X-Callcaster-Audio-Actor",
@@ -8174,12 +8174,45 @@
               "schema": {
                 "type": "object",
                 "additionalProperties": false,
+                "allOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "household": {
+                            "enum": [
+                              false
+                            ]
+                          }
+                        },
+                        "not": {
+                          "required": [
+                            "household_snapshot"
+                          ]
+                        }
+                      },
+                      {
+                        "properties": {
+                          "household": {
+                            "enum": [
+                              true
+                            ]
+                          }
+                        },
+                        "required": [
+                          "household_snapshot"
+                        ]
+                      }
+                    ]
+                  }
+                ],
                 "required": [
                   "workspace_id",
                   "campaign_id",
                   "contact_id",
                   "queue_id",
                   "dispatch_generation",
+                  "voice_reservation_id",
                   "household"
                 ],
                 "properties": {
@@ -8188,19 +8221,6 @@
                     "minLength": 1
                   },
                   "campaign_id": {
-                    "oneOf": [
-                      {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 9007199254740991
-                      },
-                      {
-                        "type": "string",
-                        "pattern": "^[1-9][0-9]*$"
-                      }
-                    ]
-                  },
-                  "contact_id": {
                     "oneOf": [
                       {
                         "type": "integer",
@@ -8226,12 +8246,96 @@
                       }
                     ]
                   },
+                  "contact_id": {
+                    "oneOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$"
+                      }
+                    ]
+                  },
                   "dispatch_generation": {
                     "type": "string",
                     "format": "uuid"
                   },
+                  "voice_reservation_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  },
                   "household": {
                     "type": "boolean"
+                  },
+                  "household_snapshot": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "household_id",
+                      "entries"
+                    ],
+                    "properties": {
+                      "household_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "entries": {
+                        "type": "array",
+                        "maxItems": 1000,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "queue_id",
+                            "contact_id",
+                            "dispatch_generation",
+                            "voice_reservation_id"
+                          ],
+                          "properties": {
+                            "queue_id": {
+                              "oneOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "string",
+                                  "pattern": "^[1-9][0-9]*$"
+                                }
+                              ]
+                            },
+                            "contact_id": {
+                              "oneOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "string",
+                                  "pattern": "^[1-9][0-9]*$"
+                                }
+                              ]
+                            },
+                            "dispatch_generation": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "voice_reservation_id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "nullable": true
+                            }
+                          }
+                        }
+                      }
+                    }
                   },
                   "call_sid": {
                     "type": "string",
@@ -8246,6 +8350,7 @@
                 "contact_id": 7,
                 "queue_id": 27,
                 "dispatch_generation": "10000000-0000-4000-8000-000000000099",
+                "voice_reservation_id": "10000000-0000-4000-8000-000000000088",
                 "household": false,
                 "call_sid": "CA33333333333333333333333333333333"
               }
@@ -8262,17 +8367,51 @@
                     {
                       "type": "object",
                       "additionalProperties": false,
+                      "allOf": [
+                        {
+                          "oneOf": [
+                            {
+                              "properties": {
+                                "household": {
+                                  "enum": [
+                                    false
+                                  ]
+                                }
+                              },
+                              "not": {
+                                "required": [
+                                  "household_snapshot"
+                                ]
+                              }
+                            },
+                            {
+                              "properties": {
+                                "household": {
+                                  "enum": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "household_snapshot"
+                              ]
+                            }
+                          ]
+                        }
+                      ],
                       "required": [
                         "workspace_id",
                         "campaign_id",
                         "contact_id",
                         "queue_id",
                         "dispatch_generation",
+                        "voice_reservation_id",
                         "household",
                         "success",
                         "user_id",
                         "dequeued",
-                        "advance_state"
+                        "advance_state",
+                        "removed_entries"
                       ],
                       "properties": {
                         "workspace_id": {
@@ -8284,12 +8423,12 @@
                           "minimum": 1,
                           "maximum": 9007199254740991
                         },
-                        "contact_id": {
+                        "queue_id": {
                           "type": "integer",
                           "minimum": 1,
                           "maximum": 9007199254740991
                         },
-                        "queue_id": {
+                        "contact_id": {
                           "type": "integer",
                           "minimum": 1,
                           "maximum": 9007199254740991
@@ -8298,13 +8437,120 @@
                           "type": "string",
                           "format": "uuid"
                         },
+                        "voice_reservation_id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "nullable": true
+                        },
                         "household": {
                           "type": "boolean"
+                        },
+                        "household_snapshot": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "household_id",
+                            "entries"
+                          ],
+                          "properties": {
+                            "household_id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "nullable": true
+                            },
+                            "entries": {
+                              "type": "array",
+                              "maxItems": 1000,
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "queue_id",
+                                  "contact_id",
+                                  "dispatch_generation",
+                                  "voice_reservation_id"
+                                ],
+                                "properties": {
+                                  "queue_id": {
+                                    "oneOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 9007199254740991
+                                      },
+                                      {
+                                        "type": "string",
+                                        "pattern": "^[1-9][0-9]*$"
+                                      }
+                                    ]
+                                  },
+                                  "contact_id": {
+                                    "oneOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 9007199254740991
+                                      },
+                                      {
+                                        "type": "string",
+                                        "pattern": "^[1-9][0-9]*$"
+                                      }
+                                    ]
+                                  },
+                                  "dispatch_generation": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "voice_reservation_id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "nullable": true
+                                  }
+                                }
+                              }
+                            }
+                          }
                         },
                         "call_sid": {
                           "type": "string",
                           "pattern": "^CA[0-9a-fA-F]{32}$",
                           "description": "The captured customer Call SID when completing a call. Omit it for an idle manual skip."
+                        },
+                        "removed_entries": {
+                          "type": "array",
+                          "maxItems": 1001,
+                          "minItems": 1,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "queue_id",
+                              "contact_id",
+                              "dispatch_generation",
+                              "voice_reservation_id"
+                            ],
+                            "properties": {
+                              "queue_id": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "contact_id": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "dispatch_generation": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "voice_reservation_id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "nullable": true
+                              }
+                            }
+                          }
                         },
                         "success": {
                           "type": "boolean",
@@ -8333,17 +8579,51 @@
                     {
                       "type": "object",
                       "additionalProperties": false,
+                      "allOf": [
+                        {
+                          "oneOf": [
+                            {
+                              "properties": {
+                                "household": {
+                                  "enum": [
+                                    false
+                                  ]
+                                }
+                              },
+                              "not": {
+                                "required": [
+                                  "household_snapshot"
+                                ]
+                              }
+                            },
+                            {
+                              "properties": {
+                                "household": {
+                                  "enum": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "household_snapshot"
+                              ]
+                            }
+                          ]
+                        }
+                      ],
                       "required": [
                         "workspace_id",
                         "campaign_id",
                         "contact_id",
                         "queue_id",
                         "dispatch_generation",
+                        "voice_reservation_id",
                         "household",
                         "success",
                         "user_id",
                         "dequeued",
-                        "advance_state"
+                        "advance_state",
+                        "removed_entries"
                       ],
                       "properties": {
                         "workspace_id": {
@@ -8355,12 +8635,12 @@
                           "minimum": 1,
                           "maximum": 9007199254740991
                         },
-                        "contact_id": {
+                        "queue_id": {
                           "type": "integer",
                           "minimum": 1,
                           "maximum": 9007199254740991
                         },
-                        "queue_id": {
+                        "contact_id": {
                           "type": "integer",
                           "minimum": 1,
                           "maximum": 9007199254740991
@@ -8369,13 +8649,120 @@
                           "type": "string",
                           "format": "uuid"
                         },
+                        "voice_reservation_id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "nullable": true
+                        },
                         "household": {
                           "type": "boolean"
+                        },
+                        "household_snapshot": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "household_id",
+                            "entries"
+                          ],
+                          "properties": {
+                            "household_id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "nullable": true
+                            },
+                            "entries": {
+                              "type": "array",
+                              "maxItems": 1000,
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "queue_id",
+                                  "contact_id",
+                                  "dispatch_generation",
+                                  "voice_reservation_id"
+                                ],
+                                "properties": {
+                                  "queue_id": {
+                                    "oneOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 9007199254740991
+                                      },
+                                      {
+                                        "type": "string",
+                                        "pattern": "^[1-9][0-9]*$"
+                                      }
+                                    ]
+                                  },
+                                  "contact_id": {
+                                    "oneOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 9007199254740991
+                                      },
+                                      {
+                                        "type": "string",
+                                        "pattern": "^[1-9][0-9]*$"
+                                      }
+                                    ]
+                                  },
+                                  "dispatch_generation": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "voice_reservation_id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "nullable": true
+                                  }
+                                }
+                              }
+                            }
+                          }
                         },
                         "call_sid": {
                           "type": "string",
                           "pattern": "^CA[0-9a-fA-F]{32}$",
                           "description": "The captured customer Call SID when completing a call. Omit it for an idle manual skip."
+                        },
+                        "removed_entries": {
+                          "type": "array",
+                          "maxItems": 1001,
+                          "minItems": 1,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "queue_id",
+                              "contact_id",
+                              "dispatch_generation",
+                              "voice_reservation_id"
+                            ],
+                            "properties": {
+                              "queue_id": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "contact_id": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "dispatch_generation": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "voice_reservation_id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "nullable": true
+                              }
+                            }
+                          }
                         },
                         "success": {
                           "type": "boolean",
@@ -8404,17 +8791,51 @@
                     {
                       "type": "object",
                       "additionalProperties": false,
+                      "allOf": [
+                        {
+                          "oneOf": [
+                            {
+                              "properties": {
+                                "household": {
+                                  "enum": [
+                                    false
+                                  ]
+                                }
+                              },
+                              "not": {
+                                "required": [
+                                  "household_snapshot"
+                                ]
+                              }
+                            },
+                            {
+                              "properties": {
+                                "household": {
+                                  "enum": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "household_snapshot"
+                              ]
+                            }
+                          ]
+                        }
+                      ],
                       "required": [
                         "workspace_id",
                         "campaign_id",
                         "contact_id",
                         "queue_id",
                         "dispatch_generation",
+                        "voice_reservation_id",
                         "household",
                         "success",
                         "user_id",
                         "dequeued",
                         "advance_state",
+                        "removed_entries",
                         "call_sid"
                       ],
                       "properties": {
@@ -8427,12 +8848,12 @@
                           "minimum": 1,
                           "maximum": 9007199254740991
                         },
-                        "contact_id": {
+                        "queue_id": {
                           "type": "integer",
                           "minimum": 1,
                           "maximum": 9007199254740991
                         },
-                        "queue_id": {
+                        "contact_id": {
                           "type": "integer",
                           "minimum": 1,
                           "maximum": 9007199254740991
@@ -8441,13 +8862,120 @@
                           "type": "string",
                           "format": "uuid"
                         },
+                        "voice_reservation_id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "nullable": true
+                        },
                         "household": {
                           "type": "boolean"
+                        },
+                        "household_snapshot": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "household_id",
+                            "entries"
+                          ],
+                          "properties": {
+                            "household_id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "nullable": true
+                            },
+                            "entries": {
+                              "type": "array",
+                              "maxItems": 1000,
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "queue_id",
+                                  "contact_id",
+                                  "dispatch_generation",
+                                  "voice_reservation_id"
+                                ],
+                                "properties": {
+                                  "queue_id": {
+                                    "oneOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 9007199254740991
+                                      },
+                                      {
+                                        "type": "string",
+                                        "pattern": "^[1-9][0-9]*$"
+                                      }
+                                    ]
+                                  },
+                                  "contact_id": {
+                                    "oneOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 9007199254740991
+                                      },
+                                      {
+                                        "type": "string",
+                                        "pattern": "^[1-9][0-9]*$"
+                                      }
+                                    ]
+                                  },
+                                  "dispatch_generation": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "voice_reservation_id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "nullable": true
+                                  }
+                                }
+                              }
+                            }
+                          }
                         },
                         "call_sid": {
                           "type": "string",
                           "pattern": "^CA[0-9a-fA-F]{32}$",
                           "description": "The captured customer Call SID when completing a call. Omit it for an idle manual skip."
+                        },
+                        "removed_entries": {
+                          "type": "array",
+                          "maxItems": 0,
+                          "minItems": 0,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "queue_id",
+                              "contact_id",
+                              "dispatch_generation",
+                              "voice_reservation_id"
+                            ],
+                            "properties": {
+                              "queue_id": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "contact_id": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "dispatch_generation": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "voice_reservation_id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "nullable": true
+                              }
+                            }
+                          }
                         },
                         "success": {
                           "type": "boolean",

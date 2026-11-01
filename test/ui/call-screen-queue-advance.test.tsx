@@ -14,7 +14,7 @@ const actor = "10000000-0000-4000-8000-000000000002";
 const fetcher = vi.fn<typeof fetch>();
 let resolve: (value: Response) => void;
 const ack = { workspace_id: contact.workspace, campaign_id: 42, contact_id: 7, queue_id: 27,
-  dispatch_generation: contact.dispatch_generation, household: false, user_id: actor, success: true, dequeued: true, advance_state: "dequeued" };
+  dispatch_generation: contact.dispatch_generation, voice_reservation_id: null, removed_entries: [{ queue_id: 27, contact_id: 7, dispatch_generation: contact.dispatch_generation, voice_reservation_id: null }], household: false, user_id: actor, success: true, dequeued: true, advance_state: "dequeued" };
 
 beforeEach(() => {
   fetcher.mockReset();
@@ -23,19 +23,21 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllGlobals(); });
 
-function screenFlow(callSid: string | null = null) {
+function screenFlow(callSid: string | null = null, initialSubject = contact, household = false) {
   return renderHook(({ workspaceId, userId, subject }) => {
-    const [queue, setQueue] = useState([contact, other]);
+    const [queue, setQueue] = useState([initialSubject, other]);
     const [answers, setAnswers] = useState<Record<string, unknown> | null>({ q1: "retained answer" });
+    const [selected, setSelected] = useState<QueueItem | null>(subject);
+    const [saveData] = useState(() => vi.fn());
     const flow = useCampaignQueueFlow({ campaign, workspaceId, userId, questionContact: subject, customerCallSid: callSid,
-      isCurrentCustomer: () => true, groupByHousehold: false, queue, householdMap: {}, nextRecipient: subject,
-      attemptList: [], callsList: [], activeCallSid: undefined, hangUp: vi.fn(), setQuestionContact: vi.fn(),
-      setRecentAttempt: vi.fn(), setUpdate: vi.fn(), setNextRecipient: vi.fn(), setQueue });
+      isCurrentCustomer: () => true, groupByHousehold: household, queue, householdMap: {}, nextRecipient: subject,
+      attemptList: [], callsList: [], activeCallSid: undefined, hangUp: vi.fn(), setQuestionContact: setSelected,
+      setRecentAttempt: vi.fn(), setUpdate: vi.fn(), setNextRecipient: setSelected, setQueue });
     const next = useCampaignDequeueActions({ campaign, questionContact: subject, send: vi.fn(), setCallDuration: vi.fn(),
-      handleDialButton: vi.fn(), saveData: vi.fn(), dequeue: flow.dequeue, isCurrentQueue: flow.isCurrentQueue,
-      fetchMore: vi.fn(async () => undefined), householdMap: {}, handleNextNumber: vi.fn(), setRecentAttempt: vi.fn(), setUpdate: setAnswers });
-    return { ...flow, queue, setQueue, next, answers };
-  }, { initialProps: { workspaceId: contact.workspace, userId: actor, subject: contact } });
+      handleDialButton: vi.fn(), saveData, dequeue: flow.dequeue, isCurrentQueue: flow.isCurrentQueue,
+      fetchMore: vi.fn(async () => undefined), householdMap: {}, handleNextNumber: flow.handleNextNumber, setRecentAttempt: vi.fn(), setUpdate: setAnswers });
+    return { ...flow, queue, setQueue, next, answers, selected, saveData };
+  }, { initialProps: { workspaceId: contact.workspace, userId: actor, subject: initialSubject } });
 }
 
 describe("call-screen confirmed queue advance", () => {
@@ -78,6 +80,35 @@ describe("call-screen confirmed queue advance", () => {
     await act(async () => { resolve(Response.json(ack)); expect(await pending).toBe(true); });
     expect(result.current.queue).toEqual([newer, other]);
   });
+  test("a newer reservation in the same generation survives an older acknowledgement", async () => {
+    const { result } = screenFlow(); let pending!: Promise<boolean>;
+    act(() => { pending = result.current.dequeue({ contact }); });
+    const newer = { ...contact, voice_reservation_id: "20000000-0000-4000-8000-000000000077" };
+    act(() => result.current.setQueue([newer, other]));
+    await act(async () => { resolve(Response.json(ack)); expect(await pending).toBe(true); });
+    expect(result.current.queue).toEqual([newer, other]);
+  });
+  test("a household request captures hidden members and removes only the confirmed identities", async () => {
+    const member = { queue_id: other.id, contact_id: other.contact_id, dispatch_generation: other.dispatch_generation, voice_reservation_id: null };
+    const hidden = { ...member, queue_id: 29, contact_id: 9 };
+    const subject = { ...contact, advance_snapshot: { household_id: "10000000-0000-4000-8000-000000000088", entries: [member, hidden] } };
+    const { result } = screenFlow(null, subject, true); let pending!: Promise<boolean>;
+    act(() => { pending = result.current.dequeue({ contact: subject }); });
+    expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body)).household_snapshot.entries).toEqual([member, hidden]);
+    const newer = { ...other, dispatch_generation: "20000000-0000-4000-8000-000000000099" };
+    act(() => result.current.setQueue([subject, newer]));
+    await act(async () => { resolve(Response.json({ ...ack, household: true, household_snapshot: subject.advance_snapshot,
+      removed_entries: [...ack.removed_entries, member, hidden] })); expect(await pending).toBe(true); });
+    expect(result.current.queue).toEqual([newer]);
+  });
+  test("Save and Next uses the current queue after its primary row leaves through realtime", async () => {
+    const { result } = screenFlow(); let pending!: Promise<void>;
+    act(() => { pending = result.current.next(); });
+    act(() => result.current.setQueue([other]));
+    await act(async () => { resolve(Response.json(ack)); await pending; });
+    expect(result.current.selected?.id).toBe(other.id);
+    expect(result.current.queue).toEqual([other]);
+  });
   test("a requested batch still arrives after advancing to another contact on the same page", async () => {
     const { result, rerender } = screenFlow(); let pending!: Promise<void>;
     act(() => { pending = result.current.fetchMore({ householdMap: {} }); });
@@ -116,12 +147,29 @@ describe("call-screen confirmed queue advance", () => {
     expect(await dequeue({ contact })).toBe(false);
     expect(fetcher).not.toHaveBeenCalled();
   });
+  test("a retained Save and Next callback cannot save after unmount", async () => {
+    const { result, unmount } = screenFlow(); const { next, saveData } = result.current;
+    unmount(); await next();
+    expect(saveData).not.toHaveBeenCalled();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  test("Save and Next selects from the current queue after a pending reply", async () => {
+    const { result } = screenFlow();
+    const third = { ...other, id: 29, contact_id: 9, contact: { ...other.contact, id: 9 } };
+    act(() => result.current.setQueue([contact, other, third]));
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.next(); });
+    act(() => result.current.setQueue([contact, third]));
+    await act(async () => { resolve(Response.json(ack)); await pending; });
+    expect(result.current.selected?.id).toBe(third.id);
+    expect(result.current.queue).toEqual([third]);
+  });
   test("an acknowledged old completed call can finish its form while the newer queue work stays", async () => {
     const callSid = "CA33333333333333333333333333333333";
     const { result } = screenFlow(callSid); let pending!: Promise<void>;
     act(() => { pending = result.current.next(); });
     await act(async () => {
-      resolve(Response.json({ ...ack, call_sid: callSid, dequeued: false, advance_state: "superseded" })); await pending;
+      resolve(Response.json({ ...ack, call_sid: callSid, dequeued: false, advance_state: "superseded", removed_entries: [] })); await pending;
     });
     expect(result.current.answers).toEqual({});
     expect(result.current.queue).toEqual([contact, other]);

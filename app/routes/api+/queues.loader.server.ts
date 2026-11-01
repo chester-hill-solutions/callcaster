@@ -11,6 +11,7 @@ import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { data as routeData } from "react-router";
 import { defineLoader } from "@/lib/handler.server";
 import type { LoaderFunctionArgs } from "react-router";
+import { withQueueAdvanceSnapshots } from "@/server/queue-advance-snapshot.server";
 
 export const loader = defineLoader({
   auth: ({ request }: LoaderFunctionArgs) => requireJsonAuth(request),
@@ -53,9 +54,10 @@ export const loader = defineLoader({
 
     const queueItems = await fetchCampaignQueueRowsByIds(
       newQueue.map((item: { queue_id: number }) => item.queue_id),
+      campaignWorkspace,
     );
 
-    return routeData(queueItems);
+    return routeData(await withQueueAdvanceSnapshots(queueItems, campaignWorkspace));
   } catch (error) {
     return createErrorResponse(error, "Failed to load queue");
   }

@@ -80,7 +80,9 @@ Conference/handset acceptance remain in development.
 
 `POST /api/queues` is the captured **Save and Next** control. Send
 `workspace_id`, `campaign_id`, `contact_id`, `queue_id`, `dispatch_generation`
-and boolean `household`. Include the captured customer `call_sid` when finishing
+`voice_reservation_id` (including null) and boolean `household`. For a household
+action, also send the server-provided `household_snapshot`. It captures each
+member, including members outside the visible page. Include the captured customer `call_sid` when finishing
 a call; omit it for an idle manual skip. The required
 `X-Callcaster-Audio-Actor` header must match the signed-in actor. Workspace API
 keys cannot use this session-only operation.
@@ -88,7 +90,7 @@ keys cannot use this session-only operation.
 The server checks membership and the queue snapshot under the workspace lock.
 A customer must have ended and belong to this actor and contact. Funding and
 final billing keep their existing owners. HTTP 200 echoes the captured fields,
-`user_id`, `dequeued` and `advance_state`:
+`user_id`, `dequeued`, `advance_state` and `removed_entries`:
 
 - `dequeued`: this request removed its own queue row.
 - `already_dequeued`: that exact row was already removed; a retry is safe.
@@ -97,9 +99,11 @@ final billing keep their existing owners. HTTP 200 echoes the captured fields,
   gets this result; the action does not guess which queue generation it owned.
 
 Wait for a matching acknowledgement before clearing the form. Remove the local
-queue row only for `dequeued` or `already_dequeued`. HTTP 409, failed requests
+queue rows only when their queue ID, contact, generation and reservation match
+an entry in `removed_entries`. Live, requeued, rebuilt or reassigned household
+members stay queued. `superseded` returns no removed entries. HTTP 409, failed requests
 and unknown replies keep the contact and answers visible. Retry an unknown
-request with the same captured fields. GET and DELETE keep their existing contracts.
+request with the same captured fields. GET adds a read-only `advance_snapshot` to call-screen rows. DELETE is unchanged.
 
 ## Browser dialer / tokens
 

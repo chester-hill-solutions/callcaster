@@ -9,13 +9,16 @@ describe("captured queue advance API contract", () => {
     expect(post.security).toEqual([{ sessionCookie: [] }, { secureSessionCookie: [] }]);
     expect(post.parameters).toContainEqual(expect.objectContaining({ name: "X-Callcaster-Audio-Actor", in: "header", required: true }));
     const request = post.requestBody.content["application/json"].schema;
-    expect(request.required).toEqual(["workspace_id", "campaign_id", "contact_id", "queue_id", "dispatch_generation", "household"]);
+    expect(request.required).toEqual(["workspace_id", "campaign_id", "contact_id", "queue_id", "dispatch_generation", "voice_reservation_id", "household"]);
     expect(request.additionalProperties).toBe(false);
     expect(request.properties.dispatch_generation).toEqual({ type: "string", format: "uuid" });
     const responses = post.responses["200"].content["application/json"].schema.oneOf;
     expect(responses).toHaveLength(3);
     expect(responses.map(schema => [schema.properties.advance_state.enum[0], schema.properties.dequeued.enum[0]]))
       .toEqual([["dequeued", true], ["already_dequeued", false], ["superseded", false]]);
+    expect(responses[0].required).toContain("removed_entries");
+    expect(request.properties.household_snapshot.properties.entries.maxItems).toBe(1000);
+    expect(responses[2].properties.removed_entries.maxItems).toBe(0);
     expect(responses[2].required).toContain("call_sid");
     for (const status of ["400", "401", "403", "404", "409", "500"]) expect(post.responses).toHaveProperty(status);
     expect(path.get.operationId).toBe("getQueues"); expect(path.delete.operationId).toBe("deleteQueues");

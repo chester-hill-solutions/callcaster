@@ -704,6 +704,15 @@ Raw `execute` results do not use Drizzle column decoders. Timestamp values
 can be strings even when a cast says Date. Prefer scoped relational reads, or
 decode each selected timestamp and prove it against the installed driver.
 
+Do not overlap source-hash test proofs with `npm run ci:local`. Its vendor
+validation can rebuild declaration files. Finish that gate first, then capture
+a stable source snapshot and run independent focused proofs in parallel.
+
+Do not put raw correlated table-column SQL inside a scoped relational `where`.
+Drizzle can remap the inner columns to the outer table alias. Use transaction-
+bound select subqueries or separate tenant-scoped reads, and verify the query
+against an owned database with both positive and refusal cases.
+
 For real RPC fixtures, inspect and seed each required foreign-key actor.
 Membership or an auth identity may not supply the legacy user-profile row.
 A fixture or constraint error before the target assertion is not defect proof.

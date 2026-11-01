@@ -29,6 +29,10 @@ vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/campaign-queue-db.server", () => ({
   fetchCampaignQueueRowsByIds: (...args: unknown[]) => mocks.fetchCampaignQueueRowsByIds(...args),
 }));
+vi.mock("@/server/queue-advance-snapshot.server", async importOriginal => ({
+  ...(await importOriginal<typeof import("@/server/queue-advance-snapshot.server")>()),
+  withQueueAdvanceSnapshots: vi.fn(async rows => rows),
+}));
 vi.mock("@/server/call-screen-queue-advance.server", async importOriginal => ({
   ...await importOriginal<typeof import("@/server/call-screen-queue-advance.server")>(),
   advanceCallScreenQueue: (...args: unknown[]) => mocks.advanceCallScreenQueue(...args),
@@ -58,7 +62,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.resolveContactWorkspaceId.mockReset();
     mocks.rpcSelectAndUpdateCampaignContacts.mockReset();
     mocks.advanceCallScreenQueue.mockReset();
-    mocks.advanceCallScreenQueue.mockResolvedValue({ ok: true, dequeued: true, advance_state: "dequeued" });
+    mocks.advanceCallScreenQueue.mockResolvedValue({ ok: true, dequeued: true, advance_state: "dequeued", removed_entries: [] });
     mocks.resolveCampaignWorkspaceId.mockResolvedValue("w1");
     mocks.resolveContactWorkspaceId.mockResolvedValue("w1");
     mocks.fetchCampaignQueueRowsByIds.mockResolvedValue([]);
@@ -113,11 +117,11 @@ describe("app/routes/api+/queues/route.tsx", () => {
       campaignId: 99,
       limit: 2,
     });
-    expect(mocks.fetchCampaignQueueRowsByIds).toHaveBeenCalledWith([1, 2]);
+    expect(mocks.fetchCampaignQueueRowsByIds).toHaveBeenCalledWith([1, 2], "w1");
   });
 
   const current = { workspace_id: "w1", contact_id: 2, campaign_id: 7, queue_id: 9,
-    dispatch_generation: "10000000-0000-4000-8000-000000000099", household: false };
+    dispatch_generation: "10000000-0000-4000-8000-000000000099", voice_reservation_id: null, household: false };
   async function post(body: unknown = current, expectedActor = "u1") {
     queueJsonAuthSession({ user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce(body);
@@ -138,7 +142,8 @@ describe("app/routes/api+/queues/route.tsx", () => {
     { campaign_id: undefined }, { campaign_id: null }, { campaign_id: true }, { campaign_id: -1 },
     { campaign_id: 1.5 }, { campaign_id: "7abc" }, { campaign_id: Number.MAX_SAFE_INTEGER + 1 },
     { contact_id: 0 }, { household: "false" }, { queue_id: undefined }, { queue_id: 0 },
-    { dispatch_generation: undefined }, { dispatch_generation: "not-a-generation" }, { call_sid: "not-a-call" },
+    { voice_reservation_id: undefined }, { voice_reservation_id: "wrong-owner" }, { household: true },
+    { household_snapshot: { household_id: null, entries: [] } }, { dispatch_generation: undefined }, { dispatch_generation: "not-a-generation" }, { call_sid: "not-a-call" },
   ])("action POST rejects invalid captured fields %j before queue access", async patch => {
     const res = await post({ ...current, ...patch });
     expect(res.status).toBe(400);
@@ -150,7 +155,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
     const res = await post({ ...current, contact_id: "2", campaign_id: "7", queue_id: "9" });
     expect(res.status).toBe(200);
     expect(mocks.advanceCallScreenQueue).toHaveBeenCalledExactlyOnceWith(current, "u1");
-    await expect(res.json()).resolves.toEqual({ ...current, user_id: "u1", success: true, dequeued: true, advance_state: "dequeued" });
+    await expect(res.json()).resolves.toEqual({ ...current, user_id: "u1", success: true, dequeued: true, advance_state: "dequeued", removed_entries: [] });
   });
 
   test.each(["missing", "different workspace"])("action POST rejects a %s campaign/contact pair", async kind => {
@@ -173,10 +178,10 @@ describe("app/routes/api+/queues/route.tsx", () => {
   });
 
   test("an already-dequeued current snapshot has an exact idempotent acknowledgement", async () => {
-    mocks.advanceCallScreenQueue.mockResolvedValueOnce({ ok: true, dequeued: false, advance_state: "already_dequeued" });
+    mocks.advanceCallScreenQueue.mockResolvedValueOnce({ ok: true, dequeued: false, advance_state: "already_dequeued", removed_entries: [] });
     const res = await post();
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ ...current, user_id: "u1", success: true, dequeued: false, advance_state: "already_dequeued" });
+    await expect(res.json()).resolves.toEqual({ ...current, user_id: "u1", success: true, dequeued: false, advance_state: "already_dequeued", removed_entries: [] });
   });
 
   test("a lost membership during the transaction remains a uniform 404", async () => {
