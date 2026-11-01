@@ -32,15 +32,14 @@ SIM_SMS_MESSAGE="<unique test message>"
 
 The temporary compatibility adapter rejects a missing or changed approved
 recipient value. The sender email is derived from the resolved SIM persona;
-the password is retrieved only by the sign-in task through the runtime context.
+the browser password is retrieved only by the sign-in task through the runtime context.
 This prevents an environment mix-up from sending a live message to an
 unapproved number.
 
-The planned inherited configuration and secret-provider migration is defined in
-[ADR-0040](adr/0040-inherited-config-and-pluggable-secrets.md). Until ADR-0040
-Phase 5 migrates SIM, this page describes the current interface. Do not add new
-SIM-specific variables; new SIM work uses the compatibility boundary until the
-shared loader is available.
+Profiles use the shared configuration and secret-provider boundary in
+[ADR-0040](adr/0040-inherited-config-and-pluggable-secrets.md). The temporary
+recipient/message adapter remains until #2812 is complete. Do not add new
+SIM-specific variables or read dotenv files inside browser tasks.
 
 `e2e/sim/config.ts` is the temporary #2812 compatibility adapter. It is only
 used at SIM bootstrap to build typed task input. Task modules do not import it.

@@ -5,8 +5,25 @@ import { user, workspace, workspace_audit_event, workspace_member } from "@/db/s
 import { reconcileSimProfile, SimReconciliationError, type SimReconciliationResult } from "@/lib/sim-profile-reconciliation.server";
 import type { ResolvedSimProfile } from "../../e2e/sim/personas";
 
-export async function reconcileSimProfileInDatabase(profile: ResolvedSimProfile, getPassword: () => Promise<string>): Promise<SimReconciliationResult> {
-  if (profile.environment !== "local" || profile.trafficPolicy !== "local-only" || !/^[a-z0-9-]+-local$/.test(profile.runtimeIdentity) || process.env.RAILWAY_ENVIRONMENT !== undefined || process.env.RAILWAY_ENVIRONMENT_NAME !== undefined || process.env.RAILWAY_ENVIRONMENT_ID !== undefined || process.env.RAILWAY_SERVICE_ID !== undefined || process.env.RAILWAY_DEPLOYMENT_ID !== undefined || process.env.RAILWAY_PROJECT_ID || process.env.K_SERVICE || process.env.VERCEL || process.env.FLY_APP_NAME || process.env.NODE_ENV === "production") {
+export async function reconcileSimProfileInDatabase(
+  profile: ResolvedSimProfile,
+  getPassword: () => Promise<string>,
+): Promise<SimReconciliationResult> {
+  if (
+    profile.environment !== "local" ||
+    profile.trafficPolicy !== "local-only" ||
+    !/^[a-z0-9-]+-local$/.test(profile.runtimeIdentity) ||
+    process.env.RAILWAY_ENVIRONMENT !== undefined ||
+    process.env.RAILWAY_ENVIRONMENT_NAME !== undefined ||
+    process.env.RAILWAY_ENVIRONMENT_ID !== undefined ||
+    process.env.RAILWAY_SERVICE_ID !== undefined ||
+    process.env.RAILWAY_DEPLOYMENT_ID !== undefined ||
+    process.env.RAILWAY_PROJECT_ID !== undefined ||
+    process.env.K_SERVICE !== undefined ||
+    process.env.VERCEL !== undefined ||
+    process.env.FLY_APP_NAME !== undefined ||
+    process.env.NODE_ENV === "production"
+  ) {
     throw new SimReconciliationError("blocked", "SIM reconciliation is allowed only for local runtime");
   }
   const passwordHash = await hashPassword(await getPassword());

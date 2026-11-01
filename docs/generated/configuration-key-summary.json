@@ -3,7 +3,7 @@
   "generatedBy": "tools:config:inventory",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "5820fd1ca51ec379a3728a870b0dfed6e4554051bec579654a87a97aa6c7c0a3",
+    "recordDigest": "116aa581b7d51c82d9f0261a41c244f5223a978ad9ab0aaecfd71340ba9a764a",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -2295,6 +2295,7 @@
       "test/sim-profile-reconciliation.test.ts",
       "test/sim-profile-status.test.ts",
       "test/sim-runtime-context.test.ts",
+      "test/sim-sms-flow-cleanup.test.ts",
       "test/sim-task-context.test.ts",
       "test/sms-action.route.test.ts",
       "test/sms-campaign-send-mode.test.ts",
