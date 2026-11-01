@@ -454,7 +454,7 @@
       "test/ui/softphone-session-end.test.tsx",
       "app/server/predictive-human-admission.server.ts",
       "app/server/predictive-human-presence.server.ts",
-      "client/migrations/20261031000001_predictive_human_admission.sql",
+      "client/migrations/20261101000001_predictive_human_admission.sql",
       "app/server/predictive-customer-current.server.ts",
       "app/hooks/call/useRecoveredPredictiveSubject.ts"
     ],

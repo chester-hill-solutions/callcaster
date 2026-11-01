@@ -55,6 +55,13 @@ Handle each predicate separately so a normal non-ancestor result does not skip
 the next check. Keep unknown refs conservative rather than treating an error as
 proof that a commit is absent from a branch.
 
+## Migration versions after a rebase
+
+If an unmerged migration conflicts with a trunk version, inspect the deployed
+ledgers first. Keep applied trunk files fixed. Give only unpublished, unapplied
+migrations fresh versions, preserve their SQL bytes, and test a fresh owned
+database. Keep the old local proof database and its ledger unchanged.
+
 ## Rebase with local changes
 
 Git cannot rebase a dirty worktree. Do not discard tested changes to satisfy the

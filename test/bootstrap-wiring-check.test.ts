@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { afterEach, beforeEach, expect, test } from "vitest";
 
-const root = resolve(import.meta.dirname, ".."), migration = "20261031000001_predictive_human_admission.sql";
+const root = resolve(import.meta.dirname, ".."), migration = "20261101000001_predictive_human_admission.sql";
 let fixture: string;
 
 beforeEach(() => {

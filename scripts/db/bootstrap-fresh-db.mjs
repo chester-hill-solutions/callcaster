@@ -154,9 +154,9 @@ const steps = [
   "client/migrations/20261030000007_voice_customer_recording_launch.sql",
   "client/migrations/20261030000008_voice_audio_request_controls.sql",
   "client/migrations/20261031000000_contact_merge_receipts.sql",
-  "client/migrations/20261031000001_predictive_human_admission.sql",
+  "client/migrations/20261101000001_predictive_human_admission.sql",
   "client/migrations/20261031000001_workspace_number_release_history.sql",
-  "client/migrations/20261031000002_predictive_customer_recovery.sql",
+  "client/migrations/20261101000002_predictive_customer_recovery.sql",
 ];
 
 /**
