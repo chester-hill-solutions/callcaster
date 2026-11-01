@@ -886,6 +886,10 @@ Remove only the helper's error guards; preserve existing listeners.
 A direct unexpected SDK exception can still stop public `destroy`; report that
 incomplete result and stop replacement registration instead of claiming closure.
 
+Do not overlap a source-hash proof with the vendor distribution check or other
+generated-file writers. Run focused proofs after those writers stop, then
+require matching source hashes; a passing test report alone is insufficient.
+
 For long-running checks, keep head hashes, completed reports and ownership
 metadata in a persistent task artifact folder. A process handle or temporary
 log is not a passing result after an interruption. Check the same process or
