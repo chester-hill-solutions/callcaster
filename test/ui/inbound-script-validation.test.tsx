@@ -93,4 +93,25 @@ describe("inbound script validation details", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent('invalid forward target "forward:+0123"');
     expect(screen.getByText(/keep an invalid menu as a draft/)).toBeInTheDocument();
   });
+
+  test.each([false, true])("shows the Support name for the reported loop in the editor (inbound: %s)", async (inboundFlow) => {
+    const doc = scripts.migrateFromCallcasterFlow({
+      startPageId: "page_survey",
+      pages: { page_survey: { title: "Survey", blocks: ["block_intro", "block_mupwwvov_2", "block_finish"] } },
+      blocks: {
+        block_intro: { type: "synthetic", title: "Introduction", audioFile: "Welcome", options: [{ value: "1", label: "Continue", next: "page_survey:block_mupwwvov_2" }] },
+        block_mupwwvov_2: { type: "synthetic", title: "Support", audioFile: "Choose", options: [
+          { value: "1", label: "Rory Nisan", next: "page_survey:block_mupwwvov_2" },
+          { value: "2", label: "Continue", next: "page_survey:block_finish" },
+        ] },
+        block_finish: { type: "synthetic", title: "Goodbye", audioFile: "Thank you", options: [{ value: "1", label: "Finish", next: "hangup" }] },
+      },
+    });
+    render(<ScriptEditorShell document={doc} onChange={vi.fn()} audioFlow inboundFlow={inboundFlow} />);
+    fireEvent.click(screen.getByRole("button", { name: "Script validation: issues found" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent('Routing cycle detected: step "Support"');
+    expect(alert).not.toHaveTextContent("block_mupwwvov_2");
+  });
+
 });

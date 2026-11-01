@@ -62,6 +62,7 @@ function rawRoutingInput(flow: CallcasterFlow, startPageId: string): IvrRoutingI
     )),
     blocks: Object.fromEntries(Object.entries(flow.blocks).map(([id, block]) => [id, {
       id,
+      title: typeof block.title === "string" ? block.title : undefined,
       options: Array.isArray(block.options) ? block.options.flatMap((option) =>
         option && typeof option === "object" && "next" in option && typeof option.next === "string"
           ? [{ next: option.next }] : [],

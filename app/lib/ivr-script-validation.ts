@@ -26,10 +26,14 @@ export type IvrRoutingValidation = {
 };
 
 export type IvrRoutingInput = Pick<ScriptDocument, "pages" | "startPageId"> & {
-  blocks: Record<string, ScriptDocument["blocks"][string] | { id: string; options?: Array<{ next?: string }> }>;
+  blocks: Record<string, ScriptDocument["blocks"][string] | { id: string; title?: string; options?: Array<{ next?: string }> }>;
 };
 
 const TERMINAL_TARGETS = new Set(["hangup", "end"]);
+
+function blockName(document: IvrRoutingInput, blockId: string): string {
+  return document.blocks[blockId]?.title?.trim() || blockId;
+}
 
 type ResolvedTarget =
   | { kind: "terminal" }
@@ -88,7 +92,7 @@ function resolveNext(
       return { kind: "invalid", reason: `Routes to missing block "${blockId}"` };
     }
     if (inbound && !document.pages[pageId].blockIds.includes(blockId)) {
-      return { kind: "invalid", reason: `Routes to block "${blockId}" outside page "${pageId}"` };
+      return { kind: "invalid", reason: `Routes to block "${blockName(document, blockId)}" outside page "${pageId}"` };
     }
     return { kind: "block", pageId, blockId };
   }
@@ -137,7 +141,7 @@ export function validateIvrRouting(
             kind: "dangling",
             sourceBlock: blockId,
             target: option.next,
-            error: `Step "${blockId}" ${resolved.reason}`,
+            error: `Step "${blockName(document, blockId)}" ${resolved.reason}`,
           });
           continue;
         }
@@ -158,7 +162,7 @@ export function validateIvrRouting(
       issues.push({
         kind: "cycle",
         blockId,
-        error: `Routing cycle detected: step "${blockId}" loops back on itself without reaching "Hang up" or "end"`,
+        error: `Routing cycle detected: step "${blockName(document, blockId)}" loops back on itself without reaching "Hang up" or "end"`,
       });
       return;
     }
