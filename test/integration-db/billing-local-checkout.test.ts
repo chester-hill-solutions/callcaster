@@ -19,8 +19,8 @@ const databaseUrl = process.env.INTEGRATION_DB_URL ?? process.env.DATABASE_URL;
 const suite = databaseUrl ? describe : describe.skip;
 const workspaceId = randomUUID();
 const roles = ["caller", "member", "admin", "owner"] as const;
-const actors = roles.map(role => ({ role, userId: randomUUID() }));
-const ownerId = actors.find(actor => actor.role === "owner")!.userId;
+const ownerId = randomUUID();
+const actors = roles.map(role => ({ role, userId: role === "owner" ? ownerId : randomUUID() }));
 const outsider = randomUUID();
 
 suite("local checkout uses real roles and ledger without provider traffic (#2828)", () => {
