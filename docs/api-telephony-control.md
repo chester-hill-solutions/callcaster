@@ -105,6 +105,13 @@ members stay queued. `superseded` returns no removed entries. HTTP 409, failed r
 and unknown replies keep the contact and answers visible. Retry an unknown
 request with the same captured fields. GET adds a read-only `advance_snapshot` to call-screen rows. DELETE is unchanged.
 
+Funded queue advancement uses the reservation's original actor. Under the
+workspace fence and ordered queue locks, a reassigned primary or a member with
+a live customer or later outreach stays queued. Household rows also need trusted
+insertion or explicit-redial time before the original admission. An unknown
+historical sibling stays queued. Billing and call results retain their existing
+owners.
+
 Legacy completion callbacks use the saved Call and outreach attempt to identify
 the original queue work. A saved parent can supply a legacy child leg's queue
 identity. A saved queue ID must match. Older Calls without that ID require

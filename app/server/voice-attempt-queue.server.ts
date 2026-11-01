@@ -22,7 +22,7 @@ export async function dequeueFundedVoiceAttempt(reservation: VoiceReservation) {
     const tdb = createTenantDb(reservation.workspace, tx);
     const savedCampaign = await tdb.campaign.findFirst({ where: eq(campaign.id, queue.campaign_id), columns: { group_household_queue: true } });
     await rpcDequeueContact(tdb, { workspaceId: reservation.workspace, campaignId: queue.campaign_id,
-      contactId: queue.contact_id, dequeuedById: queue.assigned_to_user_id,
+      contactId: queue.contact_id,
       groupOnHousehold: savedCampaign?.group_household_queue ?? false, dequeuedReasonText: "Call completed",
       voiceReservationId: reservation.id, readDb: tx, deferEmit: (emit) => publish.push(emit) });
   });

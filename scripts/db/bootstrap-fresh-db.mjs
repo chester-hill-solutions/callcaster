@@ -159,6 +159,7 @@ const steps = [
   "client/migrations/20261101000002_predictive_customer_recovery.sql",
   "client/migrations/20261101000003_voice_dialer_intents.sql",
   "client/migrations/20261101000006_voice_legacy_queue_insertion.sql",
+  "client/migrations/20261101000007_funded_voice_queue_ownership.sql",
 ];
 
 /**

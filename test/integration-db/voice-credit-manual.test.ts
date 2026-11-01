@@ -580,6 +580,91 @@ describe("manual voice funding and ownership (#2879)", () => {
     const sibling = await addHouseholdSibling(); await send(); const child = await connectRecipient(); await status(child, "completed", "42"); await flushCallJobs();
     const [queue] = await sql`select queue_state from public.campaign_queue where id = ${sibling.queue}`; expect(queue.queue_state).toBe("dequeued");
   });
+  test.each(["primary", "household"])("a delayed funded result cannot borrow a reassigned %s", async target => {
+    const sibling = target === "household" ? await addHouseholdSibling() : null;
+    await send(); const child = await connectRecipient(); await billWithoutQueueEffects(child);
+    const targetId = sibling ? Number(sibling.queue) : queueId;
+    if (target === "primary") {
+      const { requeueCampaignQueueById } = await import("@/lib/campaign-queue-updates.server");
+      await requeueCampaignQueueById(targetId, workspaceId);
+    }
+    const { claimNextQueueContact } = await import("@/lib/campaign-queue-db.server");
+    const { createTenantDb } = await import("@/server/tenant-db");
+    const claimed = await claimNextQueueContact(createTenantDb(workspaceId), campaignId, otherActor);
+    expect(Number(claimed?.queue_id)).toBe(targetId);
+    const [before] = await sql`select * from public.campaign_queue where id = ${targetId}`;
+    expect(before.assigned_to_user_id).toBe(otherActor);
+    await flushCallJobs();
+    expect((await sql`select * from public.campaign_queue where id = ${targetId}`)[0]).toEqual(before);
+    expect(await state()).toMatchObject({ credits: 96, holds: 0, ledger: 1 });
+  });
+  test("funded completion preserves a household member with a live legacy customer", async () => {
+    const sibling = await addHouseholdSibling();
+    await send(); const child = await connectRecipient(); await billWithoutQueueEffects(child);
+    await sql`insert into public.call (sid, workspace, account_sid, user_id, campaign_id, contact_id, queue_id, status)
+      values (${callSid()}, ${workspaceId}::uuid, ${accountSid}, ${actor}::uuid, ${campaignId}, ${sibling.contact}, ${sibling.queue}, 'in-progress')`;
+    const [before] = await sql`select * from public.campaign_queue where id = ${sibling.queue}`;
+    await flushCallJobs();
+    expect((await sql`select * from public.campaign_queue where id = ${sibling.queue}`)[0]).toEqual(before);
+    expect((await sql`select queue_state from public.campaign_queue where id = ${queueId}`)[0].queue_state).toBe('dequeued');
+    expect(await state()).toMatchObject({ credits: 96, holds: 0, ledger: 1 });
+  });
+  test.each(["live customer", "new outreach"])("funded completion preserves its primary after a %s", async changed => {
+    await send(); const child = await connectRecipient(); await billWithoutQueueEffects(child);
+    if (changed === "live customer") await sql`insert into public.call (sid, workspace, account_sid, user_id, campaign_id, contact_id, queue_id, status)
+      values (${callSid()}, ${workspaceId}::uuid, ${accountSid}, ${actor}::uuid, ${campaignId}, ${contactId}, ${queueId}, 'in-progress')`;
+    else await sql`insert into public.outreach_attempt (workspace, campaign_id, contact_id, user_id, disposition)
+      values (${workspaceId}::uuid, ${campaignId}, ${contactId}, ${actor}::uuid, 'completed')`;
+    const [before] = await sql`select * from public.campaign_queue where id = ${queueId}`;
+    await flushCallJobs();
+    expect((await sql`select * from public.campaign_queue where id = ${queueId}`)[0]).toEqual(before);
+    expect(await state()).toMatchObject({ credits: 96, holds: 0, ledger: 1 });
+  });
+  test("funded completion rechecks ownership after waiting for its workspace lock", async () => {
+    await send(); const child = await connectRecipient(); await billWithoutQueueEffects(child);
+    const { findVoiceReservationForCall } = await import("@/server/voice-bridge-reservation.server");
+    const { dequeueFundedVoiceAttempt } = await import("@/server/voice-attempt-queue.server");
+    const saved = await findVoiceReservationForCall(workspaceId, child.sid);
+    const url = process.env.INTEGRATION_DB_URL ?? process.env.DATABASE_URL;
+    if (!saved || !url) throw new Error('Owned reservation and database required');
+    const blocker = postgres(url, { max: 1 }); let pending: Promise<void> | undefined; let before: unknown;
+    try {
+      const [{ pid }] = await blocker`select pg_backend_pid() pid`;
+      await blocker.begin(async tx => {
+        await tx`select id from public.workspace where id = ${workspaceId}::uuid for no key update`;
+        pending = dequeueFundedVoiceAttempt(saved);
+        let waiting = false;
+        for (const deadline = Date.now() + 3000; Date.now() < deadline;) {
+          const [row] = await sql`select count(*)::int waiting from pg_stat_activity where datname = current_database() and ${pid} = any(pg_blocking_pids(pid))`;
+          if (row.waiting > 0) { waiting = true; break; }
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        if (!waiting) throw new Error('Funded completion did not reach its workspace fence');
+        const { requeueCampaignQueueById } = await import("@/lib/campaign-queue-updates.server");
+        const { claimNextQueueContact } = await import("@/lib/campaign-queue-db.server");
+        const { createTenantDb } = await import("@/server/tenant-db");
+        await requeueCampaignQueueById(queueId, workspaceId);
+        const claimed = await claimNextQueueContact(createTenantDb(workspaceId), campaignId, otherActor);
+        expect(Number(claimed?.queue_id)).toBe(queueId);
+        [before] = await sql`select * from public.campaign_queue where id = ${queueId}`;
+      });
+      expect(before).toBeDefined(); await pending;
+      expect((await sql`select * from public.campaign_queue where id = ${queueId}`)[0]).toEqual(before);
+      expect(await state()).toMatchObject({ credits: 96, holds: 0, ledger: 1 });
+    } finally { await pending?.catch(() => undefined); await blocker.end(); }
+  });
+  test.each(["unknown insertion", "new outreach"])("funded completion preserves household work with %s", async changed => {
+    const sibling = await addHouseholdSibling();
+    await send(); const child = await connectRecipient(); await billWithoutQueueEffects(child);
+    if (changed === "unknown insertion") await sql`update public.campaign_queue set inserted_at = null, redial_requested_at = null where id = ${sibling.queue}`;
+    else await sql`insert into public.outreach_attempt (workspace, campaign_id, contact_id, user_id, disposition)
+      values (${workspaceId}::uuid, ${campaignId}, ${sibling.contact}, ${actor}::uuid, 'completed')`;
+    const [before] = await sql`select * from public.campaign_queue where id = ${sibling.queue}`;
+    await flushCallJobs();
+    expect((await sql`select * from public.campaign_queue where id = ${sibling.queue}`)[0]).toEqual(before);
+    expect((await sql`select queue_state from public.campaign_queue where id = ${queueId}`)[0].queue_state).toBe('dequeued');
+    expect(await state()).toMatchObject({ credits: 96, holds: 0, ledger: 1 });
+  });
   test.each(["replay", "first result"])("an old household %s leaves a newer sibling intent live", async (timing) => {
     const sibling = await addHouseholdSibling(); await send(); const child = await connectRecipient(); await billWithoutQueueEffects(child);
     if (timing === "replay") await flushCallJobs();
@@ -593,6 +678,18 @@ describe("manual voice funding and ownership (#2879)", () => {
     } else await flushCallJobs();
     const [after] = await sql`select queue_state, dispatch_generation, voice_reservation_id, dequeued_at from public.campaign_queue where id = ${sibling.queue}`;
     expect(after).toEqual(before);
+  });
+  test("funded completion preserves a requeued household intent before its next call", async () => {
+    const sibling = await addHouseholdSibling();
+    await send(); const child = await connectRecipient(); await billWithoutQueueEffects(child);
+    const { enqueueContactsForCampaign } = await import("@/lib/queue.server");
+    await enqueueContactsForCampaign(campaignId, [Number(sibling.contact)], { requeue: true });
+    const [before] = await sql`select * from public.campaign_queue where id = ${sibling.queue}`;
+    await flushCallJobs();
+    expect((await sql`select * from public.campaign_queue where id = ${sibling.queue}`)[0]).toEqual(before);
+    expect((await sql`select queue_state from public.campaign_queue where id = ${queueId}`)[0].queue_state).toBe('dequeued');
+    expect(provider.create).toHaveBeenCalledOnce();
+    expect(await state()).toMatchObject({ credits: 96, holds: 0, ledger: 1 });
   });
   test.each(["account", "caller", "recipient", "direction", "parent", "SID", "URL", "nonce"])("signed recipient %s mismatches cannot change funding", async (fault) => {
     await send(); const root = firstCall(), child = await connectRecipient(); await status(child, "ringing"); delivery.jobs.length = 0;

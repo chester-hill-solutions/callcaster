@@ -719,6 +719,11 @@ outbox/result boundaries there and retain the participant-versus-terminal claim
 assertions. Keep billing, queue ownership and retry proof on the real worker
 and owned database.
 
+Funded queue completion must use the saved reservation actor, never today's
+assignee. Prove assignment release and a canonical claim by another actor,
+including a real workspace-lock wait. Exclude only saved provider/setup/audio
+legs when checking live customers; a later outreach still owns newer work.
+
 For queue generation tests, use explicit requeue through
 `enqueueContactsForCampaign(..., { requeue: true })`. Assignment release keeps
 the current intent. Inspect foreign-key delete actions before rebuilding a
