@@ -115,20 +115,20 @@ describe("validateScriptSteps routing fold (#1884)", () => {
     expect(result.ok).toBe(true);
   });
 
-  test("fails a routing cycle", () => {
+  test("names the saved block when the launch gate rejects a routing cycle", () => {
     const steps = {
       pages: {
         page_1: { id: "page_1", title: "P", blocks: ["a", "b"] },
       },
       blocks: {
-        a: { id: "a", type: "recorded", options: [{ value: "1", next: "b" }] },
+        a: { id: "a", type: "recorded", title: "Support", options: [{ value: "1", next: "b" }] },
         b: { id: "b", type: "recorded", options: [{ value: "1", next: "a" }] },
       },
     };
     const result = validateScriptSteps(steps);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.errors.join("; ")).toMatch(/cycle/i);
+      expect(result.errors.join("; ")).toContain('Routing cycle detected: step "Support"');
     }
   });
 

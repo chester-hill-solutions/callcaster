@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Script routing errors show the saved block names in inbound and outbound editors and launch validation. Untitled legacy blocks keep their ID fallback ([#2776](https://github.com/chester-hill-solutions/callcaster/issues/2776)).
+
 - Fixed: Released phone numbers stay in dated, read-only workspace and support history. Live sender lists, routing, rental billing and reports exclude them; repeat release is refused ([PR #3097](https://github.com/chester-hill-solutions/callcaster/pull/3097), [#2995](https://github.com/chester-hill-solutions/callcaster/issues/2995)).
 
 - Fixed: Archiving a workspace permanently revokes its API keys and blocks its API sessions. Restoring the workspace requires new keys, including for workspaces archived under the old rule ([PR #3096](https://github.com/chester-hill-solutions/callcaster/pull/3096), [#2994](https://github.com/chester-hill-solutions/callcaster/issues/2994)).

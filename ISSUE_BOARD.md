@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Base inventory: complete native Issue and Project snapshots from 2026-10-29 UTC, 401 open issues. Selected refresh: #1724, #2546, #2943, #2992, #2993, #3085, #3088 and new child #3091 on 2026-10-31; #1981, #1983, #2700, #2994 and #2995 on 2026-11-01. Refresh the full board with npm run tools:issues:board.
+Base inventory: complete native Issue and Project snapshots from 2026-10-29 UTC, 401 open issues. Selected refresh: #1724, #2546, #2943, #2992, #2993, #3085, #3088 and new child #3091 on 2026-10-31; #1981, #1983, #2700, #2776, #2994 and #2995 on 2026-11-01. Refresh the full board with npm run tools:issues:board.
 
 Live native Issue metadata covers all 401 open issues. Type, Priority, Effort and Environment come from those Issue fields. The complete authenticated Project export has 398 unique issue URLs, matching the visible filtered count after hierarchy was turned off and all rows loaded. #100, #2902 and #2906 are absent from that complete Project view and retain unknown Project Status. No status is inferred from a PR, label or issue state.
 
@@ -47,9 +47,21 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 23
+## Fix now — 24
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
+
+### [#2776](https://github.com/chester-hill-solutions/callcaster/issues/2776) Script validation error doesn't use human readable block names
+- **IN PROGRESS** · Verdict: **Fix now** · Type: Bug · Priority: Medium · Effort: unset · Environment: prod · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-11-01
+- The reported routing error uses an internal block ID. The active fix uses the saved title in both editors and launch validation; final checks, merge and acceptance remain.
+- Current behavior: At dev@7723dbb3, a Support self-loop is reported as block_mupwwvov_2. The candidate uses Support while retaining the routing issue IDs and legacy ID fallback.
+- Root cause: Routing messages interpolate the block ID, and the raw inbound routing adapter drops the saved title.
+- Resolution: Use the title for displayed routing errors and retain it in the inbound adapter. Keep the graph, route targets, terminal rules and machine-readable issue IDs unchanged.
+- Look in: `app/lib/ivr-script-validation.ts`, `app/lib/inbound-script-validation.ts`, `test/ivr-script-validation.test.ts`, `test/ui/inbound-script-validation.test.tsx`
+- Existing tests: The original runtime fails two new Node cases and both real editor cases. Eight Node and eleven UI controls pass.; The candidate passes 59 affected Node tests and 13 UI tests, including inbound and outbound editor rendering. Final checks will include the named target and fallback cases.
+- Missing tests: Final exact-head local gate and full applicable GitHub CI remain, followed by dev deployment and release acceptance.
+- Done when: The reported three-step self-loop identifies Support instead of its internal ID.; Inbound and outbound validation display the saved block names.; Untitled legacy blocks retain a useful ID fallback.; Routing decisions and machine-readable issue IDs remain unchanged.
+- Tracker: Native Project Status is In progress, read in the authenticated board on 2026-11-01. Type Bug, Priority Medium, Enviornment prod, Effort unset; assigned to @wra-sol. No parent, children or open blockers. Keep open until release acceptance.
 
 ### [#3073](https://github.com/chester-hill-solutions/callcaster/issues/3073) Align the patched Twilio redirect dependency
 - **IN PROGRESS** · Verdict: **Fix now** · Type: Task · Priority: High · Effort: Low · Environment: unset · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-29
@@ -2003,7 +2015,7 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 224
+## Needs triage — 223
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
 
@@ -2017,10 +2029,6 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 
 ### [#2778](https://github.com/chester-hill-solutions/callcaster/issues/2778) Why are twilio subaccounts named after workspace names instead of UUID?
 - Status: Backlog · Type: Task · Priority: Medium · Effort: unset · Environment: unset · Labels: question · Assignee: @wra-sol · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2776](https://github.com/chester-hill-solutions/callcaster/issues/2776) Script validation error doesn't use human readable block names
-- Status: Backlog · Type: Bug · Priority: Medium · Effort: unset · Environment: prod · Labels: ux · Assignee: none · Updated: 2026-10-21
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2775](https://github.com/chester-hill-solutions/callcaster/issues/2775) Start campaign vs Schedule?

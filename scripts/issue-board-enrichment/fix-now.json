@@ -1,5 +1,36 @@
 [
   {
+    "issueNumber": 2776,
+    "verdict": "fix-now",
+    "summary": "The reported routing error uses an internal block ID. The active fix uses the saved title in both editors and launch validation; final checks, merge and acceptance remain.",
+    "currentBehavior": "At dev@7723dbb3, a Support self-loop is reported as block_mupwwvov_2. The candidate uses Support while retaining the routing issue IDs and legacy ID fallback.",
+    "rootCause": "Routing messages interpolate the block ID, and the raw inbound routing adapter drops the saved title.",
+    "resolution": "Use the title for displayed routing errors and retain it in the inbound adapter. Keep the graph, route targets, terminal rules and machine-readable issue IDs unchanged.",
+    "lookIn": [
+      "app/lib/ivr-script-validation.ts",
+      "app/lib/inbound-script-validation.ts",
+      "test/ivr-script-validation.test.ts",
+      "test/ui/inbound-script-validation.test.tsx"
+    ],
+    "existingTests": [
+      "The original runtime fails two new Node cases and both real editor cases. Eight Node and eleven UI controls pass.",
+      "The candidate passes 59 affected Node tests and 13 UI tests, including inbound and outbound editor rendering. Final checks will include the named target and fallback cases."
+    ],
+    "missingTests": [
+      "Final exact-head local gate and full applicable GitHub CI remain, followed by dev deployment and release acceptance."
+    ],
+    "acceptanceCriteria": [
+      "The reported three-step self-loop identifies Support instead of its internal ID.",
+      "Inbound and outbound validation display the saved block names.",
+      "Untitled legacy blocks retain a useful ID fallback.",
+      "Routing decisions and machine-readable issue IDs remain unchanged."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Native Project Status is In progress, read in the authenticated board on 2026-11-01. Type Bug, Priority Medium, Enviornment prod, Effort unset; assigned to @wra-sol. No parent, children or open blockers. Keep open until release acceptance."
+  },
+  {
     "issueNumber": 2638,
     "verdict": "fix-now",
     "summary": "PR #3023 names the Call list selection controls and reuses one named Rows per page control. Review, merge and deployed acceptance remain.",
