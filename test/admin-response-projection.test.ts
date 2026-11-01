@@ -68,6 +68,14 @@ vi.mock("@/lib/database/workspace.server", async (importOriginal) => ({
   getWorkspaceTwilioPortalSnapshot: async () => null,
 }));
 
+vi.mock("@/lib/workspace-number-history.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/workspace-number-history.server")>()),
+  getWorkspaceNumberHistory: async () => [{
+    id: "number:2995", number_id: 2995, phone_number: "+16135552995",
+    friendly_name: "Retired support line", type: "rented", released_at: "2026-10-01T12:00:00.000Z",
+  }],
+}));
+
 function userRow(id: string, access_level = "standard") {
   return {
     id,
@@ -273,6 +281,7 @@ for (const surface of surfaces)
                 "workspace",
                 "workspaceUsers",
                 "phoneNumbers",
+                "numberHistory",
                 "twilioAccountInfo",
                 "twilioNumbers",
                 "twilioUsage",
@@ -321,6 +330,10 @@ for (const surface of surfaces)
           memberCount: 1,
         });
       if (surface.type === "detail") {
+        expect(payload.numberHistory).toEqual([{
+          id: "number:2995", number_id: 2995, phone_number: "+16135552995",
+          friendly_name: "Retired support line", type: "rented", released_at: "2026-10-01T12:00:00.000Z",
+        }]);
         expect(boundary.accounts).toHaveBeenCalledWith("AC_workspace");
         expect(Object.keys(payload.twilioAccountInfo).sort()).toEqual([
           "dateCreated",

@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Released phone numbers stay in dated, read-only workspace and support history. Live sender lists, routing, rental billing and reports exclude them; repeat release is refused ([PR #3097](https://github.com/chester-hill-solutions/callcaster/pull/3097), [#2995](https://github.com/chester-hill-solutions/callcaster/issues/2995)).
+
 - Fixed: Members can review and merge confirmed duplicate-person records while keeping history, call lists and the most restrictive opt-out. SMS errors link to Contacts for review ([PR #3093](https://github.com/chester-hill-solutions/callcaster/pull/3093), [#3091](https://github.com/chester-hill-solutions/callcaster/issues/3091)).
 
 - Fixed: Campaign SMS respects an opt-out saved on any matching workspace contact, including copies outside the selected audience ([PR #3090](https://github.com/chester-hill-solutions/callcaster/pull/3090), [#3088](https://github.com/chester-hill-solutions/callcaster/issues/3088)).

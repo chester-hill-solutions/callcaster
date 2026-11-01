@@ -2,7 +2,7 @@
   {
     "issueNumber": 2995,
     "verdict": "fix-now",
-    "summary": "Retain released numbers as dated, read-only history while all live paths exclude them. The active candidate is in progress; final CI, merge and acceptance remain.",
+    "summary": "Retain released numbers as dated, read-only history while all live paths exclude them. The active candidate is draft PR #3097; final CI, merge and acceptance remain.",
     "currentBehavior": "At dev@05195e1e, release deletes the original workspace_number row. The candidate marks it released and retains its release date, keeps legacy receipt history, and filters live lists, routing, billing and reports.",
     "rootCause": "Number consumers assume every row is live. Retaining rows requires the lifecycle filter and read-only protection to land with the release write.",
     "resolution": "Complete #2995 as one change: retain the row after confirmed provider release, show workspace and support history, exclude released rows from live reads and writes, refuse repeat release, and keep the existing recovery and release-first archive order. A later explicit purchase creates a new rental row.",
@@ -14,7 +14,7 @@
       "test/integration-db/number-history-live-paths.test.ts"
     ],
     "existingTests": [
-      "Original runtime fails 15 of 56 initial cases. The candidate passes 123 affected database cases, 23 UI cases and 35 API contract checks. Earlier affected Node run passed 3,521 cases. Final source checks remain."
+      "Original runtime fails 15 of 56 initial cases. The candidate passes the full owned PostgreSQL tier (1,358 cases), 23 UI cases and 48 admin-response/API contract checks. Final exact-head checks and GitHub CI remain."
     ],
     "missingTests": [
       "Require final exact-head local checks and full GitHub CI before merge; then verify dev deployment and operator/release acceptance. Provider boundaries use an isolated fake; no live number was released."

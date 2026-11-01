@@ -16,7 +16,7 @@ Restore slice #3094 is merged and deployed to dev. #2992 and #2993 are on-dev, a
 
 Archive-key rule #2994 was decided by the owner on 2026-10-31: revoke keys permanently; restore needs new keys. The active branch is in progress, with the task linked to #2732. Full CI, merge and deployed acceptance remain. Other sections retain their dated evidence.
 
-Released-number task #2995 is In progress in the authenticated board on 2026-10-31. The active candidate retains dated history and filters live use; final CI, merge and acceptance remain. Parent #2732 is High priority; #2995 has no own Priority, Effort or Enviornment value. Other sections retain their dated evidence.
+Released-number task #2995 is In progress in the authenticated board on 2026-10-31. Draft PR #3097 retains dated history and filters live use; final CI, merge and acceptance remain. Parent #2732 is High priority; #2995 has no own Priority, Effort or Enviornment value. Other sections retain their dated evidence.
 
 ## How to use this board
 
@@ -56,7 +56,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Root cause: Number consumers assume every row is live. Retaining rows requires the lifecycle filter and read-only protection to land with the release write.
 - Resolution: Complete #2995 as one change: retain the row after confirmed provider release, show workspace and support history, exclude released rows from live reads and writes, refuse repeat release, and keep the existing recovery and release-first archive order. A later explicit purchase creates a new rental row.
 - Look in: `app/server/number-release-intent.server.ts`; `app/lib/workspace-number-history.server.ts`; `app/components/phone-numbers/NumberHistory.tsx`; `client/migrations/20261031000001_workspace_number_release_history.sql`; `test/integration-db/number-history-live-paths.test.ts`
-- Existing tests: Original runtime fails 15 of 56 initial cases. The candidate passes 123 affected database cases, 23 UI cases and 35 API contract checks. Earlier affected Node run passed 3,521 cases. Final source checks remain.
+- Existing tests: Original runtime fails 15 of 56 initial cases. The candidate passes the full owned PostgreSQL tier (1,358 cases), 23 UI cases and 48 admin-response/API contract checks. Final exact-head checks and GitHub CI remain.
 - Missing tests: Require final exact-head local checks and full GitHub CI before merge; then verify dev deployment and operator/release acceptance. Provider boundaries use an isolated fake; no live number was released.
 - Done when: Release retains the original row with released status and a date.; Live lists, routing, senders, billing and reports exclude released rows.; Workspace and support history show the release date without mutation controls.; Repeat release and attempts to reactivate the same row are refused without repeated provider work or charges.; Archive keeps release-first ordering and failure recovery; script/queue cleanup preserves valid history references.
 - Tracker: Native Project Status is In progress, read in the authenticated board on 2026-10-31. Assigned to @wra-sol, child of High-priority #2732. Its own Priority, Effort and Enviornment fields are unset. Keep open for release acceptance.
