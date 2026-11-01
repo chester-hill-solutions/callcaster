@@ -147,3 +147,7 @@ formatting. When removing a JSON array record, handle its adjacent comma,
 including the last record. Parse the edited JSON before saving it, then run
 `loadEnrichment` and `git diff --check`. Keep base snapshot dates distinct from
 selected live Issue and Project checks; do not imply a complete board refresh.
+
+Render changed field lines from the validated record. When updating commit IDs,
+replace full IDs before short forms and compare the exact rendered values with
+the record before saving.
