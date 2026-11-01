@@ -16,15 +16,14 @@
  * - it matches the existing number convention, so one workspace's resources
  *   read as one block in the console.
  *
- * Twilio truncates friendly names rather than rejecting them, and the truncation
- * is silent, so the suffix is what keeps the resource identifiable when the name
- * is long. `MAX_TWILIO_FRIENDLY_NAME_LENGTH` is set below Twilio's limit so the
- * id suffix always survives.
+ * Keep the id suffix when shortening a name. Callers must use the limit for
+ * their resource; the Account API allows 64 characters. The default budget
+ * preserves the existing labels used by current callers.
  */
 
 /**
- * Twilio accepts friendly names up to 160 characters. Reserve room for the
- * ` · <id>` suffix so the identifying part is never the part that gets cut.
+ * Default budget for existing callers. Resource-specific limits can be lower.
+ * Reserve room for the id suffix when a caller supplies a lower limit.
  */
 export const MAX_TWILIO_FRIENDLY_NAME_LENGTH = 160;
 
@@ -36,11 +35,13 @@ const WORKSPACE_ID_PREFIX_LENGTH = 8;
 
 /** Control characters are rejected by Twilio and break console rendering. */
 function sanitize(raw: string): string {
-  return raw
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u001f\u007f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    raw
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u001f\u007f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
 
 /** The ` · 6aff2ab3` part of a resource name. Empty-safe. */
@@ -58,7 +59,8 @@ function workspaceSuffix(workspaceId: string): string {
 const SUFFIX_RESERVE = SUFFIX_SEPARATOR.length + WORKSPACE_ID_PREFIX_LENGTH;
 
 /**
- * Friendly name for a workspace's Twilio subaccount and API key.
+ * Friendly name for a workspace-owned resource.
+ * Pass the resource-specific limit when needed: Account names allow 64 characters.
  *
  * Falls back to the uuid alone when the workspace has no usable name, so a
  * blank or whitespace-only name never produces a resource named ` · 6aff2ab3`.
@@ -66,6 +68,7 @@ const SUFFIX_RESERVE = SUFFIX_SEPARATOR.length + WORKSPACE_ID_PREFIX_LENGTH;
 export function workspaceResourceName(
   workspaceName: string | null | undefined,
   workspaceId: string,
+  maxLength = MAX_TWILIO_FRIENDLY_NAME_LENGTH,
 ): string {
   const suffix = workspaceSuffix(workspaceId);
   const name = sanitize(workspaceName ?? "");
@@ -74,8 +77,13 @@ export function workspaceResourceName(
     return sanitize(workspaceId) || "Workspace";
   }
 
-  const budget = MAX_TWILIO_FRIENDLY_NAME_LENGTH - SUFFIX_RESERVE;
-  const trimmed = name.length > budget ? name.slice(0, budget).trimEnd() : name;
+  const budget = maxLength - SUFFIX_RESERVE;
+  if (!Number.isInteger(maxLength) || budget < 1) {
+    throw new RangeError(
+      "The resource name limit must leave room for its id suffix",
+    );
+  }
+  const trimmed = [...name].slice(0, budget).join("").trimEnd();
 
   // Guard the degenerate case where the name is all separator characters and
   // trims away to nothing at the budget boundary.

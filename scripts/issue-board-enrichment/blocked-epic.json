@@ -835,22 +835,23 @@
     "issueNumber": 2168,
     "verdict": "blocked-epic",
     "recommendedTitle": "Cull old dev numbers and workspaces: backfill subaccount names and record the keep-list in the repo",
-    "summary": "The keep-list now lives in the repo and is enforced by PR #2536 on dev. Name backfill and the repeat-policy decision remain; workspace-row cleanup stays deferred.",
-    "currentBehavior": "The confirmed keep-list is enforced by PR #2536 (7f2c2f9a). The issue records the historical 19-number cull. PR #2537 (41a1308d) only updated board evidence; it did not implement name backfill. Current scripts provide read-only reports and closed-preview App cleanup, but no legacy subaccount rename command.",
+    "summary": "The keep-list is delivered. Urgent child #3102 provides the separate reviewed name-backfill tool. Retention and repeat-policy decisions remain; workspace-row cleanup stays deferred.",
+    "currentBehavior": "The source includes a dry-run and reviewed apply command. The GET-only live audit on 2026-11-01 found 7 eligible dev names, 1 already correct and 30 protected rows (27 cross-environment references and 3 without a valid match). That audit made no provider or database writes.",
     "rootCause": "No tooling existed to decide what could be culled, and no recorded rule to make the decision repeatable. The name-fragment junk exclusion is deliberately a --exclude flag rather than hardcoded, because it is a judgement call rather than a rule.",
-    "resolution": "Implement a separate idempotent name-backfill plan from the existing naming helper and ownership evidence. Default to dry-run, require an explicit environment and owner match, and review the exact rename list before provider writes. Record the one-off versus recurring policy before scheduling cleanup. Workspace-row cleanup remains deferred.",
+    "resolution": "Complete the #3102 operator receipt and release acceptance, then record the retention/repeat decision in #2029. Keep shared and unknown accounts protected. Do not schedule cleanup or remove workspace rows as part of naming.",
     "lookIn": [
-      "scripts/cull-keep-list.mjs (the confirmed keep-list, shipped)",
-      "scripts/cull-report-policy.mjs:8-24 (the keep-list wins first)",
-      "app/lib/database/workspace-twilio-subaccount.server.ts:39-62 (workspaceResourceName, create path only)",
-      "scripts/twilio-resource-prune-report.mjs (resolves legacy names to their owner workspace)"
+      "scripts/backfill-twilio-subaccount-names.mjs",
+      "scripts/lib/twilio-subaccount-name-backfill.mjs",
+      "scripts/cull-keep-list.mjs",
+      "docs/twilio-subaccount-name-backfill.md"
     ],
     "existingTests": [
       "cull-report.mjs handles 555-number test credentials, the E911 VERIFY line, cross-workspace-only blockers, and compares dates rather than strings",
-      "test/cull-report-policy.test.ts confirms the three recorded workspace IDs and proves 2608141501 survives the phone-name cull rule"
+      "test/cull-report-policy.test.ts confirms the three recorded workspace IDs and proves 2608141501 survives the phone-name cull rule",
+      "80 focused Node cases and 4 real-PostgreSQL cases pass. Isolated disabled ownership, pagination and name-limit guards fail their relevant tests while controls pass."
     ],
     "missingTests": [
-      "Name backfill must be idempotent."
+      "Reviewed operational apply, receipt verification and release acceptance remain for child #3102. The parent retention/repeat policy is still unrecorded."
     ],
     "acceptanceCriteria": [
       "Subaccount display names are backfilled to the #2167 format",
@@ -861,7 +862,7 @@
     "blockedBy": [],
     "size": "S-M",
     "risk": "low",
-    "trackerRecommendation": "Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type unset, Priority Urgent, Effort Medium, Enviornment unset; assignee @wra-sol. Parent #2029 (open). Children: #2931 (open). Native open blockers: none. Native Type is unset. Backfill needs implementation and reviewed provider-write acceptance; keep-list is delivered. No cleanup was run in this refresh."
+    "trackerRecommendation": "Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Task, Priority Urgent, Effort Medium, Enviornment unset; assigned @wra-sol. Parent #2029; open children #2931 and #3102; no native open blockers. The name-backfill work is split into #3102 as requested. Keep the parent open for its complete policy and operational scope."
   },
   {
     "issueNumber": 2213,
