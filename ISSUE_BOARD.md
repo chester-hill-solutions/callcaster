@@ -1,26 +1,16 @@
 # CallCaster — Open Issue Board for Agents
 
-Base inventory: complete native Issue and Project snapshots from 2026-10-29 UTC, 401 open issues. Selected refresh: #1724, #2546, #2943, #2992, #2993, #3085, #3088 and new child #3091 on 2026-10-31; #1981, #1983, #2700, #2776, #2994 and #2995 on 2026-11-01. Refresh the full board with npm run tools:issues:board.
+Base snapshots: complete native Issue metadata and Project export from 2026-10-29 UTC (401 issues; 398 Project rows). The full open-issue inventory was checked again on 2026-11-01 UTC: 403 issues, exactly matching this board. This is not a new full Project export. Unselected entries retain their dated evidence. Refresh the full board with npm run tools:issues:board.
 
-Live native Issue metadata covers all 401 open issues. Type, Priority, Effort and Environment come from those Issue fields. The complete authenticated Project export has 398 unique issue URLs, matching the visible filtered count after hierarchy was turned off and all rows loaded. #100, #2902 and #2906 are absent from that complete Project view and retain unknown Project Status. No status is inferred from a PR, label or issue state.
+Selected refresh, 2026-11-01 UTC: all 27 current Urgent/High issues plus #2533 and #2776. Native Type, Priority, Effort, Enviornment, owners, relationships and full timelines were read. Actual Project Status was read separately in the authenticated issue sidebar; no Status is inferred from a PR or label. The earlier full Project view omitted #100, #2902 and #2906; their Project Status stays unknown.
 
-Current dev includes the merged SMS export and credential-log fixes plus auth isolation #3074, compiler #3075 and credential limits #3079. The current Project export confirms their linked auth, compiler and credential-limit issues are on-dev. Keep issues open for deployed verification and release acceptance.
+PR #3100 is merged and healthy on dev: #2533 now shows both elapsed session time and accumulated connected talk time. PR #3099 for #2776 is also merged and healthy; script errors use block names. Those tasks and the merged redirect repair #3073 move to Verify and close. Operator and release acceptance remain.
 
-The approved merge batch #3070 and CI changes #3082–#3084 are merged into dev. PR #3087 is now also merged at 6f940f35; its tree matches tested e93fb40a and both dev app/worker deployments pass. PRs #3081 and #3086 remain parked with both original branches saved. PR #3092 is parked unmerged and its branch is preserved. PR #3093 for #3091 is merged into dev. Both deployments and its receipt migration are verified; operator and release acceptance remain.
+Take existing urgent and high-priority app requirements first. The approved batch #3070, contact import #3087, consent #3090, reviewed contact repair #3093, archive/restore #3094, archive-key revocation #3096 and released-number history #3097 are on dev. Parent #2546 remains In progress with three on-dev children; preserve #2089 and the CMS deferral under #2677. PRs #3081, #3086 and #3092 stay parked with their branches preserved. Use one open PR for the active branch.
 
-Priority correction, 2026-10-31: take existing urgent and high-priority app requirements first. #3085 and #3088 are on-dev. Parent #2546 remains In progress; its three implemented children are on-dev in the authenticated board. PR #3090 is merged with green CI and successful dev app/worker deployments. PR #3093 is merged into dev at f5bbbfe5 with green CI and successful app/worker deployments. #3091 is on-dev; there is no open PR. Preserve the #2089 ambiguous-recipient guard. The newer #2677 decision defers CMS re-sync and external-ID upserts; do not schedule that historical #2679 work. Other sections retain their prior snapshot evidence.
+The user made #2700 human-only: skip agent setup and acceptance. Keep receipt quantity #1981 and the stated 13% Ontario tax #1983 blocked. See [the account audit](docs/stripe-environments.md). The retention/repeat decision #2029 remains open despite Status on-dev. In #2168, the keep-list is delivered; name backfill and repeat policy remain, and workspace-row cleanup stays deferred. PR #2537 changed planning evidence only. No provider cleanup was run for this refresh.
 
-Question #1724 is answered and closed as completed on 2026-10-31. The real renderer passes 27 existing tests and 11 direct missing/null/empty/fallback output checks. It is identical in master and dev. The live Project Status was still Backlog after closure; no closed-item move was made.
-
-Restore slice #3094 is merged and deployed to dev. #2992 and #2993 are on-dev, assigned @wra-sol and linked as children of High-priority #2732. Their own Priority, Effort and Enviornment fields remain unset. The keep-address decision for #2943 is recorded; that styling fix is on-dev for mail-client acceptance.
-
-Archive-key rule #2994 is merged in PR #3096 at dev@05195e1e. The app and worker were healthy, and /readyz returned 200. Archive permanently revokes keys; restore needs new keys. Native Status is on-dev. Operator and release acceptance remain.
-
-Released-number task #2995 is merged in PR #3097 at dev@0b73c943. All applicable CI passed, including 1,358 PostgreSQL cases; the app and worker were healthy and /readyz returned 200. Native Status is on-dev. Operator and release acceptance remain. Parent #2732 is High priority; neither child has its own Priority, Effort or Enviornment value.
-
-Stripe prerequisites, 2026-11-01: #1983 already specifies 13% Ontario tax and is blocked by #2700. #1981 also has that native open blocker; preserve its existing receipt-quantity branch. A read-only audit found that dev and QA share a test account with no webhook endpoints. Production uses a separate live account. The dedicated dev sandbox, customer-reference plan and once-only fulfillment proof remain. See [the current account map](docs/stripe-environments.md). These selected entries are refreshed; unrelated entries retain their dated evidence.
-
-Caller timing #2533 was refreshed on 2026-10-31 (America/Toronto). The owner requires both elapsed session time and accumulated connected talk time. The task is In progress; the active candidate keeps these totals across queue updates and resets them on a new workspace/campaign visit. Final checks, merge and acceptance remain.
+Earlier selected updates remain: #1724 is answered and closed as completed; #2992–#2995 are on-dev; #2943 keeps its postal address by owner decision. Dev delivery and source tests do not replace operator, provider or release acceptance.
 
 ## How to use this board
 
@@ -49,44 +39,9 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 25
+## Fix now — 22
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
-
-### [#2533](https://github.com/chester-hill-solutions/callcaster/issues/2533) show caller how long theyve been calling for somewhere (agent request)
-- **IN PROGRESS** · Verdict: **Fix now** · Type: Feature · Priority: Medium · Effort: Low · Environment: unset · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-11-01
-- The owner requires both elapsed session time and total connected talk time. The active feature adds them to the shared calling header; final checks, merge and release acceptance remain.
-- Current behavior: At dev@a6ba6390, the call screen shows individual call duration but no session totals. The candidate shows Session and Talk for the current workspace/campaign visit in both dialing modes.
-- Root cause: The header has no visit clock or accumulated connected-time display. The individual call counter resets between contacts.
-- Resolution: Keep elapsed and connected-time totals in the shared header. Use the canonical recipient display state for talk time, preserve totals across queue updates, reset on a new workspace/campaign visit, and keep the header readable at phone widths.
-- Look in: `app/components/call/CallScreen.SessionTimers.tsx`, `app/components/call/CallScreen.Header.tsx`, `app/components/call/CallScreen.Layout.tsx`, `test/ui/call-screen-session-timers.test.tsx`, `test/ui/call-screen-leave.test.tsx`
-- Existing tests: The original runtime fails all eleven new header cases while fourteen existing controls pass. The first candidate run passes 35 UI cases.; Using the agent device state as talk-time input fails both real call-screen connection tests; fourteen controls pass. The correct source is restored exactly.
-- Missing tests: Require final exact-head local checks, focused tests and applicable GitHub CI. Verify the deployed dev app and complete release acceptance.
-- Done when: Both dialing modes show elapsed session time and total connected talk time.; Session time continues between calls; talk time pauses when the recipient is not connected and adds time across contacts.; Queue and title refreshes preserve the totals; leaving or changing workspace/campaign starts a new visit.; Delayed timer callbacks do not slow the clock, and fractional connected time is retained between short calls.; Both timers and the campaign title remain readable on phone and desktop widths; timer updates do not announce every second.
-- Tracker: Native Project Status is In progress, confirmed in the authenticated board. Type Feature, Priority Medium, Effort Low, Enviornment unset; assigned to @wra-sol. No parent, children or open blockers. Owner clarification: show both timers. Keep open for release acceptance.
-
-### [#2776](https://github.com/chester-hill-solutions/callcaster/issues/2776) Script validation error doesn't use human readable block names
-- **IN PROGRESS** · Verdict: **Fix now** · Type: Bug · Priority: Medium · Effort: unset · Environment: prod · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-11-01
-- The reported routing error uses an internal block ID. The active fix uses the saved title in both editors and launch validation; final checks, merge and acceptance remain.
-- Current behavior: At dev@7723dbb3, a Support self-loop is reported as block_mupwwvov_2. The candidate uses Support while retaining the routing issue IDs and legacy ID fallback.
-- Root cause: Routing messages interpolate the block ID, and the raw inbound routing adapter drops the saved title.
-- Resolution: Use the title for displayed routing errors and retain it in the inbound adapter. Keep the graph, route targets, terminal rules and machine-readable issue IDs unchanged.
-- Look in: `app/lib/ivr-script-validation.ts`, `app/lib/inbound-script-validation.ts`, `test/ivr-script-validation.test.ts`, `test/ui/inbound-script-validation.test.tsx`
-- Existing tests: The original runtime fails two new Node cases and both real editor cases. Eight Node and eleven UI controls pass.; The candidate passes 59 affected Node tests and 13 UI tests, including inbound and outbound editor rendering. Final checks will include the named target and fallback cases.
-- Missing tests: Final exact-head local gate and full applicable GitHub CI remain, followed by dev deployment and release acceptance.
-- Done when: The reported three-step self-loop identifies Support instead of its internal ID.; Inbound and outbound validation display the saved block names.; Untitled legacy blocks retain a useful ID fallback.; Routing decisions and machine-readable issue IDs remain unchanged.
-- Tracker: Native Project Status is In progress, read in the authenticated board on 2026-11-01. Type Bug, Priority Medium, Enviornment prod, Effort unset; assigned to @wra-sol. No parent, children or open blockers. Keep open until release acceptance.
-
-### [#3073](https://github.com/chester-hill-solutions/callcaster/issues/3073) Align the patched Twilio redirect dependency
-- **IN PROGRESS** · Verdict: **Fix now** · Type: Task · Priority: High · Effort: Low · Environment: unset · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-29
-- High: align the fixed Twilio redirect dependency; npm is affected while Bun is already patched.
-- Current behavior: PR #3076 is open with the tested follow-redirects 1.16.2 patch. It is not merged into dev.
-- Root cause: The two locks resolve different compatible versions of the same transitive runtime package.
-- Resolution: Review and approve PR #3076, then verify the merged dev deployment and follow the release process. Do not start a duplicate dependency patch.
-- Look in: `package.json`, `package-lock.json`, `bun.lock`
-- Existing tests: Six loopback Twilio/Axios cases pass. The old npm tree fails three credential-forwarding cases while three controls pass; the old Bun tree already passes.; Full npm run ci:local passed on the final commit. All applicable exact-head GitHub checks passed.
-- Missing tests: Merge approval, dev deployment verification and required release acceptance remain.
-- Tracker: Included from original PR #3076 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges.
 
 ### [#1826](https://github.com/chester-hill-solutions/callcaster/issues/1826) Dev-environment PR acceptance suite
 - Verdict: **Fix now** · Type: Task · Priority: Medium · Effort: Low · Environment: unset · Labels: devops/admin · Assignee: none · Updated: 2026-10-19
@@ -347,7 +302,42 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 61
+## Verify and close — 64
+
+### [#2533](https://github.com/chester-hill-solutions/callcaster/issues/2533) show caller how long theyve been calling for somewhere (agent request)
+- Verdict: **Verify and close** · Type: Feature · Priority: Medium · Effort: Low · Environment: unset · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-11-01
+- Both owner-requested totals are merged and deployed to dev in PR #3100: elapsed session time and accumulated connected talk time.
+- Current behavior: At dev@09f41816, both dialing modes show Session and Talk in the shared header. Session continues between contacts; Talk uses the recipient connected state and retains fractional time. Queue refreshes preserve totals; a new workspace/campaign visit resets them.
+- Root cause: The missing visit clock and connected-time total were added to the shared calling header.
+- Resolution: Complete operator and release acceptance. Preserve the owner decision to show both totals; no further implementation is needed without a failing requirement.
+- Look in: `app/components/call/CallScreen.SessionTimers.tsx`, `app/components/call/CallScreen.Header.tsx`, `app/components/call/CallScreen.Layout.tsx`, `test/ui/call-screen-session-timers.test.tsx`, `test/ui/call-screen-leave.test.tsx`
+- Existing tests: 65 focused UI cases, 18 board cases, 37 local gates and all 17 applicable GitHub checks passed on b15c07a3.; The original code fails all eleven new header cases. Using agent-device state as talk input fails both real call-screen wiring cases while fourteen controls pass.; Phone and desktop browser checks cover both modes, light/dark, queue refresh and talk-time pause. Exact dev app/worker deployments are healthy and /readyz returns 200.
+- Missing tests: Operator and release acceptance remain.
+- Done when: Both dialing modes show elapsed session time and total connected talk time.; Session time continues between calls; talk time pauses when the recipient is not connected and adds time across contacts.; Queue and title refreshes preserve the totals; leaving or changing workspace/campaign starts a new visit.; Delayed timer callbacks do not slow the clock, and fractional connected time is retained between short calls.; Both timers and the campaign title remain readable on phone and desktop widths; timer updates do not announce every second.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Feature, Priority Medium, Effort Low, Enviornment unset; assignee @wra-sol. No parent. Children: none. Native open blockers: none. PR #3100 is merged and deployed. Owner decision: show both timers. Keep open for release acceptance.
+
+### [#2776](https://github.com/chester-hill-solutions/callcaster/issues/2776) Script validation error doesn't use human readable block names
+- Verdict: **Verify and close** · Type: Bug · Priority: Medium · Effort: unset · Environment: prod · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-11-01
+- Readable script validation errors are merged and deployed to dev in PR #3099. Errors use the saved block title, with the legacy ID as fallback.
+- Current behavior: At dev@a6ba6390, the reported three-step self-loop identifies Support in inbound and outbound editors and server launch validation. Routing targets and structured issue IDs remain stable.
+- Root cause: Routing messages interpolate the block ID, and the raw inbound routing adapter drops the saved title.
+- Resolution: Complete operator and release acceptance. Keep saved titles in the inbound adapter and preserve the untitled-block fallback.
+- Look in: `app/lib/ivr-script-validation.ts`, `app/lib/inbound-script-validation.ts`, `test/ivr-script-validation.test.ts`, `test/ui/inbound-script-validation.test.tsx`
+- Existing tests: 78 focused Node cases, 13 UI cases, 37 local gates and all 17 applicable GitHub checks passed on b8d53bd8.; The original runtime fails two new Node and two real editor cases; eight Node and eleven UI controls pass.; Exact dev app/worker deployments and /readyz were healthy after merge.
+- Missing tests: Operator and release acceptance remain.
+- Done when: The reported three-step self-loop identifies Support instead of its internal ID.; Inbound and outbound validation display the saved block names.; Untitled legacy blocks retain a useful ID fallback.; Routing decisions and machine-readable issue IDs remain unchanged.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Bug, Priority Medium, Effort unset, Enviornment prod; assignee @wra-sol. No parent. Children: none. Native open blockers: none. PR #3099 is merged and deployed; operator and release acceptance remain.
+
+### [#3073](https://github.com/chester-hill-solutions/callcaster/issues/3073) Align the patched Twilio redirect dependency
+- Verdict: **Verify and close** · Type: Task · Priority: High · Effort: Low · Environment: unset · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-29
+- The Twilio redirect dependency repair is merged into dev. npm and Bun both resolve follow-redirects 1.16.2.
+- Current behavior: PR #3076 merged at e5db5f28 and the approved batch PR #3070 merged at af5767d6. The current npm and Bun lockfiles retain the fixed runtime dependency.
+- Root cause: The two locks resolve different compatible versions of the same transitive runtime package.
+- Resolution: Complete release acceptance. Do not restart the dependency patch from the stale open-PR record.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`
+- Existing tests: Six loopback Twilio/Axios cases pass. The old npm tree fails three credential-forwarding cases while three controls pass; the old Bun tree already passes.; Full npm run ci:local passed on the final commit. All applicable exact-head GitHub checks passed.
+- Missing tests: Release acceptance remains; no live provider traffic is required to retest redirect credential isolation.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Task, Priority High, Effort Low, Enviornment unset; assignee @wra-sol. Parent #1802 (open). Children: none. Native open blockers: none. PR #3076 and batch #3070 are merged. Release acceptance remains.
 
 ### [#2994](https://github.com/chester-hill-solutions/callcaster/issues/2994) Task: decide whether an archived workspace's API keys stay valid
 - Verdict: **Verify and close** · Type: Task · Priority: unset · Effort: unset · Environment: unset · Size: M · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
@@ -395,10 +385,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Root cause: The original layout defect needs real mail-client acceptance; the old planning record missed the later keep-address decision.
 - Resolution: Verify password-reset alignment in real mail clients and compare other transactional emails that use the same shell. Keep the postal address. Follow the release acceptance path.
 - Look in: `app/lib/email-layout.server.ts`, `test/email-layout.server.test.ts`
-- Tracker: Native Task, Priority High, Effort nothing-burger, Enviornment dev. Actual Project Status on-dev was read in the authenticated issue sidebar on 2026-10-31. PR #2954 / 25fa571c is merged. The human keep-address decision is in issuecomment-6385832543.
-
-
-Likely already fixed or working as designed. Run the listed verification, then close without new code.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Task, Priority High, Effort nothing-burger, Enviornment dev; assignee none. Parent #2075 (open). Children: none. Native open blockers: none. PR #2954 is merged. The recorded owner decision keeps the postal address; real mail-client acceptance remains.
 
 ### [#3091](https://github.com/chester-hill-solutions/callcaster/issues/3091) Provide a reviewed repair for duplicate workspace contacts
 - Verdict: **Verify and close** · Type: Bug · Priority: High · Effort: High · Environment: unset · Size: L · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
@@ -410,7 +397,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: All 37 local gate checks pass on clean cb175e79. Focused validation passes 116 database/schema cases, 78 Node cases and 37 UI cases. Fresh database setup and both migration-list guards pass.; All 19 applicable exact-head GitHub checks pass. PostgreSQL 18.6 runs all 30 repair cases within 1,295 passing database cases. Full Node/UI, browser, build, bundle, codegen and schema gates pass.; The original merge regressions fail while valid controls pass. The import lock-order regression and saved list-total regression fail before their fixes. Rollback includes profile, membership, history, queue, continuation and list-total state.; The dev merge tree equals tested cb175e79. App and worker are online at f5bbbfe5, readiness passes, and the receipt table plus migration ledger were verified with transaction_read_only enabled.
 - Missing tests: Deployed operator acceptance with approved contacts and release acceptance.
 - Done when: Do not merge distinct external or voter identities or bypass ambiguous-recipient protection.; Retain the chosen profile, source snapshots, history and completed queue state. Any saved opt-out remains effective.; Keep import receipts immutable and serialize imports with repair. Reject active work and stale reviews; roll back failures; repeat requests apply once.
-- Tracker: Native Bug, Priority High, Effort High, assigned @wra-sol, parent #2546. Actual Project Status on-dev was verified in the authenticated issue sidebar and timeline. PR #3093 is merged; no PR is open. PRs #3081, #3086 and #3092 remain parked with their branches preserved.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Bug, Priority High, Effort High, Enviornment unset; assignee @wra-sol. Parent #2546 (open). Children: none. Native open blockers: none. PR #3093 is merged at f5bbbfe5. Operator and release acceptance remain. Parked #3081, #3086 and #3092 branches are preserved.
 
 ### [#3088](https://github.com/chester-hill-solutions/callcaster/issues/3088) Honor opt-outs across duplicate workspace contacts in campaign SMS
 - Verdict: **Verify and close** · Type: Bug · Priority: High · Effort: Medium · Environment: unset · Size: S · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
@@ -422,7 +409,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: The new requirement fails on both real adapters with the old coordinator; 17 controls pass.; Rebased 982371e6 passes all 37 local checks, 136 affected Node cases and 36 real-Postgres cases with no test skips. Checks cover both adapters, no intent/provider/outreach work on opt-out or read failure, eligible and all-opted-in duplicate controls, formatted and international phones, another workspace, and 65,536 selected phones.; Before the CI tooling rebase, full local CI passed on clean 3f532afa in 698.01 seconds: 6,159 Node cases with three existing skips, 34 Bun cases and 1,568 UI cases; all guards, typecheck, lint, build, bundle and codegen checks passed. The rebase changes only approved CI tooling paths; application and affected test sources are unchanged.; Final publication head 4395c28a passes the fast local gate, 136 affected Node cases, 36 real database cases and all applicable GitHub CI. Squash merge 71ecaadd has the identical tested tree.
 - Missing tests: Deployed dev and release acceptance.
 - Done when: An opted-out same-workspace phone copy blocks the queued copy, including records outside the selected audience.; Both adapters enforce the rule before message intents, provider calls and outreach attempts.; Other phones and other workspaces cannot block a permitted recipient.; All-opted-in duplicates retain the existing one-send behavior.; A failed read consumes no contact attempts and removes no queued work.; Bound database parameters and reuse canonical normalized phone identity.
-- Tracker: Native Bug, Priority High, Effort Medium, assigned @wra-sol, native parent #2546. Actual Project Status on-dev was verified in the authenticated board. All applicable exact-head GitHub checks pass; both dev app and worker deployments succeeded. Keep the issue open until release acceptance.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Bug, Priority High, Effort Medium, Enviornment unset; assignee @wra-sol. Parent #2546 (open). Children: none. Native open blockers: none. PR #3090 is merged at 71ecaadd; release acceptance remains.
 
 ### [#3071](https://github.com/chester-hill-solutions/callcaster/issues/3071) Patch Better Auth verification token isolation
 - Verdict: **Verify and close** · Type: Task · Priority: Urgent · Effort: Medium · Environment: unset · Size: M · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-29
@@ -434,7 +421,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: Token-purpose regressions fail against the old library and pass against the patch.; Full npm run ci:local passed on the final commit. All applicable exact-head GitHub checks passed.; PR #3074: 6,102 Node, 34 Bun and 1,541 UI cases; three existing Node skips passed at ceef311c; merged into dev as 553a7a63. The current complete Project export confirms on-dev.
 - Missing tests: Deployed verification and required release acceptance remain.
 - Done when: A token from one purpose cannot authenticate another purpose or consume its pending state.; Valid email/password and one-use Magic Link controls pass in an isolated fixture.; App verification, recovery, session and two-factor policies remain covered.
-- Tracker: PR #3074 is merged into dev. Actual Project Status on-dev was read from the complete 398-item export. Keep open for deployed verification and release; do not start a duplicate implementation.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Task, Priority Urgent, Effort Medium, Enviornment unset; assignee @wra-sol. Parent #1802 (open). Children: none. Native open blockers: none. PR #3074 is merged; no new isolation implementation is needed without a failing requirement. Release acceptance remains.
 
 ### [#2774](https://github.com/chester-hill-solutions/callcaster/issues/2774) IVR Voicemails Drops aren't smart and get cut off
 - Verdict: **Verify and close** · Type: Bug · Priority: Urgent · Effort: unset · Environment: prod · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-26
@@ -446,7 +433,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: test/campaign-ivr-dispatch.test.ts; test/campaign-test-call.test.ts; test/ivr-machine-detection.test.ts; test/ivr-page.route.test.ts; test/ivr.route.test.ts; test/ivr-initiate.server.test.ts
 - Missing tests: A controlled live voicemail recording with a confirmed test recipient after deployment.
 - Done when: Configured drops wait for greeting completion on production and test calls.; Beep, silence and other machine-end results play the saved drop; completed callbacks cannot replay it.; An approved recipient confirms the entire message was recorded after deployment.
-- Tracker: 2026-10-28 source review at dev@4977bfef. Keep live voicemail acceptance separate from the merge.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Bug, Priority Urgent, Effort unset, Enviornment prod; assignee @wra-sol. No parent. Children: none. Native open blockers: none. PR #3005 is merged. A complete voicemail with an approved recipient remains the provider acceptance step.
 
 ### [#2075](https://github.com/chester-hill-solutions/callcaster/issues/2075) Restore the password recovery email journey
 - Verdict: **Verify and close** · Type: Bug · Priority: Urgent · Effort: Low · Environment: unset · Labels: none · Assignee: none · Updated: 2026-10-24
@@ -457,7 +444,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `app/routes/remember.action.server.ts`, `app/routes/reset-password.loader.server.ts`, `app/routes/reset-password.action.server.ts`, `app/routes/reset-password.tsx`, `/auth/callback.loader.server.ts`, `app/routes/remember.tsx`
 - Existing tests: test/password-recovery-journey.test.ts — walks the ACTUAL issued email through the installed Better Auth (memory adapter): it reads the reset link out of the sent mail, drives the real `api+/auth/$.loader.server` callback (expects 302 to /reset-password?token=<issued token>), loads the reset page (expects `{ token }`), submits the new password, asserts the password changed (the old password no longer signs in, the new one does) and that the link cannot be replayed (the second submit returns 400). It also covers identical generic feedback for known and unknown emails, the caller-selected-host resistance, the expired-link path, and the request rate limit. Ran green on this tree: `npx vitest run -c vitest.node.config.ts test/password-recovery-journey.test.ts ...` -> 4 files passed, 34 tests passed. test/ui/reset-password-feedback.test.tsx and e2e/specs/password-reset-feedback.spec.ts cover the failure feedback (one toast, retained fields, no layout shift) but the UI suite could not be executed in this checkout (every UI test fails with 'Cannot read properties of null (reading useContext)' from the vendored shad-cc copy of next-themes/react; an unrelated control test fails identically — a local install artifact, not a code defect).
 - Done when: A person confirms the reported symptom is gone on master.
-- Tracker: Urgent priority; live Project Status tested-on-dev, but the latest detailed acceptance report explicitly leaves the real inbox journey open. Preserve that gap; do not close or silently claim completion.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status tested-on-dev. Native Type Bug, Priority Urgent, Effort Low, Enviornment unset; assignee none. No parent. Children: #2661 (open), #2943 (open). Native open blockers: none. The timeline records deployed feedback checks from #2944. The current Status records a dev test; real-inbox and release evidence must be checked before closure.
 
 ### [#2931](https://github.com/chester-hill-solutions/callcaster/issues/2931) workspace number renewal reminder even though worksapce is in weird limbo state without a number
 - Verdict: **Verify and close** · Type: Bug · Priority: Urgent · Effort: unset · Environment: dev · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-23
@@ -466,7 +453,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Root cause: The old sweep selected rented rows without checking that a provider rental existed.
 - Resolution: Run the focused rental tests, then verify the affected workspace and scheduled notices in the deployed environment before release.
 - Look in: `app/lib/number-rental-billing.server.ts`, `test/number-rental-billing.server.test.ts`
-- Tracker: Native Bug, Priority Urgent, Project Status on-dev. PR #2933 / 0bb55f52 is included in current dev. Source evidence is separate from deployed billing acceptance.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Bug, Priority Urgent, Effort unset, Enviornment dev; assignee @wra-sol. Parent #2168 (open). Children: none. Native open blockers: none. PR #2933 is included in current dev. Scheduled notice and billing acceptance remain.
 
 ### [#2519](https://github.com/chester-hill-solutions/callcaster/issues/2519) call settings: call in verification not conigured
 - Verdict: **Verify and close** · Type: Bug · Priority: Urgent · Effort: Medium · Environment: prod · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-19
@@ -477,6 +464,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `app/lib/verification-number.server.ts`, `/verify-call-in-session.loader.server.ts`, `/route.action.server.ts`, `/panels/AdminSystemSettingsPanel.tsx`, `docs/release-test-guide-2026-10-19.md`
 - Existing tests: No automated test for this change. scripts/configure-verification-number.mjs registers and activates a number in one transaction and is the operator path, and docs/release-test-guide-2026-10-19.md:13-21 lists the manual checks.
 - Done when: A person confirms the reported symptom is gone on master.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-qa. Native Type Bug, Priority Urgent, Effort Medium, Enviornment prod; assignee @wra-sol. No parent. Children: none. Native open blockers: none. The code is in master; an operator must register and activate a dedicated number and complete a real verification call. Do not use a customer support line.
 
 ### [#3085](https://github.com/chester-hill-solutions/callcaster/issues/3085) Reuse an existing workspace contact across audience imports
 - Verdict: **Verify and close** · Type: Bug · Priority: High · Effort: unset · Environment: unset · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
@@ -488,7 +476,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: 50 real-database cases pass without skips. The original implementation fails four contact-reuse cases while 33 controls pass. The original renderer fails the new reuse/ambiguity download assertion while three controls pass.; 35 focused Node cases pass. Changed runtime files and the report test have no lint warnings; the recovery test retains its one existing warning.; Full npm run ci:local passes on clean 030d8bd45cec1ab46243489322ce0306f4181d9a in 698.38 seconds: 6,153 Node tests with three existing skips, 34 Bun tests and 1,568 UI tests. All guards, typecheck, lint, build, bundle and codegen checks pass. Start/end commit and source hashes match.
 - Missing tests: Deployed dev acceptance of repeated-phone imports and default-branch promotion remain. No live SMS or phone traffic was sent.
 - Done when: One workspace contact can belong to two audiences.; Concurrent imports, replay and recovery cannot duplicate contacts, memberships or receipts.; Reuse preserves saved profile, opt-out, line type, household and history.; Ambiguous legacy phones add no contact or membership and produce a clear report.; Workspace isolation and unmapped-phone behavior stay intact.
-- Tracker: Native Bug, Priority High. PR #3087 merged into dev at 6f940f35 with a tree identical to tested e93fb40a. Applicable GitHub checks and both dev app/worker deployment statuses pass. Actual Project Status is on-dev, verified in the authenticated board; the issue stays open. Parent #2546 remains In progress.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Bug, Priority High, Effort unset, Enviornment unset; assignee @wra-sol. Parent #2546 (open). Children: none. Native open blockers: none. PR #3087 is merged at 6f940f35; release acceptance remains. Do not claim the whole parent is complete.
 
 ### [#3072](https://github.com/chester-hill-solutions/callcaster/issues/3072) Patch the API generator Handlebars compiler
 - Verdict: **Verify and close** · Type: Task · Priority: High · Effort: Low · Environment: unset · Size: S · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-29
@@ -499,7 +487,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `package.json`, `package-lock.json`, `bun.lock`
 - Existing tests: Four real compiler cases pass; the old compiler fails three while the normal control passes.; Full npm run ci:local passed on the final commit. All applicable exact-head GitHub checks passed.; PR #3075: 6,106 Node, 34 Bun and 1,541 UI cases; three existing Node skips passed at 7e044729; merged into dev as c33a0a20. The current complete Project export confirms on-dev.
 - Missing tests: Deployed verification and required release acceptance remain.
-- Tracker: PR #3075 is merged into dev. Actual Project Status on-dev was read from the complete 398-item export. Keep open for deployed verification and release; do not start a duplicate implementation.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Task, Priority High, Effort Low, Enviornment unset; assignee @wra-sol. No parent. Children: none. Native open blockers: none. PR #3075 is merged; no new compiler implementation is needed without a failing requirement. Release acceptance remains.
 
 ### [#2603](https://github.com/chester-hill-solutions/callcaster/issues/2603) SMS Exports should have "external_id" and/or all contact fields not just contact name
 - Verdict: **Verify and close** · Type: Feature · Priority: High · Effort: Low · Environment: prod · Size: S · Risk: medium · Labels: ux, business-logic · Assignee: @wra-sol · Updated: 2026-10-28
@@ -510,19 +498,19 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `app/lib/campaign-sms-report.server.ts`, `app/lib/campaign-sms-report-data.server.ts`, `test/integration-db/campaign-sms-report.test.ts`
 - Existing tests: Four added real-PostgreSQL identity cases and the existing report suite pass: 12 cases, zero skipped. Original source and weakened identity guards fail the relevant cases. Full local CI and all applicable GitHub checks passed at final head 582f1255 before the approved merge.
 - Done when: Exported delivery and reply CSVs retain the contact external_id.; Missing external IDs produce an empty cell without losing the row.; Existing access rules, column values and tenant scope remain correct.
-- Tracker: Merged source proof on dev, with Project Status on-dev verified in the live issue sidebar on 2026-10-28. Keep the issue open for required environment acceptance and release; no live provider traffic was used.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Feature, Priority High, Effort Low, Enviornment prod; assignee @wra-sol. Parent #1752 (closed). Children: none. Native open blockers: none. PR #3068 is merged at a0060296. Verify an approved CSV against known external IDs, then complete release acceptance.
 
 ### [#1874](https://github.com/chester-hill-solutions/callcaster/issues/1874) IVR estimates are too low. projected CPS is too high
 - Verdict: **Verify and close** · Type: Bug · Priority: High · Effort: Low · Environment: dev · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-26
-- The previous concurrency bound still uses an optimistic legacy rate and displays conflicting rate units; the reopened report is not fixed on the default branch.
+- The revised completion estimate is on dev in PR #3006. Provider pacing from PR #3009 is also merged; real campaign accuracy still needs acceptance.
 - Current behavior: PR #3006 merged into dev on 2026-10-26. The completion estimate now includes the durable worker polling delay. High priority; live Project Status is on-dev.
 - Root cause: The old 200ms queue-next plus 500ms webhook-delay heuristic assumes 1.43 dial starts per second. Durable dispatch now schedules a successor one second after each batch; an idle worker sleeps five seconds before claiming it. The concurrency-only patch did not model that loop. The UI also appends calls/sec and CPS to values already converted to per minute. Remaining queue counts are correct; no arbitrary duration multiplier or worker pacing change is needed.
-- Resolution: Verify the displayed estimate against an approved real campaign before release. Keep #3007 separate: dispatch pacing remains in open PR #3009.
+- Resolution: Compare the displayed completion estimate with an approved real campaign and follow release acceptance. PR #3009 for #3007 is merged at 4253788d; do not start another pacing patch from the old open-PR claim.
 - Look in: `app/lib/campaign-outbound-estimate.ts`, `app/lib/throughput-config.ts`, `app/lib/worker/poll-jobs.server.ts`, `app/lib/worker/handlers/campaign.server.ts`, `app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx`
 - Existing tests: test/worker.test.ts: real poll loop with fake time proves a one-second successor waits five seconds.; test/campaign-outbound-estimate.test.ts: 24/minute cadence, stable projected average finish for both reported screenshot counts, configured-rate and concurrency controls.; test/ui/campaign-launch-ivr-estimate.test.tsx: real notice renders calls/minute, worker pacing and remaining-queue wording.
 - Missing tests: After release, compare the displayed range with an actual campaign; the estimate is a planning model and provider/database delays can vary.
 - Done when: Default planning rate includes the durable worker batch and poll cadence.; The two reported queue counts keep the average projected finish stable at the reported processing pace.; Rate labels use consistent units and distinguish a drained queue from calls still in flight.; A deployed campaign confirms the estimate is useful before closing.
-- Tracker: 2026-10-28 source review at dev@4977bfef. This is merged source proof, not deployed call acceptance.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Bug, Priority High, Effort Low, Enviornment dev; assignee @wra-sol. No parent. Children: none. Native open blockers: none. A real campaign comparison remains; code merge is not throughput acceptance.
 
 ### [#2732](https://github.com/chester-hill-solutions/callcaster/issues/2732) Delete Workspace Option
 - Verdict: **Verify and close** · Type: Feature · Priority: High · Effort: unset · Environment: unset · Size: S · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-24
@@ -531,7 +519,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Root cause: The archive flow preserves provider release state instead of deleting rows before their numbers can be released.
 - Resolution: Verify archive, release-failure recovery, retained history and navigation in an approved test workspace. Keep restore and archived-key policy in their separate tasks.
 - Look in: `app/lib/workspace-archive.server.ts`, `test/workspace-archive.test.ts`, `test/workspace-archive-middleware.test.ts`
-- Tracker: Native Feature, Priority High, Project Status on-dev. PR #2958 / 0c72d196 is on dev. Source proof is not authorization to archive a live customer workspace.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Feature, Priority High, Effort unset, Enviornment unset; assignee @wra-sol. No parent. Children: #2992 (open), #2993 (open), #2995 (open), #2994 (open). Native open blockers: none. Archive, restore, key revocation and released-number history are on dev through #2958, #3094, #3096 and #3097. Approved workspace/operator and release acceptance remain; do not archive a live customer for testing.
 
 ### [#2757](https://github.com/chester-hill-solutions/callcaster/issues/2757) Include all subaccount resources in the Twilio prune report
 - Verdict: **Verify and close** · Type: Bug · Priority: High · Effort: Low · Environment: prod · Size: S · Risk: medium · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-10-24
@@ -542,18 +530,18 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `scripts/twilio-resource-prune-report.mjs`, `scripts/lib/twilio-prune-resources.mjs`, `test/twilio-prune-resources.test.ts`
 - Existing tests: test/twilio-prune-resources.test.ts
 - Done when: Include Messaging Services with the subaccount’s own credentials.; Enumerate all account and resource pages.; Fail unreadable lists with account context instead of reporting an empty successful scan.; Keep the report read-only and preserve all keep-list and environment/owner decisions.
-- Tracker: Bug; Priority High; Effort Low; environment prod; assigned to wra-sol. Project Status Backlog verified in the browser. Parent #1165. Review https://github.com/chester-hill-solutions/callcaster/pull/2758; the parent full audit and retention decisions remain blocked.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Bug, Priority High, Effort Low, Enviornment prod; assignee @wra-sol. Parent #1165 (open). Children: none. Native open blockers: none. PR #2758 is merged at 860b344f. The suspended-account read failure stays explicit; full cleanup is not accepted.
 
 ### [#2531](https://github.com/chester-hill-solutions/callcaster/issues/2531) Add a Notes field for all callers
 - Verdict: **Verify and close** · Type: Feature · Priority: High · Effort: Medium · Environment: prod · Size: S · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-24
-- PR #2755 adds a Notes field for all callers in Power and Predictive modes, with saved-result restoration, contact-safe autosave and equal-height desktop panels. Review and deployed acceptance remain.
+- PR #2755 is merged into dev. Notes are available to all callers in both dialing modes, with saved-result restoration and contact-safe autosave. Deployed and release acceptance remain.
 - Current behavior: Fixed on dev. Every caller role has a Notes field on the call screen, edited like the other questionnaire fields.
 - Root cause: The call screen only renders script questions. Saved outreach results do not initialize the draft, contact changes can retain the preceding draft, and the debounce does not retain the original save target across a handoff. Contact selection also discards results when no provider call row exists.
-- Resolution: Fixed in #2755 (`b7904d8a`): the Notes control in `app/components/call/CallScreen.Questionnaire.tsx` and the debounced save path in `app/hooks/utils/useDebouncedSave.ts`.
+- Resolution: Verify Notes with a caller role, reload the saved attempt and switch contacts. Confirm notes and questionnaire results remain separate and the phone/desktop layouts meet the recorded criteria. Follow release acceptance.
 - Look in: `app/components/call/CallScreen.Questionnaire.tsx`, `app/hooks/call/useCallScreen.ts`, `app/hooks/utils/useDebouncedSave.ts`, `app/routes/api+/questions.action.server.ts`, `app/lib/callscreenActions.ts`
 - Existing tests: test/ui/call-screen-questionnaire.test.tsx; test/ui/hooks-call-screen.test.tsx
 - Done when: All callers can edit Notes in Power and Predictive modes.; Notes save with the selected outreach attempt and return after reload or contact selection.; Questionnaire answers, notes and disposition edits preserve one another.; Notes do not carry over when the selected contact changes.; The field uses the shared accessible controls and works at phone and desktop widths.; Desktop queue, questionnaire and call-control frames have equal heights; long scripts retain reachable call controls and phone layouts remain stacked.
-- Tracker: User clarified the requirement on 2026-10-20: a Notes field available to all callers. Native Type Feature; Priority High; Effort Medium; environment prod; assigned to wra-sol. Project Status Backlog at the start; no parent, children or dependencies. PR #2755 targets dev and has a verified Development link. Keep open through default-branch promotion and release acceptance.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Feature, Priority High, Effort Medium, Enviornment prod; assignee @wra-sol. No parent. Children: none. Native open blockers: none. PR #2755 is merged; operator and release acceptance remain.
 
 ### [#2512](https://github.com/chester-hill-solutions/callcaster/issues/2512) SMS Message page is super slow when sending out a campaign
 - Verdict: **Verify and close** · Type: Task · Priority: High · Effort: Medium · Environment: unset · Labels: ux, business-logic · Assignee: @wra-sol · Updated: 2026-10-19
@@ -564,6 +552,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `app/hooks/chats/useChatsPage.ts`, `id/chats.loader.server.ts`, `app/lib/database/workspace-conversations.server.ts`, `app/lib/chat-conversation-sort.ts`, `id/chats/ConversationList.tsx`, `app/lib/chats/conversation-utils.ts`
 - Existing tests: test/chat-conversation-sort.test.ts:31 — 'filters out unreplied conversations for hasReplied' and the getChatSortOption default cases (lines 189-196); test/ui/use-chats-page-pagination.test.tsx:185 — 'defaults to conversations with a reply' plus the page-cache key cases; test/conversation-utils.test.ts — the phone-key merge cases. Added by 4ea8f3ba (PR #2535).
 - Done when: A person confirms the reported symptom is gone on master.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-qa. Native Type Task, Priority High, Effort Medium, Enviornment unset; assignee @wra-sol. No parent. Children: none. Native open blockers: none. Verify responsiveness with a large approved campaign. Virtualization and a page cache do not measure perceived performance.
 
 ### [#1841](https://github.com/chester-hill-solutions/callcaster/issues/1841) IVR key press does not interrupt the current audio block (prompt sits outside the Gather)
 - Verdict: **Verify and close** · Type: Bug · Priority: High · Effort: unset · Environment: unset · Labels: none · Assignee: none · Updated: 2026-10-19
@@ -574,6 +563,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `app/lib/ivr-block-runtime.server.ts`, `app/lib/ivr-block-render.server.ts`, `blockId.action.server.ts`, `test/ivr-block.route.test.ts`, `test/inbound-ivr-block.route.test.ts`
 - Existing tests: test/ivr-block.route.test.ts (outbound) and test/inbound-ivr-block.route.test.ts (inbound) — both assert the nested `<Gather><Play/></Gather>` TwiML. Ran green: `DATABASE_URL=... npx vitest run test/inbound-ivr-block.route.test.ts test/ivr-page.route.test.ts` → 2 files / 24 tests passed; test/ivr-block.route.test.ts also passed in the earlier run.
 - Done when: A person confirms the reported symptom is gone on master.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-qa. Native Type Bug, Priority High, Effort unset, Enviornment unset; assignee none. No parent. Children: none. Native open blockers: none. The code is in master; a person must confirm that a mid-prompt key press stops audio on both IVR paths.
 
 ### [#2698](https://github.com/chester-hill-solutions/callcaster/issues/2698) call interface in "Predictive Dialer" campaign says "power dialer" and in "power dialer" says "manual dialing"
 - Verdict: **Verify and close** · Type: Bug · Priority: Medium · Effort: Low · Environment: dev · Size: XS · Risk: low · Labels: design, ux · Assignee: @wra-sol · Updated: 2026-10-20
@@ -1190,7 +1180,7 @@ Product, security, or operations decision required before implementation can be 
 - Look in: `scripts/twilio-resource-prune-report.mjs (the read-only report, with the accounts section)`, `scripts/twilio-resource-prune-keep-list.mjs (where the survivors go)`, `app/lib/number-release.server.ts:152 (the number release path and its E911 blocker)`
 - Missing tests: no check reports which numbers in an account are referenced by a live workspace record, which is the check that would make this repeatable; no test covers a release that is refused because a reference exists; no test asserts that a released number cannot still be selected as a campaign sender
 - Done when: Arfin's keep-list is recorded in the issue, with the workspace each kept number belongs to; Every number released is confirmed to have no live workspace reference, checked by query and not by eye; The kept numbers are confirmed still working after the release run; The rule for 'in use' is written down, with the chosen option; A decision is recorded on whether the clean-up repeats on a schedule or stays a one-off
-- Tracker: Needs decision, and it is a short one. The engineering is a console exercise; what is genuinely unresolved is the safety rule, and getting that wrong breaks a dev workspace in a way nobody notices until later. If the answer is 'a reference check first', that is worth filing as its own small issue, because it makes every future clean-up safe and is more valuable than this particular release.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Task, Priority Urgent, Effort Medium, Enviornment unset; assignee @wra-sol. Parent #1165 (open). Children: #2168 (open). Native open blockers: #1320. The in-use and repeat-policy decisions are still unrecorded. Status on-dev does not resolve this decision. #1320 is an open native blocker.
 
 ### [#1320](https://github.com/chester-hill-solutions/callcaster/issues/1320) ops(twilio): migrate one CHS number with callback and database reconciliation
 - Verdict: **Needs decision** · Type: Task · Priority: Urgent · Effort: unset · Environment: unset · Size: S-M · Risk: high · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-10-15
@@ -1202,7 +1192,7 @@ Product, security, or operations decision required before implementation can be 
 - Existing tests: n/a — operational
 - Missing tests: before/after evidence, rollback steps
 - Done when: Ownership confirmed before transfer; Voice/SMS/callbacks work in new workspace; Single owner after migration
-- Tracker: Ops task with a rollback plan. The possible dependency on #1329 was dropped when #1329 closed as not planned on 2026-10-17; re-check current account ownership before the transfer.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status Backlog. Native Type Task, Priority Urgent, Effort unset, Enviornment unset; assignee @wra-sol. No parent. Children: none. Native open blockers: none. An operator must confirm source/target ownership, billing and callbacks before the production number transfer. No transfer was made.
 
 ### [#2941](https://github.com/chester-hill-solutions/callcaster/issues/2941) Enable self-serve signup in production deliberately
 - Verdict: **Needs decision** · Type: Feature · Priority: High · Effort: Medium · Environment: prod · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-23
@@ -1212,11 +1202,10 @@ Product, security, or operations decision required before implementation can be 
 - Resolution: Complete #2216 acceptance. Record the signup volume bound, trial credit policy and intended production flag. Then make one atomic rollout change with open/closed-path tests.
 - Look in: `app/server/auth-instance.ts`, `app/routes/signup.action.server.ts`, `shared/pricing.ts`
 - Blocked by: [#2216](https://github.com/chester-hill-solutions/callcaster/issues/2216)
-- Tracker: Native Feature, Priority High, Effort Medium, Project Status Backlog. Preserve the native #2216 dependency until its required verification is done.
-
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status Backlog. Native Type Feature, Priority High, Effort Medium, Enviornment prod; assignee none. No parent. Children: none. Native open blockers: #2216. The verification code has landed, but signup volume, trial-credit policy and deliberate production configuration still need decisions. Do not change SIGNUP_OPEN in this task.
 
 ### [#2546](https://github.com/chester-hill-solutions/callcaster/issues/2546) Audience imports create duplicate workspace contacts and block or duplicate SMS
-- **IN PROGRESS** · Verdict: **Needs decision** · Type: Bug · Priority: High · Effort: Medium · Environment: unset · Size: L · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
+- **IN PROGRESS** · Verdict: **Needs decision** · Type: Bug · Priority: High · Effort: Medium · Environment: unset · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-15
 - High-priority user requirement. Import reuse #3085, campaign consent #3088 and reviewed legacy repair #3091 are merged into dev. Keep the parent open for deployed operator checks and release acceptance.
 - Current behavior: Dev includes PR #3087 contact reuse, PR #3090 cross-contact opt-out protection and PR #3093 reviewed duplicate-person repair. The #2089 manual-SMS ambiguity guard remains intact. The #3091 app/worker deployments and receipt migration are verified.
 - Root cause: Contact identity is deduplicated inside one audience, while SMS recipient identity is workspace-wide.
@@ -1224,7 +1213,7 @@ Product, security, or operations decision required before implementation can be 
 - Look in: `app/lib/audience-import-map.server.ts`, `app/server/audience-import-effects.server.ts`, `app/lib/chat-sms-guards.server.ts`
 - Existing tests: The #3085 focused real-database run passes 50 cases, including cross-audience reuse, concurrent imports, formatted phones, opt-out preservation, workspace isolation, replay/recovery, manual-SMS identity and download messages. The original implementation fails four regression cases.; Full npm run ci:local passes on clean 030d8bd45cec1ab46243489322ce0306f4181d9a in 698.38 seconds: 6,153 Node tests with three existing skips, 34 Bun tests and 1,568 UI tests. All guards, typecheck, lint, build, bundle and codegen checks pass. Start/end commit and source hashes match.; The #3088 old coordinator fails both HTTP and worker consent regressions while 17 controls pass. Draft PR #3090 passes 37 local checks, 136 affected Node cases and 36 real-database cases after rebasing onto merged CI PR #3089. Full local CI passed before that tooling-only rebase; application and affected test sources are unchanged.; PR #3090 is merged at 71ecaadd with an identical tested tree, green applicable GitHub checks and successful dev app/worker deployments. Child #3091 has real database red/green evidence for reviewed repair.; PR #3093 passes all applicable exact-head CI, including 1,295 PostgreSQL 18.6 database cases and all 30 repair cases. Both dev services are online at the source-equivalent merge; a read-only schema check confirms its migration.
 - Done when: Never pick an arbitrary duplicate or loosen opt-out checks.; The data repair must preserve history and apply the most restrictive consent state.; Reusing a canonical contact must add a conflict-safe audience membership.
-- Tracker: Native Bug, Priority High, Effort Medium. Project Status remains In progress. Children #3085, #3088 and #3091 are on-dev. Keep this parent open for its remaining requirements.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status In progress. Native Type Bug, Priority High, Effort Medium, Enviornment unset; assignee none. No parent. Children: #3085 (open), #3088 (open), #3091 (open). Native open blockers: none. Children #3085, #3088 and #3091 are on-dev. Preserve #2089 consent and ambiguity protection. Keep parent open for its remaining requirements; CMS work remains deferred under #2677.
 
 ### [#1709](https://github.com/chester-hill-solutions/callcaster/issues/1709) Workspace Sidebar
 - Verdict: **Needs decision** · Type: Change Request · Priority: Medium · Effort: Medium · Environment: unset · Size: S · Risk: medium · Labels: design, ux · Assignee: @sai-sy · Updated: 2026-10-21
@@ -1621,60 +1610,60 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - The owner already specified 13% Ontario tax. The open Stripe environment prerequisite #2700 blocks implementation and receipt acceptance.
 - Current behavior: At dev@0b73c943, Checkout declares tax_behavior exclusive but supplies neither automatic_tax nor tax_rates. No tax is added by this request.
 - Root cause: The Checkout flow does not calculate or attach tax. The native issue is explicitly blocked by #2700; the rate itself is not an unanswered decision.
-- Resolution: Complete #2700, then implement and verify the stated Ontario tax requirement in the chosen sandbox. Check active tax registration and the applicable Stripe configuration before enabling tax collection. Preserve the credit purchase amount and once-only fulfillment.
+- Resolution: Wait for the human owner to complete #2700. Then implement and verify the stated 13% Ontario tax requirement in the chosen sandbox, after checking tax registration and Stripe configuration. Preserve the purchased credit amount and once-only fulfillment.
 - Look in: `app/lib/platform-billing.server.ts`, `test/platform-billing-checkout.test.ts`, `docs/stripe-environments.md`
 - Blocked by: [#2700](https://github.com/chester-hill-solutions/callcaster/issues/2700)
 - Existing tests: Source inspection confirms exclusive pricing without an enabled tax calculation. No real sandbox charge or receipt proves the requested tax.
 - Missing tests: Verify the tax line, pretax amount and final total on the actual sandbox receipt, plus the purchased credits and once-only fulfillment.
 - Done when: The supported Ontario purchase includes the stated 13% tax and shows it on the receipt.; The credit quantity and fulfillment remain correct.; The chosen account configuration and actual sandbox receipt are verified before release.
-- Tracker: Native Project Status is Backlog, read on 2026-11-01. Type Change Request, Priority High, Effort Medium, Enviornment unset, assigned to @wra-sol. Open blocker #2700 remains; historical #2699 and parent #1322 are closed. Do not ask the owner to decide the already-stated rate again.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status Backlog. Native Type Change Request, Priority High, Effort Medium, Enviornment unset; assignee @wra-sol. Parent #1322 (closed). Children: none. Native open blockers: #2700. Human-only #2700 remains the open prerequisite. Do not ask for the tax rate again.
 
 ### [#2700](https://github.com/chester-hill-solutions/callcaster/issues/2700) Align Stripe workspaces across environments
-- Verdict: **Blocked / split first** · Type: Task · Priority: High · Effort: unset · Environment: dev · Size: M · Risk: high · Labels: question · Assignee: @sai-sy · Updated: 2026-10-20
-- A read-only audit confirms dev and QA share one test account with no webhook endpoints. The dedicated dev sandbox, its customer mapping and fulfillment proof remain.
+- Verdict: **Blocked / split first** · Type: Task · Priority: High · Effort: unset · Environment: dev · Size: M · Risk: high · Labels: question · Assignee: @sai-sy · Updated: 2026-11-01
+- Human-only task, as directed by the user. The audit records the current account map; sandbox setup, customer mapping and fulfillment acceptance remain with the human owner.
 - Current behavior: On 2026-11-01, dev and QA use test account acct_1QRvDwFzTNqbqKww; production uses live account acct_1QxCXMCKD626kdKP. App and worker agree within each environment. The shared test account has zero webhook endpoints; production has one enabled Checkout-completed endpoint.
 - Root cause: The required dedicated dev sandbox has not been established. Present webhook-secret variables do not prove a matching endpoint, and existing customer IDs belong to the current account.
-- Resolution: Confirm the intended sandbox parent and obtain live-account CLI access. Create the dedicated dev sandbox, plan customer-reference migration, align app and worker, configure its webhook and matching secret, and prove once-only fulfillment. Confirm QA and production intent and Sai dashboard access. Defer stale-resource cleanup to #2701.
+- Resolution: Skip agent execution. The human owner must select and configure the sandbox, arrange account access, review customer-reference mapping, align app and worker, configure the webhook and verify once-only fulfillment. Do not request another account choice or CLI login. Keep #1981 and #1983 blocked until acceptance.
 - Look in: `docs/stripe-environments.md`, `app/lib/platform-billing.server.ts`, `app/lib/database/stripe.server.ts`, `app/routes/api+/stripe-webhook.action.server.ts`
 - Existing tests: Read-only Railway config and Stripe GET /v1/account checks confirm account/mode agreement. The full webhook endpoint inventory confirms zero test endpoints and one enabled live endpoint.; Read-only database and customer API checks: dev 35 real customer IDs resolve plus one synthetic fixture; QA 28 resolve plus one synthetic fixture; production all seven resolve. Most old customers have no workspace metadata, so complete ownership matching is not proven.
 - Missing tests: The intended parent account and dedicated dev sandbox are not confirmed. Sandbox inventory requires an authorized live-account CLI profile.; Webhook signing-secret matching, Sai access and an actual sandbox purchase with one correct workspace fulfillment remain unverified.
 - Done when: Production, QA and dev account or sandbox IDs and dashboard links are documented and confirmed.; Dev has a dedicated sandbox; app, worker, webhook and customer references match it.; A sandbox purchase credits the intended workspace exactly once and produces a reviewable receipt.; Sai can access the intended dashboard for the existing receipt work.
-- Tracker: Native Project Status is Backlog, read on 2026-11-01. Type Task, Priority High, Enviornment dev, Effort unset, assigned to @sai-sy. Keep the existing owner. This blocks #1981 and #1983; it is not implemented or on-dev. Read-only audit details are in docs/stripe-environments.md.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status Backlog. Native Type Task, Priority High, Effort unset, Enviornment dev; assignee @sai-sy. No parent. Children: none. Native open blockers: none. Human-only per the user. Keep @sai-sy as owner and #1981/#1983 blocked. The audit is not sandbox acceptance.
 
 ### [#1165](https://github.com/chester-hill-solutions/callcaster/issues/1165) Prune stale non-production Twilio resources safely
 - **IN PROGRESS** · Verdict: **Blocked / split first** · Type: Feature · Priority: Urgent · Effort: Medium · Environment: unset · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-10-19
-- The preview-app cleanup shipped in PR #2733. Remaining cleanup needs the accurate inventory in #2757 and the retention decision in #2029; a suspended subaccount currently rejects Messaging Services reads.
-- Current behavior: A live read-only check finds a suspended subaccount whose Messaging Services API returns HTTP 401 with both listed and fetched credentials. The existing report hid those failures as empty service lists and capped account enumeration at 200.
-- Root cause: The collector used a nonexistent v2010 Messaging Services path and suppressed read errors. Resource release also needs the existing policy decision; a missing database owner or an unreadable subaccount does not prove that a resource is unused.
-- Resolution: Complete the report repair in #2757. Keep unreadable or unverified resources protected, then apply the approved retention rule from #2029 before further cleanup.
+- Closed-preview TwiML App cleanup and the #2757 inventory repair are on dev. Broader resource cleanup still needs a complete readable inventory and the #2029 retention decision.
+- Current behavior: PR #2758 uses subaccount Messaging Services credentials, reads all SDK pages and fails on unreadable inventories. Its recorded live scan stopped on a suspended subaccount with HTTP 401; that failure is not an empty resource list.
+- Root cause: The report omission is repaired. Workspace-owned resource removal, unreadable-account handling and retention approval remain separate work; unknown ownership does not prove that a resource is unused.
+- Resolution: Keep unreadable and unverified resources protected. Resolve inventory access and the #2029 retention policy before another cleanup. The existing closed-preview App deletion path does not cover workspace numbers, Messaging Services or subaccounts.
 - Look in: `scripts/twilio-resource-prune-report.mjs`, `scripts/lib/twilio-resource-prune-policy.mjs`, `scripts/local/prune-environment-twiml-apps.mjs`, `scripts/lib/live-environments.mjs`
 - Blocked by: [#2757](https://github.com/chester-hill-solutions/callcaster/issues/2757), [#2029](https://github.com/chester-hill-solutions/callcaster/issues/2029)
-- Existing tests: test/twilio-resource-prune-policy.test.ts — 31 policy cases (environment check, owner check, keep list, assertPrunable guard); no test exercises a real delete (there is no delete path for workspace-owned resources); Parent-only live audit: 206 inventory entries, 12 KEEP, 0 STALE and 194 UNKNOWN. This includes 192 subaccount metadata rows but excludes their resource lists; it is not a complete account audit. An active subaccount probe reads a Messaging Service successfully, while the full scan identifies a suspended subaccount and exits with failure.
-- Tracker: Feature; Priority Urgent; Effort Medium; environment unset; assigned to wra-sol. Project Status In progress was read in the issue sidebar. Parent #1158 is closed; existing closed dependencies #1164 and #1212 remain. Open dependencies #2757 and #2029 are now linked natively. Do not change a suspended account or release numbers as part of the report repair.
+- Existing tests: PR #2758 records 38 focused cases, including the real SDK boundary, pagination and failed reads.; The policy suite covers environment, ownership and keep-list guards. No current evidence authorizes broader live deletion.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status In progress. Native Type Feature, Priority Urgent, Effort Medium, Enviornment unset; assignee @wra-sol. Parent #1158 (closed). Children: #2029 (open), #2757 (open). Native open blockers: #2029, #2757. Native open blockers #2757 and #2029 remain; #2757 code is on dev but broader cleanup is not accepted.
 
 ### [#2168](https://github.com/chester-hill-solutions/callcaster/issues/2168) Cull old dev numbers and workspaces: backfill subaccount names and record the keep-list in the repo
 - Verdict: **Blocked / split first** · Type: unset · Priority: Urgent · Effort: Medium · Environment: unset · Size: S-M · Risk: low · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-10-17
 - The keep-list now lives in the repo and is enforced by PR #2536 on dev. Name backfill and the repeat-policy decision remain; workspace-row cleanup stays deferred.
-- Current behavior: Verified on dev@20f59d0e, 19 October 2026. The keep-list slice is done and proven: scripts/cull-keep-list.mjs holds the three confirmed workspace ids, it wins before every cull rule, and test/cull-report-policy.test.ts asserts that 2608141501 survives the phone-name rule. The report is still read-only with no delete path. What is not done: nothing renames the legacy UUID-named Twilio subaccounts - workspaceResourceName is used only on the create path - and the repeat-versus-one-off policy is unrecorded.
+- Current behavior: The confirmed keep-list is enforced by PR #2536 (7f2c2f9a). The issue records the historical 19-number cull. PR #2537 (41a1308d) only updated board evidence; it did not implement name backfill. Current scripts provide read-only reports and closed-preview App cleanup, but no legacy subaccount rename command.
 - Root cause: No tooling existed to decide what could be culled, and no recorded rule to make the decision repeatable. The name-fragment junk exclusion is deliberately a --exclude flag rather than hardcoded, because it is a judgement call rather than a rule.
-- Resolution: The keep-list is done. What remains is a backfill that renames the legacy UUID-named Twilio subaccounts to the workspaceResourceName form, plus the decision on whether the cull is repeatable or a one-off. The naming helper already exists in app/lib/twilio-resource-name.ts, and the prune report from PR #2733 now resolves those legacy names to their owner workspace, so the backfill has a source of truth to work from.
+- Resolution: Implement a separate idempotent name-backfill plan from the existing naming helper and ownership evidence. Default to dry-run, require an explicit environment and owner match, and review the exact rename list before provider writes. Record the one-off versus recurring policy before scheduling cleanup. Workspace-row cleanup remains deferred.
 - Look in: `scripts/cull-keep-list.mjs (the confirmed keep-list, shipped)`, `scripts/cull-report-policy.mjs:8-24 (the keep-list wins first)`, `app/lib/database/workspace-twilio-subaccount.server.ts:39-62 (workspaceResourceName, create path only)`, `scripts/twilio-resource-prune-report.mjs (resolves legacy names to their owner workspace)`
 - Existing tests: cull-report.mjs handles 555-number test credentials, the E911 VERIFY line, cross-workspace-only blockers, and compares dates rather than strings; test/cull-report-policy.test.ts confirms the three recorded workspace IDs and proves 2608141501 survives the phone-name cull rule
 - Missing tests: Name backfill must be idempotent.
 - Done when: Subaccount display names are backfilled to the #2167 format; The keep-list lives in the repository, not a shell argument; 2608141501 survives, since it is on both the keep-list and the phone-number-named rule; The cull report remains read-only with no delete path
-- Tracker: Blocked / split first: durable keep-list is on dev in PR #2536. Name backfill is a separate Twilio-write task and needs idempotence. Record the repeat/retention decision before scheduling cleanup. Workspace-row cleanup remains deferred. #2170 (stale subaccount credentials) closed as completed on 2026-10-17, so that credential block is gone. Related PRs: #2536, #2171, #2167. PR #2536 passed full CI, E2E, schema, and Railway preview checks; issue #2168 is on-dev.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type unset, Priority Urgent, Effort Medium, Enviornment unset; assignee @wra-sol. Parent #2029 (open). Children: #2931 (open). Native open blockers: none. Native Type is unset. Backfill needs implementation and reviewed provider-write acceptance; keep-list is delivered. No cleanup was run in this refresh.
 
 ### [#1157](https://github.com/chester-hill-solutions/callcaster/issues/1157) epic(testing): controlled synthetic campaign audiences
 - **IN PROGRESS** · Verdict: **Blocked / split first** · Type: Feature · Priority: High · Effort: High · Environment: unset · Size: L-XL · Risk: high · Labels: devops/admin · Assignee: @sai-sy · Updated: 2026-10-17
-- Let testers upload controlled test audiences for voice/SMS/AI scenarios; in simulator mode data stays synthetic and never contacts real recipients; measure setup time, callback delay, completion, throughput. Parent of #1191/#1192/#1193.
-- Current behavior: The parent is High priority and its three children are closed, but their closure reasons do not prove that all eight requested scenarios exist.
+- The requested voice, SMS and IVR test outcomes are not all implemented. The approved SIM program is #2782; closed child counts do not prove acceptance.
+- Current behavior: The current SIM flow covers explicitly requested real SMS. The voice/SIP scenarios and their run binding remain in later program stages. Historical children #1191, #1192 and #1193 have different closure reasons.
 - Root cause: #1192 is NOT_PLANNED, #1193 is DUPLICATE, and #1191 was folded into #1329. A 3/3 child count is not delivery evidence.
-- Resolution: Reconcile the parent scope with the current SIM roadmap and record which requested voice, SMS and IVR scenarios remain. Do not restart the closed child tasks or count their closures as acceptance.
-- Look in: `e2e/fixtures/seed.ts`, `app/components/audience/AudienceUploader.tsx`, `app/components/audience/AudienceUploadMapStep.tsx`
-- Existing tests: seed fixture only
-- Missing tests: scenario safety and telemetry
-- Done when: Test audiences reference server-owned scenario ids; Simulator rejects real recipient numbers; Runs report timing metrics; No billable traffic
-- Tracker: Live relationships and closure reasons reviewed 2026-10-28. Native Feature, Priority High, Effort High, Project Status In progress. Keep this parent visible until its actual scenarios have acceptance evidence.
+- Resolution: Follow the existing #2782 sequence. Finish the Stage 1 profile and SMS prerequisites before voice/SIP work. Verify all eight requested outcomes; do not restart closed children or run paid traffic as part of a board review.
+- Look in: `docs/synthetic-telephony-testing.md`, `e2e/sim/`, `app/components/audience/AudienceUploader.tsx`
+- Existing tests: The current SMS flow has safety checks; it is not evidence that all requested voice and IVR outcomes exist.
+- Missing tests: Acceptance for answer/talk, voicemail, SMS delivery/failure, invalid phone, complete IVR, unanswered IVR and partial IVR.
+- Done when: All eight requested outcomes have evidence under the approved SIM program.; Real provider traffic requires explicit authorization and the program safety checks.; Record setup time, callback delay, completion and throughput for each supported scenario.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status In progress. Native Type Feature, Priority High, Effort High, Enviornment unset; assignee @sai-sy. Parent #1155 (closed). Children: #1191 (closed), #1193 (closed), #1192 (closed). Native open blockers: none. Keep @sai-sy as owner. Closed children are not proof of delivery.
 
 ### [#2002](https://github.com/chester-hill-solutions/callcaster/issues/2002) epic(authz): permission-based authorization instead of role checks
 - Verdict: **Blocked / split first** · Type: Feature · Priority: Medium · Effort: Medium · Environment: unset · Size: XL · Risk: high · Labels: ux, business-logic · Assignee: @wra-sol · Updated: 2026-10-15

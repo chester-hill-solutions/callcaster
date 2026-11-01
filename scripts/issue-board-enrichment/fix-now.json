@@ -1,69 +1,5 @@
 [
   {
-    "issueNumber": 2533,
-    "verdict": "fix-now",
-    "summary": "The owner requires both elapsed session time and total connected talk time. The active feature adds them to the shared calling header; final checks, merge and release acceptance remain.",
-    "currentBehavior": "At dev@a6ba6390, the call screen shows individual call duration but no session totals. The candidate shows Session and Talk for the current workspace/campaign visit in both dialing modes.",
-    "rootCause": "The header has no visit clock or accumulated connected-time display. The individual call counter resets between contacts.",
-    "resolution": "Keep elapsed and connected-time totals in the shared header. Use the canonical recipient display state for talk time, preserve totals across queue updates, reset on a new workspace/campaign visit, and keep the header readable at phone widths.",
-    "lookIn": [
-      "app/components/call/CallScreen.SessionTimers.tsx",
-      "app/components/call/CallScreen.Header.tsx",
-      "app/components/call/CallScreen.Layout.tsx",
-      "test/ui/call-screen-session-timers.test.tsx",
-      "test/ui/call-screen-leave.test.tsx"
-    ],
-    "existingTests": [
-      "The original runtime fails all eleven new header cases while fourteen existing controls pass. The first candidate run passes 35 UI cases.",
-      "Using the agent device state as talk-time input fails both real call-screen connection tests; fourteen controls pass. The correct source is restored exactly."
-    ],
-    "missingTests": [
-      "Require final exact-head local checks, focused tests and applicable GitHub CI. Verify the deployed dev app and complete release acceptance."
-    ],
-    "acceptanceCriteria": [
-      "Both dialing modes show elapsed session time and total connected talk time.",
-      "Session time continues between calls; talk time pauses when the recipient is not connected and adds time across contacts.",
-      "Queue and title refreshes preserve the totals; leaving or changing workspace/campaign starts a new visit.",
-      "Delayed timer callbacks do not slow the clock, and fractional connected time is retained between short calls.",
-      "Both timers and the campaign title remain readable on phone and desktop widths; timer updates do not announce every second."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Native Project Status is In progress, confirmed in the authenticated board. Type Feature, Priority Medium, Effort Low, Enviornment unset; assigned to @wra-sol. No parent, children or open blockers. Owner clarification: show both timers. Keep open for release acceptance."
-  },
-  {
-    "issueNumber": 2776,
-    "verdict": "fix-now",
-    "summary": "The reported routing error uses an internal block ID. The active fix uses the saved title in both editors and launch validation; final checks, merge and acceptance remain.",
-    "currentBehavior": "At dev@7723dbb3, a Support self-loop is reported as block_mupwwvov_2. The candidate uses Support while retaining the routing issue IDs and legacy ID fallback.",
-    "rootCause": "Routing messages interpolate the block ID, and the raw inbound routing adapter drops the saved title.",
-    "resolution": "Use the title for displayed routing errors and retain it in the inbound adapter. Keep the graph, route targets, terminal rules and machine-readable issue IDs unchanged.",
-    "lookIn": [
-      "app/lib/ivr-script-validation.ts",
-      "app/lib/inbound-script-validation.ts",
-      "test/ivr-script-validation.test.ts",
-      "test/ui/inbound-script-validation.test.tsx"
-    ],
-    "existingTests": [
-      "The original runtime fails two new Node cases and both real editor cases. Eight Node and eleven UI controls pass.",
-      "The candidate passes 59 affected Node tests and 13 UI tests, including inbound and outbound editor rendering. Final checks will include the named target and fallback cases."
-    ],
-    "missingTests": [
-      "Final exact-head local gate and full applicable GitHub CI remain, followed by dev deployment and release acceptance."
-    ],
-    "acceptanceCriteria": [
-      "The reported three-step self-loop identifies Support instead of its internal ID.",
-      "Inbound and outbound validation display the saved block names.",
-      "Untitled legacy blocks retain a useful ID fallback.",
-      "Routing decisions and machine-readable issue IDs remain unchanged."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Native Project Status is In progress, read in the authenticated board on 2026-11-01. Type Bug, Priority Medium, Enviornment prod, Effort unset; assigned to @wra-sol. No parent, children or open blockers. Keep open until release acceptance."
-  },
-  {
     "issueNumber": 2638,
     "verdict": "fix-now",
     "summary": "PR #3023 names the Call list selection controls and reuses one named Rows per page control. Review, merge and deployed acceptance remain.",
@@ -684,29 +620,6 @@
     "size": "XS",
     "risk": "low",
     "trackerRecommendation": "Included from original PR #3010 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges."
-  },
-  {
-    "issueNumber": 3073,
-    "verdict": "fix-now",
-    "summary": "High: align the fixed Twilio redirect dependency; npm is affected while Bun is already patched.",
-    "currentBehavior": "PR #3076 is open with the tested follow-redirects 1.16.2 patch. It is not merged into dev.",
-    "rootCause": "The two locks resolve different compatible versions of the same transitive runtime package.",
-    "resolution": "Review and approve PR #3076, then verify the merged dev deployment and follow the release process. Do not start a duplicate dependency patch.",
-    "lookIn": [
-      "package.json",
-      "package-lock.json",
-      "bun.lock"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Included from original PR #3076 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges.",
-    "existingTests": [
-      "Six loopback Twilio/Axios cases pass. The old npm tree fails three credential-forwarding cases while three controls pass; the old Bun tree already passes.",
-      "Full npm run ci:local passed on the final commit. All applicable exact-head GitHub checks passed."
-    ],
-    "missingTests": [
-      "Merge approval, dev deployment verification and required release acceptance remain."
-    ]
   },
   {
     "issueNumber": 3080,

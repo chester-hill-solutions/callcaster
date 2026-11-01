@@ -33,11 +33,11 @@
     ],
     "size": "M",
     "risk": "high",
-    "trackerRecommendation": "Native Project Status is Backlog, read on 2026-11-01. Type Change Request, Priority High, Effort Medium, Enviornment unset, assigned to @wra-sol. Open blocker #2700 remains; historical #2699 and parent #1322 are closed. Do not ask the owner to decide the already-stated rate again.",
+    "trackerRecommendation": "Selected snapshot, 2026-11-01 UTC: actual Project Status Backlog. Native Type Change Request, Priority High, Effort Medium, Enviornment unset; assignee @wra-sol. Parent #1322 (closed). Children: none. Native open blockers: #2700. Human-only #2700 remains the open prerequisite. Do not ask for the tax rate again.",
     "recommendedTitle": "Receipts and charges should include tax",
     "summary": "The owner already specified 13% Ontario tax. The open Stripe environment prerequisite #2700 blocks implementation and receipt acceptance.",
     "currentBehavior": "At dev@0b73c943, Checkout declares tax_behavior exclusive but supplies neither automatic_tax nor tax_rates. No tax is added by this request.",
-    "resolution": "Complete #2700, then implement and verify the stated Ontario tax requirement in the chosen sandbox. Check active tax registration and the applicable Stripe configuration before enabling tax collection. Preserve the credit purchase amount and once-only fulfillment.",
+    "resolution": "Wait for the human owner to complete #2700. Then implement and verify the stated 13% Ontario tax requirement in the chosen sandbox, after checking tax registration and Stripe configuration. Preserve the purchased credit amount and once-only fulfillment.",
     "lookIn": [
       "app/lib/platform-billing.server.ts",
       "test/platform-billing-checkout.test.ts",
@@ -59,10 +59,10 @@
   {
     "issueNumber": 2700,
     "verdict": "blocked-epic",
-    "summary": "A read-only audit confirms dev and QA share one test account with no webhook endpoints. The dedicated dev sandbox, its customer mapping and fulfillment proof remain.",
+    "summary": "Human-only task, as directed by the user. The audit records the current account map; sandbox setup, customer mapping and fulfillment acceptance remain with the human owner.",
     "currentBehavior": "On 2026-11-01, dev and QA use test account acct_1QRvDwFzTNqbqKww; production uses live account acct_1QxCXMCKD626kdKP. App and worker agree within each environment. The shared test account has zero webhook endpoints; production has one enabled Checkout-completed endpoint.",
     "rootCause": "The required dedicated dev sandbox has not been established. Present webhook-secret variables do not prove a matching endpoint, and existing customer IDs belong to the current account.",
-    "resolution": "Confirm the intended sandbox parent and obtain live-account CLI access. Create the dedicated dev sandbox, plan customer-reference migration, align app and worker, configure its webhook and matching secret, and prove once-only fulfillment. Confirm QA and production intent and Sai dashboard access. Defer stale-resource cleanup to #2701.",
+    "resolution": "Skip agent execution. The human owner must select and configure the sandbox, arrange account access, review customer-reference mapping, align app and worker, configure the webhook and verify once-only fulfillment. Do not request another account choice or CLI login. Keep #1981 and #1983 blocked until acceptance.",
     "lookIn": [
       "docs/stripe-environments.md",
       "app/lib/platform-billing.server.ts",
@@ -86,7 +86,7 @@
     "blockedBy": [],
     "size": "M",
     "risk": "high",
-    "trackerRecommendation": "Native Project Status is Backlog, read on 2026-11-01. Type Task, Priority High, Enviornment dev, Effort unset, assigned to @sai-sy. Keep the existing owner. This blocks #1981 and #1983; it is not implemented or on-dev. Read-only audit details are in docs/stripe-environments.md."
+    "trackerRecommendation": "Selected snapshot, 2026-11-01 UTC: actual Project Status Backlog. Native Type Task, Priority High, Effort unset, Enviornment dev; assignee @sai-sy. No parent. Children: none. Native open blockers: none. Human-only per the user. Keep @sai-sy as owner and #1981/#1983 blocked. The audit is not sandbox acceptance."
   },
   {
     "issueNumber": 268,
@@ -127,38 +127,37 @@
     "issueNumber": 1157,
     "verdict": "blocked-epic",
     "recommendedTitle": "epic(testing): controlled synthetic campaign audiences",
-    "summary": "Let testers upload controlled test audiences for voice/SMS/AI scenarios; in simulator mode data stays synthetic and never contacts real recipients; measure setup time, callback delay, completion, throughput. Parent of #1191/#1192/#1193.",
-    "currentBehavior": "The parent is High priority and its three children are closed, but their closure reasons do not prove that all eight requested scenarios exist.",
+    "summary": "The requested voice, SMS and IVR test outcomes are not all implemented. The approved SIM program is #2782; closed child counts do not prove acceptance.",
+    "currentBehavior": "The current SIM flow covers explicitly requested real SMS. The voice/SIP scenarios and their run binding remain in later program stages. Historical children #1191, #1192 and #1193 have different closure reasons.",
     "rootCause": "#1192 is NOT_PLANNED, #1193 is DUPLICATE, and #1191 was folded into #1329. A 3/3 child count is not delivery evidence.",
-    "resolution": "Reconcile the parent scope with the current SIM roadmap and record which requested voice, SMS and IVR scenarios remain. Do not restart the closed child tasks or count their closures as acceptance.",
+    "resolution": "Follow the existing #2782 sequence. Finish the Stage 1 profile and SMS prerequisites before voice/SIP work. Verify all eight requested outcomes; do not restart closed children or run paid traffic as part of a board review.",
     "lookIn": [
-      "e2e/fixtures/seed.ts",
-      "app/components/audience/AudienceUploader.tsx",
-      "app/components/audience/AudienceUploadMapStep.tsx"
+      "docs/synthetic-telephony-testing.md",
+      "e2e/sim/",
+      "app/components/audience/AudienceUploader.tsx"
     ],
     "existingTests": [
-      "seed fixture only"
+      "The current SMS flow has safety checks; it is not evidence that all requested voice and IVR outcomes exist."
     ],
     "missingTests": [
-      "scenario safety and telemetry"
+      "Acceptance for answer/talk, voicemail, SMS delivery/failure, invalid phone, complete IVR, unanswered IVR and partial IVR."
     ],
     "acceptanceCriteria": [
-      "Test audiences reference server-owned scenario ids",
-      "Simulator rejects real recipient numbers",
-      "Runs report timing metrics",
-      "No billable traffic"
+      "All eight requested outcomes have evidence under the approved SIM program.",
+      "Real provider traffic requires explicit authorization and the program safety checks.",
+      "Record setup time, callback delay, completion and throughput for each supported scenario."
     ],
     "size": "L-XL",
     "risk": "high",
-    "trackerRecommendation": "Live relationships and closure reasons reviewed 2026-10-28. Native Feature, Priority High, Effort High, Project Status In progress. Keep this parent visible until its actual scenarios have acceptance evidence.",
+    "trackerRecommendation": "Selected snapshot, 2026-11-01 UTC: actual Project Status In progress. Native Type Feature, Priority High, Effort High, Enviornment unset; assignee @sai-sy. Parent #1155 (closed). Children: #1191 (closed), #1193 (closed), #1192 (closed). Native open blockers: none. Keep @sai-sy as owner. Closed children are not proof of delivery.",
     "blockedBy": []
   },
   {
     "issueNumber": 1165,
     "verdict": "blocked-epic",
-    "summary": "The preview-app cleanup shipped in PR #2733. Remaining cleanup needs the accurate inventory in #2757 and the retention decision in #2029; a suspended subaccount currently rejects Messaging Services reads.",
-    "currentBehavior": "A live read-only check finds a suspended subaccount whose Messaging Services API returns HTTP 401 with both listed and fetched credentials. The existing report hid those failures as empty service lists and capped account enumeration at 200.",
-    "resolution": "Complete the report repair in #2757. Keep unreadable or unverified resources protected, then apply the approved retention rule from #2029 before further cleanup.",
+    "summary": "Closed-preview TwiML App cleanup and the #2757 inventory repair are on dev. Broader resource cleanup still needs a complete readable inventory and the #2029 retention decision.",
+    "currentBehavior": "PR #2758 uses subaccount Messaging Services credentials, reads all SDK pages and fails on unreadable inventories. Its recorded live scan stopped on a suspended subaccount with HTTP 401; that failure is not an empty resource list.",
+    "resolution": "Keep unreadable and unverified resources protected. Resolve inventory access and the #2029 retention policy before another cleanup. The existing closed-preview App deletion path does not cover workspace numbers, Messaging Services or subaccounts.",
     "lookIn": [
       "scripts/twilio-resource-prune-report.mjs",
       "scripts/lib/twilio-resource-prune-policy.mjs",
@@ -166,16 +165,16 @@
       "scripts/lib/live-environments.mjs"
     ],
     "existingTests": [
-      "test/twilio-resource-prune-policy.test.ts — 31 policy cases (environment check, owner check, keep list, assertPrunable guard); no test exercises a real delete (there is no delete path for workspace-owned resources)",
-      "Parent-only live audit: 206 inventory entries, 12 KEEP, 0 STALE and 194 UNKNOWN. This includes 192 subaccount metadata rows but excludes their resource lists; it is not a complete account audit. An active subaccount probe reads a Messaging Service successfully, while the full scan identifies a suspended subaccount and exits with failure."
+      "PR #2758 records 38 focused cases, including the real SDK boundary, pagination and failed reads.",
+      "The policy suite covers environment, ownership and keep-list guards. No current evidence authorizes broader live deletion."
     ],
     "acceptanceCriteria": [],
-    "rootCause": "The collector used a nonexistent v2010 Messaging Services path and suppressed read errors. Resource release also needs the existing policy decision; a missing database owner or an unreadable subaccount does not prove that a resource is unused.",
+    "rootCause": "The report omission is repaired. Workspace-owned resource removal, unreadable-account handling and retention approval remain separate work; unknown ownership does not prove that a resource is unused.",
     "blockedBy": [
       2757,
       2029
     ],
-    "trackerRecommendation": "Feature; Priority Urgent; Effort Medium; environment unset; assigned to wra-sol. Project Status In progress was read in the issue sidebar. Parent #1158 is closed; existing closed dependencies #1164 and #1212 remain. Open dependencies #2757 and #2029 are now linked natively. Do not change a suspended account or release numbers as part of the report repair."
+    "trackerRecommendation": "Selected snapshot, 2026-11-01 UTC: actual Project Status In progress. Native Type Feature, Priority Urgent, Effort Medium, Enviornment unset; assignee @wra-sol. Parent #1158 (closed). Children: #2029 (open), #2757 (open). Native open blockers: #2029, #2757. Native open blockers #2757 and #2029 remain; #2757 code is on dev but broader cleanup is not accepted."
   },
   {
     "issueNumber": 1268,
@@ -837,9 +836,9 @@
     "verdict": "blocked-epic",
     "recommendedTitle": "Cull old dev numbers and workspaces: backfill subaccount names and record the keep-list in the repo",
     "summary": "The keep-list now lives in the repo and is enforced by PR #2536 on dev. Name backfill and the repeat-policy decision remain; workspace-row cleanup stays deferred.",
-    "currentBehavior": "Verified on dev@20f59d0e, 19 October 2026. The keep-list slice is done and proven: scripts/cull-keep-list.mjs holds the three confirmed workspace ids, it wins before every cull rule, and test/cull-report-policy.test.ts asserts that 2608141501 survives the phone-name rule. The report is still read-only with no delete path. What is not done: nothing renames the legacy UUID-named Twilio subaccounts - workspaceResourceName is used only on the create path - and the repeat-versus-one-off policy is unrecorded.",
+    "currentBehavior": "The confirmed keep-list is enforced by PR #2536 (7f2c2f9a). The issue records the historical 19-number cull. PR #2537 (41a1308d) only updated board evidence; it did not implement name backfill. Current scripts provide read-only reports and closed-preview App cleanup, but no legacy subaccount rename command.",
     "rootCause": "No tooling existed to decide what could be culled, and no recorded rule to make the decision repeatable. The name-fragment junk exclusion is deliberately a --exclude flag rather than hardcoded, because it is a judgement call rather than a rule.",
-    "resolution": "The keep-list is done. What remains is a backfill that renames the legacy UUID-named Twilio subaccounts to the workspaceResourceName form, plus the decision on whether the cull is repeatable or a one-off. The naming helper already exists in app/lib/twilio-resource-name.ts, and the prune report from PR #2733 now resolves those legacy names to their owner workspace, so the backfill has a source of truth to work from.",
+    "resolution": "Implement a separate idempotent name-backfill plan from the existing naming helper and ownership evidence. Default to dry-run, require an explicit environment and owner match, and review the exact rename list before provider writes. Record the one-off versus recurring policy before scheduling cleanup. Workspace-row cleanup remains deferred.",
     "lookIn": [
       "scripts/cull-keep-list.mjs (the confirmed keep-list, shipped)",
       "scripts/cull-report-policy.mjs:8-24 (the keep-list wins first)",
@@ -862,7 +861,7 @@
     "blockedBy": [],
     "size": "S-M",
     "risk": "low",
-    "trackerRecommendation": "Blocked / split first: durable keep-list is on dev in PR #2536. Name backfill is a separate Twilio-write task and needs idempotence. Record the repeat/retention decision before scheduling cleanup. Workspace-row cleanup remains deferred. #2170 (stale subaccount credentials) closed as completed on 2026-10-17, so that credential block is gone. Related PRs: #2536, #2171, #2167. PR #2536 passed full CI, E2E, schema, and Railway preview checks; issue #2168 is on-dev."
+    "trackerRecommendation": "Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type unset, Priority Urgent, Effort Medium, Enviornment unset; assignee @wra-sol. Parent #2029 (open). Children: #2931 (open). Native open blockers: none. Native Type is unset. Backfill needs implementation and reviewed provider-write acceptance; keep-list is delivered. No cleanup was run in this refresh."
   },
   {
     "issueNumber": 2213,

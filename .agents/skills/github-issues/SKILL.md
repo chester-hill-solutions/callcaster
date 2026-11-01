@@ -42,6 +42,13 @@ Project scope and must not be replaced with labels or Project item fields.
 Pass the complete input through one `$input: SetIssueFieldValueInput!` variable.
 This avoids guessing nested list input type names. Write multiline GraphQL and
 check its balanced braces before sending it; verify the saved fields separately.
+Use a JSON request with `query` and typed `variables` through `gh api graphql
+--input <file>` (or `--input -` for JSON stdin). Do not pass an input object with
+`-f input=...`; that sends a string instead of a typed GraphQL object.
+
+`IssueFields` is a GraphQL union. Read `field` through the matching inline
+fragment, such as `field { ... on IssueFieldSingleSelect { name } }`, rather
+than selecting `field { name }` directly.
 
 | Type | Use for |
 | --- | --- |
@@ -70,7 +77,7 @@ gh issue edit <number> --repo chester-hill-solutions/callcaster --type Task
 
 Do not use `Priority` or `Effort` as a Type. They are separate organization
 Issue fields. Use the `issueFieldValues` query and
-`updateIssueFieldValue` mutation in `github-cli` to edit them. Use
+`setIssueFieldValue` mutation above to edit them. Use
 `github-projects` for the separate Project fields.
 
 ## Older CLI fallback
