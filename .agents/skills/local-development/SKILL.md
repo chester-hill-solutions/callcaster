@@ -65,6 +65,11 @@ Before adding an `admin-db` or unscoped `db` import, run
 query construction in the server data layer; a typed predicate can stay inside
 the scoped membership query. Do not increase the debt baseline for a new import.
 
+For read-only history triggers, test foreign-key `SET NULL` and cascade actions.
+Blocking those updates can leave invalid references. Allow only the required
+reference-column changes; keep lifecycle state, dates and other data fixed.
+Verify direct and nested stale writers as well as normal deletion cleanup.
+
 Full test suites and production validation run in CI before merge.
 `ci:local:full` is optional for local diagnosis; do not require it before a push.
 

@@ -202,6 +202,7 @@ export async function getWorkspaceInfoWithDetails({
   const [campaigns, phoneNumbers, audiences] = await Promise.all([
     tdb.campaign.findMany().then(sortCampaignsForList),
     tdb.workspace_number.findMany({
+      where: eq(workspace_number.status, "active"),
       columns: { id: true, phone_number: true, capabilities: true },
     }),
     tdb.audience.findMany({
@@ -246,7 +247,7 @@ export async function getWorkspacePhoneNumbers({
 }) {
   const tdb = tdbIn ?? createTenantDb(workspaceId);
   try {
-    const data = await tdb.workspace_number.findMany();
+    const data = await tdb.workspace_number.findMany({ where: eq(workspace_number.status, "active") });
     return { data, error: null };
   } catch (error) {
     logger.error("Error on function getWorkspacePhoneNumbers", error);
@@ -272,12 +273,13 @@ export async function getHandsetNumberForWorkspace({
   const tdb = tdbIn ?? createTenantDb(workspaceId);
   try {
     const handset = await tdb.workspace_number.findFirst({
-      where: eq(workspace_number.handset_enabled, true),
+      where: and(eq(workspace_number.handset_enabled, true), eq(workspace_number.status, "active")),
       columns: { id: true, phone_number: true },
     });
     if (handset) return { data: handset, error: null };
 
     const first = await tdb.workspace_number.findFirst({
+      where: eq(workspace_number.status, "active"),
       columns: { id: true, phone_number: true },
     });
     return { data: first ?? null, error: null };
@@ -302,7 +304,7 @@ export async function updateWorkspacePhoneNumber({
   try {
     const rows = await tdb.workspace_number.update({
       set: updates,
-      where: eq(workspace_number.id, Number(numberId)),
+      where: and(eq(workspace_number.id, Number(numberId)), eq(workspace_number.status, "active")),
     });
     const data = rows[0] ?? null;
     return { data, error: data ? null : toDbError(new Error("Not found")) };
@@ -539,7 +541,7 @@ export async function fetchWorkspaceData(
       return { workspace: null, workspaceError: toDbError(new Error("Not found")) };
     }
     const numbers = await tdb.workspace_number.findMany({
-      where: eq(workspace_number.type, "rented"),
+      where: and(eq(workspace_number.type, "rented"), eq(workspace_number.status, "active")),
     });
     return {
       workspace: { ...workspaceRow, workspace_number: numbers },

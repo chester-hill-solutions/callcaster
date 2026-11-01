@@ -258,6 +258,8 @@ export const workspace_invite = pgTable("workspace_invite", {
 });
 
 export const workspace_number = pgTable("workspace_number", {
+  status: text({ enum: ["active", "released"] }).notNull().default("active"),
+  released_at: timestamp({ withTimezone: true, mode: "string" }),
   capabilities: jsonb(),
   created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`now()`),
   friendly_name: text(),
@@ -276,7 +278,10 @@ export const workspace_number = pgTable("workspace_number", {
   twilio_phone_number_sid: text(),
   type: text().notNull(),
   workspace: uuid().notNull(),
-});
+}, (table) => [
+  uniqueIndex("unique_workspace_phone_number_active")
+    .on(table.workspace, table.phone_number).where(sql`${table.status} = 'active'`),
+]);
 
 export const workspace_number_purchase = pgTable("workspace_number_purchase", {
   id: uuid().primaryKey(),

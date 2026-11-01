@@ -6,6 +6,7 @@ import {
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
 import { MemberRole } from "@/lib/member-role";
+import { getWorkspaceNumberHistory } from "@/lib/workspace-number-history.server";
 import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
 import { listObjects } from "@/lib/object-storage.server";
 import { defineLoader } from "@/lib/handler.server";
@@ -32,6 +33,7 @@ export const loader = defineLoader({
     const [
       { data: users },
       { data: phoneNumbers },
+      numberHistory,
       creditsBalance,
       mediaNames,
       queues,
@@ -40,6 +42,7 @@ export const loader = defineLoader({
     ] = await Promise.all([
       getWorkspaceUsers({ workspaceId }),
       getWorkspacePhoneNumbers({ workspaceId }),
+      getWorkspaceNumberHistory({ workspaceId, tdb }),
       getWorkspaceCredits(workspaceId),
       listObjects("workspaceAudio", workspaceId),
       tdb.inbound_queue.findMany({
@@ -60,6 +63,7 @@ export const loader = defineLoader({
     return routeData(
       {
         phoneNumbers,
+        numberHistory,
         workspaceId,
         mediaNames,
         users,

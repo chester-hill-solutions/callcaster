@@ -313,6 +313,7 @@ export async function fetchConversationSummary(
 
   let workspaceNumberRows: Array<{ phone_number: string | null }>;
   try {
+    // These identities identify past counterparties; this is not a live sender list.
     workspaceNumberRows = await tdb.workspace_number.findMany({
       columns: { phone_number: true },
     });
@@ -507,6 +508,7 @@ export async function readWorkspaceUnreadConversationCount(
   workspaceId: string,
 ): Promise<number> {
   const tdb = createTenantDb(workspaceId);
+  // Retired workspace numbers must not become phantom unread contacts.
   const numbers = await tdb.workspace_number.findMany({
     columns: { phone_number: true },
   });

@@ -35,7 +35,7 @@ export async function reserveNumberPurchase(args: {
       .where(eq(workspace.id, args.workspaceId)).for("update");
     if (!balance) throw new Error("Workspace not found");
     const existing = await tx.select({ id: workspace_number.id }).from(workspace_number)
-      .where(and(eq(workspace_number.workspace, args.workspaceId), eq(workspace_number.phone_number, args.phoneNumber))).limit(1);
+      .where(and(eq(workspace_number.workspace, args.workspaceId), eq(workspace_number.phone_number, args.phoneNumber), eq(workspace_number.status, "active"))).limit(1);
     const active = await tx.select().from(workspace_number_purchase).where(and(
       eq(workspace_number_purchase.workspace, args.workspaceId),
       inArray(workspace_number_purchase.state, [...ACTIVE_STATES]),

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { workspace_number as workspaceNumberTable } from "@/db/schema";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { env } from "@/lib/env.server";
@@ -52,7 +52,7 @@ export async function startWorkspaceCallerIdVerification({
   const tdb = createTenantDb(workspaceId);
 
   const existing = await tdb.workspace_number.findFirst({
-    where: eq(workspaceNumberTable.phone_number, normalizedPhoneNumber),
+    where: and(eq(workspaceNumberTable.phone_number, normalizedPhoneNumber), eq(workspaceNumberTable.status, "active")),
   });
 
   // Never demote a rented number through the caller-ID flow. The upsert below
@@ -87,7 +87,7 @@ export async function startWorkspaceCallerIdVerification({
   const numberRequest = existing
     ? await tdb.workspace_number.update({
         set: upsertValues,
-        where: eq(workspaceNumberTable.id, existing.id),
+        where: and(eq(workspaceNumberTable.id, existing.id), eq(workspaceNumberTable.status, "active")),
       })
     : await tdb.workspace_number.insert({
         ...upsertValues,

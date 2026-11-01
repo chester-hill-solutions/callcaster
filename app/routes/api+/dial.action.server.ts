@@ -160,7 +160,7 @@ export const action = defineAction({
 
     const [callerIdRecord, onboarding] = await Promise.all([
         tdb.workspace_number.findFirst({
-            where: eq(workspaceNumberTable.phone_number, caller_id),
+            where: and(eq(workspaceNumberTable.phone_number, caller_id), eq(workspaceNumberTable.status, "active")),
         }),
         getWorkspaceMessagingOnboardingState({
             workspaceId: workspace_id,

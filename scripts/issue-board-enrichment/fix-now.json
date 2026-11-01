@@ -1,5 +1,37 @@
 [
   {
+    "issueNumber": 2995,
+    "verdict": "fix-now",
+    "summary": "Retain released numbers as dated, read-only history while all live paths exclude them. The active candidate is in progress; final CI, merge and acceptance remain.",
+    "currentBehavior": "At dev@05195e1e, release deletes the original workspace_number row. The candidate marks it released and retains its release date, keeps legacy receipt history, and filters live lists, routing, billing and reports.",
+    "rootCause": "Number consumers assume every row is live. Retaining rows requires the lifecycle filter and read-only protection to land with the release write.",
+    "resolution": "Complete #2995 as one change: retain the row after confirmed provider release, show workspace and support history, exclude released rows from live reads and writes, refuse repeat release, and keep the existing recovery and release-first archive order. A later explicit purchase creates a new rental row.",
+    "lookIn": [
+      "app/server/number-release-intent.server.ts",
+      "app/lib/workspace-number-history.server.ts",
+      "app/components/phone-numbers/NumberHistory.tsx",
+      "client/migrations/20261031000001_workspace_number_release_history.sql",
+      "test/integration-db/number-history-live-paths.test.ts"
+    ],
+    "existingTests": [
+      "Original runtime fails 15 of 56 initial cases. The candidate passes 123 affected database cases, 23 UI cases and 35 API contract checks. Earlier affected Node run passed 3,521 cases. Final source checks remain."
+    ],
+    "missingTests": [
+      "Require final exact-head local checks and full GitHub CI before merge; then verify dev deployment and operator/release acceptance. Provider boundaries use an isolated fake; no live number was released."
+    ],
+    "acceptanceCriteria": [
+      "Release retains the original row with released status and a date.",
+      "Live lists, routing, senders, billing and reports exclude released rows.",
+      "Workspace and support history show the release date without mutation controls.",
+      "Repeat release and attempts to reactivate the same row are refused without repeated provider work or charges.",
+      "Archive keeps release-first ordering and failure recovery; script/queue cleanup preserves valid history references."
+    ],
+    "blockedBy": [],
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Native Project Status is In progress, read in the authenticated board on 2026-10-31. Assigned to @wra-sol, child of High-priority #2732. Its own Priority, Effort and Enviornment fields are unset. Keep open for release acceptance."
+  },
+  {
     "issueNumber": 2994,
     "verdict": "fix-now",
     "summary": "The owner chose permanent API-key revocation on archive on 2026-10-31. The active branch implements the rule; CI, merge, deployed and release acceptance remain.",

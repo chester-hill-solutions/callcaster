@@ -18,6 +18,7 @@
  *   DATABASE_URL=postgresql://... npm run doctor -- <workspaceId>
  */
 import postgres from "postgres";
+import { listLiveWorkspaceNumbers } from "../lib/live-workspace-numbers.mjs";
 
 const args = process.argv.slice(2).filter((a) => a !== "--");
 const asJson = args.includes("--json");
@@ -151,10 +152,7 @@ try {
   }
 
   // ── Numbers ──────────────────────────────────────────────────────────
-  const numbers = await sql`
-    select phone_number, type, twilio_phone_number_sid, capabilities, created_at
-    from workspace_number where workspace = ${workspaceId} order by created_at
-  `;
+  const numbers = await listLiveWorkspaceNumbers(sql, workspaceId);
   report.numbers = numbers.map((n) => ({
     number: n.phone_number,
     type: n.type,

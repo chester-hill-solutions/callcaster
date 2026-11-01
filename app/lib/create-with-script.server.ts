@@ -1,6 +1,6 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { canSpendFromNumber } from "@/lib/number-rental-lifecycle";
-import { script as scriptTable } from "@/db/schema";
+import { workspace_number as workspaceNumberTable, script as scriptTable } from "@/db/schema";
 import type { Json , Database } from "@/lib/db-types";
 import type { CampaignType } from "@/lib/database/campaign.server";
 import { logger } from "@/lib/logger.server";
@@ -35,6 +35,7 @@ export async function validateCreateWithScriptPreflight(args: {
 
   try {
     const workspaceNumbers = await tdb.workspace_number.findMany({
+      where: eq(workspaceNumberTable.status, "active"),
       columns: { phone_number: true, suspended_at: true },
     });
     const ownsNumber = workspaceNumbers.some((row) => row.phone_number === args.callerId);

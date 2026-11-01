@@ -187,8 +187,10 @@ describe("number release credential recovery through SDK and PostgreSQL (#2170)"
       account_sid: RELEASE_ACCOUNT,
     });
     const [row] =
-      await fixture`select key, token, twilio_data, (select count(*)::int from public.workspace_number where workspace = ${workspaceId}::uuid) as numbers from public.workspace where id = ${workspaceId}::uuid`;
+      await fixture`select key, token, twilio_data, (select count(*)::int from public.workspace_number where workspace = ${workspaceId}::uuid and status = 'active') as numbers from public.workspace where id = ${workspaceId}::uuid`;
     expect(row.numbers).toBe(0);
+    const [history] = await fixture`select status, released_at, phone_number from public.workspace_number where workspace = ${workspaceId}::uuid and id = ${numberId}`;
+    expect(history).toMatchObject({ status: "released", released_at: expect.any(Date), phone_number: RELEASE_PHONE });
     expect(row.twilio_data.fixtureSetting).toBe("preserve");
     return row;
   }
@@ -199,10 +201,10 @@ describe("number release credential recovery through SDK and PostgreSQL (#2170)"
     expect(provider.keyCreates()).toHaveLength(0);
     expect(provider.deletes()).toHaveLength(2);
   });
-  test("completed release replay performs no further provider operation", async () => {
+  test("completed release replay is refused without further provider operations", async () => {
     expect((await release()).error).toBeNull();
     const calls = provider.calls().length;
-    expect((await release()).error).toBeNull();
+    expect((await release()).error).toMatchObject({ name: "NumberAlreadyReleasedError" });
     expect(provider.calls()).toHaveLength(calls);
     await completed();
   });

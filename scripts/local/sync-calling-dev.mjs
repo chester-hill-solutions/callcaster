@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /* eslint-env node */
 
+import { listLiveWorkspaceNumbers } from "../lib/live-workspace-numbers.mjs";
 import "dotenv/config";
 
 import postgres from "postgres";
@@ -378,9 +379,7 @@ async function syncWorkspace({ baseUrl, sql, workspace }) {
       workspace.twilioData.sid,
       workspace.twilioData.authToken,
     );
-    const workspaceNumbers = await sql`
-      SELECT phone_number FROM workspace_number WHERE workspace = ${workspace.id}
-    `;
+    const workspaceNumbers = await listLiveWorkspaceNumbers(sql, workspace.id);
 
     const phoneNumbers = Array.isArray(workspaceNumbers) ? workspaceNumbers : [];
 

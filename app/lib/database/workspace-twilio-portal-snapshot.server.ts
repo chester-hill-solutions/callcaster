@@ -113,6 +113,7 @@ export async function getWorkspaceTwilioPortalSnapshot({workspaceId,
       .limit(1)
       .then((rows) => rows[0] ?? null),
     tdb.workspace_number.findMany({
+      where: eq(workspaceNumberTable.status, "active"),
       columns: {
         type: true,
         phone_number: true,

@@ -53,6 +53,6 @@ export async function validateInboundScriptAttachment(tdb: InboundScriptReadDb, 
 }
 
 export async function validateAttachedInboundScriptUpdate(tdb: TenantDb, scriptId: number, content: ScriptContent) {
-  const usage = await tdb.workspace_number.count({ where: eq(workspace_number.inbound_script_id, scriptId) });
+  const usage = await tdb.workspace_number.count({ where: and(eq(workspace_number.inbound_script_id, scriptId), eq(workspace_number.status, "active")) });
   if (usage) await requireValidInboundContent(tdb, content);
 }

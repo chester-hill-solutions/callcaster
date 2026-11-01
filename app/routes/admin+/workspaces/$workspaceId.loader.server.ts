@@ -54,7 +54,7 @@ export const loader = defineLoader({
     throw redirect("/admin?tab=workspaces");
   }
 
-  const { workspace, workspaceUsers, phoneNumbers } = detail;
+  const { workspace, workspaceUsers, phoneNumbers, numberHistory } = detail;
 
   let twilioAccountInfo: TwilioAccountClientData | null = null;
   let twilioNumbers: TwilioPhoneNumber[] = [];
@@ -107,6 +107,7 @@ export const loader = defineLoader({
     workspace,
     workspaceUsers,
     phoneNumbers,
+    numberHistory,
     twilioAccountInfo,
     twilioNumbers,
     twilioUsage,

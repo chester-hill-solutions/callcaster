@@ -88,7 +88,7 @@ export async function getScriptUsage(args: {
   const [campaignCount, inboundNumberCount] = await Promise.all([
     tdb.campaign.count({ where: campaignWhere }),
     tdb.workspace_number.count({
-      where: eq(workspaceNumberTable.inbound_script_id, args.scriptId),
+      where: and(eq(workspaceNumberTable.inbound_script_id, args.scriptId), eq(workspaceNumberTable.status, "active")),
     }),
   ]);
   return {

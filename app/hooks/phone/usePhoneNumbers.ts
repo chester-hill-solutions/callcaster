@@ -39,7 +39,7 @@ import { logger } from "@/lib/logger.client";
  * ```
  */
 export const usePhoneNumbers = (initialPhoneNumbers: WorkspaceNumbers[], workspace: string) => {
-  const [phoneNumbers, setPhoneNumbers] = useState<WorkspaceNumbers[]>(initialPhoneNumbers);
+  const [phoneNumbers, setPhoneNumbers] = useState<WorkspaceNumbers[]>(initialPhoneNumbers.filter(number => number?.status !== "released"));
 
   const updateWorkspaceNumbers = useCallback((payload: { eventType: string; old: WorkspaceNumbers | null; new: WorkspaceNumbers | null }) => {
     // Validate payload
@@ -56,7 +56,7 @@ export const usePhoneNumbers = (initialPhoneNumbers: WorkspaceNumbers[], workspa
               logger.error('INSERT event missing new data');
               return currentNumbers;
             }
-            if (payload.new.workspace === workspace) {
+            if (payload.new.workspace === workspace && payload.new.status !== "released") {
               if (!payload.new.id) {
                 logger.error('INSERT event missing id');
                 return currentNumbers;
@@ -73,6 +73,9 @@ export const usePhoneNumbers = (initialPhoneNumbers: WorkspaceNumbers[], workspa
               if (!payload.new.id) {
                 logger.error('UPDATE event missing id');
                 return currentNumbers;
+              }
+              if (payload.new.status === "released") {
+                return currentNumbers.filter(item => item?.id !== payload.new?.id);
               }
               return currentNumbers.map((item) => 
                 item?.id === payload.new?.id ? payload.new : item

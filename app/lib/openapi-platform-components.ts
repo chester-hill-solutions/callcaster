@@ -509,6 +509,8 @@ export const platformOpenApiComponents = {
     WorkspacePhoneNumber: {
       type: "object" as const,
       properties: {
+        status: { type: "string" as const, enum: ["active", "released"] as const, description: "Number lifecycle. Live lists return active rows only." },
+        released_at: { type: "string" as const, format: "date-time", nullable: true, description: "Release completion time. Null for active numbers." },
         id: { type: "integer" as const },
         phone_number: { type: "string" as const },
         friendly_name: { type: "string" as const, nullable: true },
