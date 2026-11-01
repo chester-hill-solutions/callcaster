@@ -66,8 +66,9 @@ describe("legacy voice terminal queue ownership", () => {
     await resultRows(f, Number(amount));
   });
 
-  test("an old completion preserves a canonically requeued primary", async () => {
+  test.each([false, true])("an old completion preserves a canonically requeued primary, unbound %s", async unbound => {
     const f = await legacyAttempt();
+    if (unbound) await sql`update public.call set queue_id = null where sid = ${f.callSid}`;
     await enqueueContactsForCampaign(f.campaign, [f.contact], { requeue: true });
     const [before] = await sql`select * from public.campaign_queue where id = ${f.queue.id}`;
     expect(before.dispatch_generation).not.toBe(f.queue.dispatch_generation);
@@ -96,11 +97,11 @@ describe("legacy voice terminal queue ownership", () => {
     await resultRows(f);
   });
 
-  test("an old completion without a saved queue ID cannot guess a current row", async () => {
+  test("an unchanged original outreach completes a legacy Call without a saved queue ID", async () => {
     const f = await legacyAttempt();
     await sql`update public.call set queue_id = null where sid = ${f.callSid}`;
     await finish(f);
-    expect((await sql`select * from public.campaign_queue where id = ${f.queue.id}`)[0]).toEqual(f.queue);
+    expect((await sql`select queue_state from public.campaign_queue where id = ${f.queue.id}`)[0].queue_state).toBe('dequeued');
     await resultRows(f);
   });
 
@@ -148,8 +149,9 @@ describe("legacy voice terminal queue ownership", () => {
     await resultRows(f);
   });
 
-  test.each([false, true])("legacy intent cutoffs keep database microsecond precision, later %s", async later => {
+  test.each([{ later: false, unbound: false }, { later: true, unbound: false }, { later: false, unbound: true }, { later: true, unbound: true }])("legacy intent cutoffs keep database microsecond precision %j", async ({ later, unbound }) => {
     const f = await legacyAttempt();
+    if (unbound) await sql`update public.call set queue_id = null where sid = ${f.callSid}`;
     await sql`update public.outreach_attempt set created_at = '2026-10-31 12:00:00.000100+00'::timestamptz where id = ${f.attempt}`;
     await sql`update public.campaign_queue set created_at = '2026-10-30 12:00:00+00'::timestamptz,
       redial_requested_at = '2026-10-31 12:00:00+00'::timestamptz + ${later ? 200 : 0} * interval '1 microsecond' where id = ${f.queue.id}`;
@@ -265,6 +267,14 @@ describe("legacy voice terminal queue ownership", () => {
     expect((await sql`select * from public.campaign_queue where id = ${f.queue.id}`)[0]).toEqual(f.queue);
     expect((await sql`select * from public.campaign_queue where id = ${other.queue.id}`)[0]).toEqual(other.queue);
     await resultRows(f);
+  });
+
+  test("an unbound Call without its original outreach attempt cannot infer a current queue owner", async () => {
+    const f = await legacyAttempt();
+    await sql`update public.call set queue_id = null, outreach_attempt_id = null where sid = ${f.callSid}`;
+    const { dequeueLegacyVoiceAttempt } = await import('@/server/legacy-voice-queue.server');
+    expect(await dequeueLegacyVoiceAttempt(workspaceId, f.callSid)).toEqual({ ownedPrimary: false, removedCount: 0 });
+    expect((await sql`select * from public.campaign_queue where id = ${f.queue.id}`)[0]).toEqual(f.queue);
   });
 
   test("a progress event cannot advance queue work", async () => {

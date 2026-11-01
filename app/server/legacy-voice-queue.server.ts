@@ -8,7 +8,7 @@ import { assignedElsewhere, hasLiveQueueCustomer, wasDequeued } from "./queue-ad
 import { logger } from "@/lib/logger.server";
 
 type SavedCall = typeof call.$inferSelect;
-type LegacyOwner = { queueId: number; campaignId: number; contactId: number; attemptId: number;
+type LegacyOwner = { queueId: number | null; campaignId: number; contactId: number; attemptId: number;
   actorId: string | null; ignoredCallSids: string[] };
 
 function savedParentMatches(source: SavedCall, parent: SavedCall | null) {
@@ -19,9 +19,9 @@ function savedParentMatches(source: SavedCall, parent: SavedCall | null) {
 }
 
 function legacyQueueIdentity(source: SavedCall, parent: SavedCall | null) {
-  const queueId = source.queue_id ?? parent?.queue_id, campaignId = source.campaign_id ?? parent?.campaign_id;
+  const queueId = source.queue_id ?? parent?.queue_id ?? null, campaignId = source.campaign_id ?? parent?.campaign_id;
   const contactId = source.contact_id ?? parent?.contact_id, attemptId = source.outreach_attempt_id ?? parent?.outreach_attempt_id;
-  if (queueId == null || campaignId == null || contactId == null || attemptId == null) return null;
+  if (campaignId == null || contactId == null || attemptId == null) return null;
   return { queueId, campaignId, contactId, attemptId };
 }
 
@@ -34,6 +34,7 @@ async function readLegacyOwner(tdb: TenantDb, callSid: string): Promise<LegacyOw
   ), columns: { id: true } });
   if (funded) return null;
   const parent = source.parent_call_sid ? await tdb.call.findFirst({ where: eq(call.sid, source.parent_call_sid) }) ?? null : null;
+  if (source.parent_call_sid && !parent && source.queue_id === null) return null;
   if (!savedParentMatches(source, parent)) return null;
   const identity = legacyQueueIdentity(source, parent);
   if (!identity) return null;
@@ -65,7 +66,7 @@ async function eligibleLegacyEntry(tdb: TenantDb, row: typeof campaign_queue.$in
   return !await hasLiveQueueCustomer(tdb, owner.campaignId, row.contact_id, owner.ignoredCallSids);
 }
 
-/** Keep legacy completion, billing and the original attempt separate from newer queue work. */
+/** Saved IDs bind modern records; older unbound Calls also require the original outreach cutoff. */
 export async function dequeueLegacyVoiceAttempt(workspaceId: string, callSid: string) {
   const publish: Array<() => Promise<void>> = [];
   const result = await db.transaction(async tx => {
@@ -85,7 +86,7 @@ export async function dequeueLegacyVoiceAttempt(workspaceId: string, callSid: st
       eq(campaign_queue.campaign_id, owner.campaignId), inArray(campaign_queue.contact_id, members.map(member => member.id)),
       belongsToLegacyAttempt(workspaceId, owner),
     )).orderBy(asc(campaign_queue.id)).for("no key update");
-    const primary = rows.find(row => row.id === owner.queueId && row.contact_id === owner.contactId);
+    const primary = rows.find(row => (owner.queueId === null || row.id === owner.queueId) && row.contact_id === owner.contactId);
     if (!primary || !await eligibleLegacyEntry(tdb, primary, owner)) return { ownedPrimary: false, removedCount: 0 };
     let removedCount = 0;
     for (const row of rows) {
