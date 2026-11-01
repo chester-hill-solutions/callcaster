@@ -382,7 +382,7 @@ export async function listAllWorkspaceUsers() {
 }
 
 export async function listAllWorkspaceNumbers() {
-  return adminDb.select().from(workspaceNumberTable);
+  return adminDb.select().from(workspaceNumberTable).where(eq(workspaceNumberTable.status, "active"));
 }
 
 export async function listAllCampaignsOrdered() {
@@ -626,7 +626,7 @@ export async function listWorkspaceNumbersForWorkspace(workspaceId: string) {
   return adminDb
     .select()
     .from(workspaceNumberTable)
-    .where(eq(workspaceNumberTable.workspace, workspaceId));
+    .where(and(eq(workspaceNumberTable.workspace, workspaceId), eq(workspaceNumberTable.status, "active")));
 }
 
 export async function listAdminWorkspaceUsersWithUser(workspaceId: string) {

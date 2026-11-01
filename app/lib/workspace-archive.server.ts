@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { workspace_number as workspaceNumberTable } from "@/db/schema";
 import { removeWorkspacePhoneNumber } from "@/lib/database/workspace.server";
@@ -46,7 +46,7 @@ export async function archiveWorkspace(
 ): Promise<ArchiveWorkspaceResult> {
   const tdb = createTenantDb(workspaceId);
   const numbers = await tdb.workspace_number.findMany({
-    where: eq(workspaceNumberTable.workspace, workspaceId),
+    where: and(eq(workspaceNumberTable.workspace, workspaceId), eq(workspaceNumberTable.status, "active")),
   });
 
   const failures: string[] = [];

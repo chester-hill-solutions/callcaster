@@ -43,7 +43,7 @@ export async function findWorkspaceNumberByPhoneNumber(
       workspaceId: workspaceNumberTable.workspace,
     })
     .from(workspaceNumberTable)
-    .where(eq(workspaceNumberTable.phone_number, phoneNumber))
+    .where(and(eq(workspaceNumberTable.phone_number, phoneNumber), eq(workspaceNumberTable.status, "active")))
     .limit(1);
 
   if (!row?.workspaceId) {
@@ -61,7 +61,7 @@ export async function findWorkspaceNumberInboundFallbackByPhone(phoneNumber: str
       workspaceId: workspaceNumberTable.workspace,
     })
     .from(workspaceNumberTable)
-    .where(eq(workspaceNumberTable.phone_number, phoneNumber))
+    .where(and(eq(workspaceNumberTable.phone_number, phoneNumber), eq(workspaceNumberTable.status, "active")))
     .limit(1);
 
   if (!row?.workspaceId) {
@@ -126,7 +126,7 @@ export async function listWorkspaceNumberTwilioCandidatesByPhone(
       workspaceTable,
       eq(workspaceNumberTable.workspace, workspaceTable.id),
     )
-    .where(eq(workspaceNumberTable.phone_number, phoneNumber));
+    .where(and(eq(workspaceNumberTable.phone_number, phoneNumber), eq(workspaceNumberTable.status, "active")));
 
   return rows.map((row) => ({ twilioData: row.twilioData }));
 }
@@ -147,6 +147,7 @@ export async function updateWorkspaceNumberCapabilitiesByPhone(
       and(
         eq(workspaceNumberTable.workspace, workspaceId),
         eq(workspaceNumberTable.phone_number, phoneNumber),
+        eq(workspaceNumberTable.status, "active"),
       ),
     )
     .returning();
@@ -180,6 +181,7 @@ export async function findWorkspaceNumberVoicemailContextByPhone(phoneNumber: st
     .where(and(
       eq(workspaceNumberTable.phone_number, phoneNumber),
       eq(workspaceNumberTable.workspace, workspaceId),
+      eq(workspaceNumberTable.status, "active"),
     ))
     .limit(1);
 

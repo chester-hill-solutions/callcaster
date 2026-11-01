@@ -118,6 +118,7 @@ export async function findAudioUsage(
         and(
           eq(workspaceNumberTable.workspace, workspaceId),
           eq(workspaceNumberTable.inbound_audio, target),
+          eq(workspaceNumberTable.status, "active"),
         ),
       ),
     db

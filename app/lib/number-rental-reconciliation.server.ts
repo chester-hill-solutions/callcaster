@@ -73,7 +73,7 @@ export async function loadNumberRentalReconciliationInput(args: {
         },
       }),
       tdb.workspace_number.findMany({
-        where: eq(workspace_number.type, "rented"),
+        where: and(eq(workspace_number.type, "rented"), eq(workspace_number.status, "active")),
         columns: { id: true, created_at: true, twilio_phone_number_sid: true },
       }),
       tdb.workspace_number_release.findMany({

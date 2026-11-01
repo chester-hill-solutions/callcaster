@@ -1,5 +1,5 @@
 import { data as routeData } from "react-router";
-import { eq, or, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 
 import {
   webhook as webhookTable,
@@ -59,7 +59,7 @@ async function lookupWorkspaceNumberByPhone(phone: string): Promise<
       })
       .from(workspaceNumberTable)
       .innerJoin(workspaceTable, eq(workspaceNumberTable.workspace, workspaceTable.id))
-      .where(eq(workspaceNumberTable.phone_number, phone))
+      .where(and(eq(workspaceNumberTable.phone_number, phone), eq(workspaceNumberTable.status, "active")))
       .limit(1);
 
     if (!row?.workspaceId) {

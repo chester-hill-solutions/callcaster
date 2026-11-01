@@ -6,8 +6,9 @@ import {
   type CallLogSearchState,
   type CallLogSortKey,
 } from "../../shared/call-log";
-import { and, asc, count, desc, eq, gt, ilike, not, or, type SQL } from "drizzle-orm";
+import { asc, count, desc, eq, gt, ilike, not, or, type SQL } from "drizzle-orm";
 import {
+  workspace_number as workspaceNumberTable,
   call as callTable,
   outreach_attempt as outreachAttemptTable,
   user as userTable,
@@ -187,6 +188,7 @@ export async function loadCallLogPage(args: {
   const tdb = createTenantDb(args.workspaceId);
 
   const workspaceNumbers = await tdb.workspace_number.findMany({
+    where: eq(workspaceNumberTable.status, "active"),
     columns: { id: true, phone_number: true },
     orderBy: (number, { asc: ascFn }) => [ascFn(number.phone_number)],
   });

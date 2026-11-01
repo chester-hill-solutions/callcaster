@@ -211,8 +211,10 @@ describe.skipIf(!databaseUrl)("admin workspace restore with real sessions and Po
     expect((await post()).status).toBe(200);
     expect(await listUserWorkspaces(actor("owner").id)).toMatchObject({ workspaces: [expect.objectContaining({ workspace: expect.objectContaining({ id: workspace }) })] });
     expect((await audits()).map(row => row.action)).toEqual(["owned.history", "workspace.archive", "workspace.restore"]);
-    const [numbers] = await sql`select count(*)::int as count from workspace_number where workspace = ${workspace}`;
+    const [numbers] = await sql`select count(*)::int as count from workspace_number where workspace = ${workspace} and status = 'active'`;
     expect(numbers.count).toBe(0);
+    const [history] = await sql`select status, released_at, phone_number from workspace_number where workspace = ${workspace}`;
+    expect(history).toMatchObject({ status: "released", released_at: expect.any(Date), phone_number: provider.phone });
     expect(provider.active).toBe(false);
     expect(provider.rented).toBe(0);
     const [receipt] = await sql`select state from workspace_number_release where workspace = ${workspace}`;

@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 import { ArrowLeft, Phone, MessageSquare, RefreshCw, Image, FileText } from "lucide-react";
+import { NumberHistory } from "@/components/phone-numbers/NumberHistory";
 import WorkspaceOverview from "@/components/workspace/WorkspaceOverview";
 
 interface TwilioPhoneNumber {
@@ -47,7 +48,7 @@ interface TwilioUsageRecord {
 }
 
 export default function WorkspaceDetails() {
-    const { workspace, workspaceUsers, phoneNumbers, twilioPortalSnapshot } = useLoaderData();
+    const { workspace, workspaceUsers, phoneNumbers, numberHistory, twilioPortalSnapshot } = useLoaderData();
     const location = useLocation();
 
     // Determine active tab from URL
@@ -111,12 +112,15 @@ export default function WorkspaceDetails() {
                     </TabsTrigger>
                 </TabsList>
                 {getActiveTab() === "overview" ? (
-                 <WorkspaceOverview
-                    workspace={workspace}
-                    workspaceUsers={workspaceUsers}
-                    phoneNumbers={phoneNumbers}
-                    twilioSnapshot={twilioPortalSnapshot}
-                 />
+                 <>
+                   <WorkspaceOverview
+                      workspace={workspace}
+                      workspaceUsers={workspaceUsers}
+                      phoneNumbers={phoneNumbers}
+                      twilioSnapshot={twilioPortalSnapshot}
+                   />
+                   <NumberHistory rows={numberHistory ?? []} />
+                 </>
                 ) : (
                     <TabsContent value={getActiveTab()}>
                         <Outlet context={{ workspace, workspaceUsers, phoneNumbers }} />

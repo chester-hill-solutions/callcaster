@@ -83,6 +83,7 @@ export async function applyRoutingPresetWithTenantDb(
         where: and(
           eq(workspace_number.type, "caller_id"),
           eq(workspace_number.phone_number, application.phoneNumber),
+          eq(workspace_number.status, "active"),
         ),
       });
       if (
@@ -109,7 +110,7 @@ export async function applyRoutingPresetWithTenantDb(
 
   const rows = await tdb.workspace_number.update({
     set: patch,
-    where: eq(workspace_number.id, parsedNumberId),
+    where: and(eq(workspace_number.id, parsedNumberId), eq(workspace_number.status, "active")),
   });
   const number = rows[0];
   if (!number) {

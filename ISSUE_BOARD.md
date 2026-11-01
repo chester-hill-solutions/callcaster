@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Base inventory: complete native Issue and Project snapshots from 2026-10-29 UTC, 401 open issues. Selected refresh: #1724, #2546, #2943, #2992, #2993, #2994, #3085, #3088 and new child #3091 on 2026-10-31. Refresh the full board with npm run tools:issues:board.
+Base inventory: complete native Issue and Project snapshots from 2026-10-29 UTC, 401 open issues. Selected refresh: #1724, #2546, #2943, #2992, #2993, #2994, #2995, #3085, #3088 and new child #3091 on 2026-10-31. Refresh the full board with npm run tools:issues:board.
 
 Live native Issue metadata covers all 401 open issues. Type, Priority, Effort and Environment come from those Issue fields. The complete authenticated Project export has 398 unique issue URLs, matching the visible filtered count after hierarchy was turned off and all rows loaded. #100, #2902 and #2906 are absent from that complete Project view and retain unknown Project Status. No status is inferred from a PR, label or issue state.
 
@@ -15,6 +15,8 @@ Question #1724 is answered and closed as completed on 2026-10-31. The real rende
 Restore slice #3094 is merged and deployed to dev. #2992 and #2993 are on-dev, assigned @wra-sol and linked as children of High-priority #2732. Their own Priority, Effort and Enviornment fields remain unset. The keep-address decision for #2943 is recorded; that styling fix is on-dev for mail-client acceptance.
 
 Archive-key rule #2994 was decided by the owner on 2026-10-31: revoke keys permanently; restore needs new keys. The active branch is in progress, with the task linked to #2732. Full CI, merge and deployed acceptance remain. Other sections retain their dated evidence.
+
+Released-number task #2995 is In progress in the authenticated board on 2026-10-31. Draft PR #3097 retains dated history and filters live use; final CI, merge and acceptance remain. Parent #2732 is High priority; #2995 has no own Priority, Effort or Enviornment value. Other sections retain their dated evidence.
 
 ## How to use this board
 
@@ -43,9 +45,21 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 25
+## Fix now — 26
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
+
+### [#2995](https://github.com/chester-hill-solutions/callcaster/issues/2995) Task: keep a released number's row with a released status
+- **IN PROGRESS** · Verdict: **Fix now** · Type: Task · Priority: unset · Effort: unset · Environment: unset · Size: L · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
+- Retain released numbers as dated, read-only history while all live paths exclude them. The active candidate is in progress; final CI, merge and acceptance remain.
+- Current behavior: At dev@05195e1e, release deletes the original workspace_number row. The candidate marks it released and retains its release date, keeps legacy receipt history, and filters live lists, routing, billing and reports.
+- Root cause: Number consumers assume every row is live. Retaining rows requires the lifecycle filter and read-only protection to land with the release write.
+- Resolution: Complete #2995 as one change: retain the row after confirmed provider release, show workspace and support history, exclude released rows from live reads and writes, refuse repeat release, and keep the existing recovery and release-first archive order. A later explicit purchase creates a new rental row.
+- Look in: `app/server/number-release-intent.server.ts`; `app/lib/workspace-number-history.server.ts`; `app/components/phone-numbers/NumberHistory.tsx`; `client/migrations/20261031000001_workspace_number_release_history.sql`; `test/integration-db/number-history-live-paths.test.ts`
+- Existing tests: Original runtime fails 15 of 56 initial cases. The candidate passes the full owned PostgreSQL tier (1,358 cases), 23 UI cases and 48 admin-response/API contract checks. Final exact-head checks and GitHub CI remain.
+- Missing tests: Require final exact-head local checks and full GitHub CI before merge; then verify dev deployment and operator/release acceptance. Provider boundaries use an isolated fake; no live number was released.
+- Done when: Release retains the original row with released status and a date.; Live lists, routing, senders, billing and reports exclude released rows.; Workspace and support history show the release date without mutation controls.; Repeat release and attempts to reactivate the same row are refused without repeated provider work or charges.; Archive keeps release-first ordering and failure recovery; script/queue cleanup preserves valid history references.
+- Tracker: Native Project Status is In progress, read in the authenticated board on 2026-10-31. Assigned to @wra-sol, child of High-priority #2732. Its own Priority, Effort and Enviornment fields are unset. Keep open for release acceptance.
 
 ### [#2994](https://github.com/chester-hill-solutions/callcaster/issues/2994) Task: decide whether an archived workspace's API keys stay valid
 - **IN PROGRESS** · Verdict: **Fix now** · Type: Task · Priority: unset · Effort: unset · Environment: unset · Size: M · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
@@ -1966,7 +1980,7 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 226
+## Needs triage — 225
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
 
@@ -2285,11 +2299,6 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 ### [#3004](https://github.com/chester-hill-solutions/callcaster/issues/3004) Make failed original uploads terminal and diagnose storage authorization errors
 - Status: Backlog · Type: Bug · Priority: unset · Effort: unset · Environment: unset · Labels: none · Assignee: none · Updated: 2026-10-26
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2995](https://github.com/chester-hill-solutions/callcaster/issues/2995) Task: keep a released number's row with a released status
-- Status: Backlog · Type: Task · Priority: unset · Effort: unset · Environment: unset · Labels: none · Assignee: none · Updated: 2026-10-25
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
 
 ### [#2816](https://github.com/chester-hill-solutions/callcaster/issues/2816) Feature: SIM task protocol and SMS flows
 - Status: Backlog · Type: Feature · Priority: unset · Effort: unset · Environment: unset · Labels: none · Assignee: none · Updated: 2026-10-24

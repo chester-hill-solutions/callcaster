@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { emitWorkspaceNumberEvent } from "@/lib/workspace-events.server";
 import { and, eq, gt, inArray, lt } from "drizzle-orm";
 import {
   workspace,
@@ -85,7 +86,7 @@ export async function beginNumberRelease(
     const number = await createTenantDb(
       workspaceId,
       tx,
-    ).workspace_number.findFirst({ where: eq(workspace_number.id, numberId) });
+    ).workspace_number.findFirst({ where: and(eq(workspace_number.id, numberId), eq(workspace_number.status, "active")) });
     if (!number?.phone_number) throw new Error("Number not found");
     const data =
       typeof row.twilioData === "string"
@@ -343,7 +344,7 @@ export async function recordNumberReleaseProvider(release: NumberRelease) {
 }
 
 export async function finishNumberRelease(release: NumberRelease) {
-  const needsSenderCleanup = await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     const owned = await lockOwnedRelease(tx, release);
     if (owned.state !== "released")
       throw new Error("Provider number release is not confirmed");
@@ -387,10 +388,11 @@ export async function finishNumberRelease(release: NumberRelease) {
         .where(ownedRelease(owned))
         .returning();
       if (!pending) throw new Error("Changed sender service was not saved");
-      return true;
+      return { needsSenderCleanup: true, number: null };
     }
-    await tdb.workspace_number.delete({
-      where: eq(workspace_number.id, release.number_id),
+    const [retained] = await tdb.workspace_number.update({
+      set: { status: "released", released_at: new Date().toISOString() },
+      where: and(eq(workspace_number.id, release.number_id), eq(workspace_number.status, "active")),
     });
     const [completed] = await tx
       .update(workspace_number_release)
@@ -398,11 +400,14 @@ export async function finishNumberRelease(release: NumberRelease) {
       .where(ownedRelease(owned))
       .returning();
     if (!completed) throw new Error("Number release completion was not saved");
-    return false;
+    return { needsSenderCleanup: false, number: retained ?? null };
   });
   invalidateWorkspaceTwilioData(release.workspace);
-  if (needsSenderCleanup)
+  if (result.needsSenderCleanup)
     throw new Error("The changed Messaging Service needs sender cleanup");
+  // Notify only after commit. Older deleted rows still need a removal event.
+  await emitWorkspaceNumberEvent(release.workspace, result.number ? "UPDATE" : "DELETE",
+    result.number, result.number ? null : { id: release.number_id, workspace: release.workspace });
 }
 
 export async function deferNumberRelease(release: NumberRelease) {

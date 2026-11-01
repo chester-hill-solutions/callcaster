@@ -18,7 +18,17 @@ import {
   type NumberRelease,
 } from "@/server/number-release-intent.server";
 
-export class NumberReleaseIncompleteError extends Error {
+/** The request conflicts with the number's current release state. */
+export abstract class NumberReleaseConflictError extends Error {}
+
+export class NumberAlreadyReleasedError extends NumberReleaseConflictError {
+  constructor() {
+    super("This number has already been released.");
+    this.name = "NumberAlreadyReleasedError";
+  }
+}
+
+export class NumberReleaseIncompleteError extends NumberReleaseConflictError {
   constructor(phone: string) {
     super(
       `Release incomplete for ${phone}. Retry to finish sender cleanup and number release.`,
@@ -305,7 +315,7 @@ export async function releaseNumberForWorkspace(args: {
     if (!Number.isSafeInteger(numberId) || numberId <= 0)
       throw new Error("Invalid number ID");
     existing = await getNumberRelease(args.workspaceId, numberId);
-    if (existing?.state === "completed") return { error: null };
+    if (existing?.state === "completed") return { error: new NumberAlreadyReleasedError() };
     if (existing && existing.lease_expires_at.getTime() > Date.now()) {
       return { error: new NumberReleaseIncompleteError(existing.phone_number) };
     }
@@ -319,7 +329,7 @@ export async function releaseNumberForWorkspace(args: {
       numberId,
       accountSid,
     );
-    if (prepared.release.state === "completed") return { error: null };
+    if (prepared.release.state === "completed") return { error: new NumberAlreadyReleasedError() };
     if (!prepared.owned)
       return {
         error: new NumberReleaseIncompleteError(prepared.release.phone_number),

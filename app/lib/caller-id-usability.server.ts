@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { workspace_number as workspaceNumberTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { canSpendFromNumber } from "@/lib/number-rental-lifecycle";
@@ -61,7 +61,7 @@ export async function resolveCallerIdUsability(
 
   const tdb = createTenantDb(workspaceId);
   const owned = await tdb.workspace_number.findFirst({
-    where: eq(workspaceNumberTable.phone_number, wanted),
+    where: and(eq(workspaceNumberTable.phone_number, wanted), eq(workspaceNumberTable.status, "active")),
     columns: { id: true, suspended_at: true },
   });
 

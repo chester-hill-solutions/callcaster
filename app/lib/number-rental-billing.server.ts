@@ -259,7 +259,7 @@ async function applyRentalLifecycleAction(args: {
 
     await tdb.workspace_number.update({
       set: { rental_warned_cycle: unpaidCycles },
-      where: eq(workspaceNumberTable.id, number.id),
+      where: and(eq(workspaceNumberTable.id, number.id), eq(workspaceNumberTable.status, "active")),
     });
     await notifyOps({
       event: "billing.rental_unpaid_warned",
@@ -280,7 +280,7 @@ async function applyRentalLifecycleAction(args: {
     if (number.suspended_at) return "none";
     await tdb.workspace_number.update({
       set: { suspended_at: new Date().toISOString() },
-      where: eq(workspaceNumberTable.id, number.id),
+      where: and(eq(workspaceNumberTable.id, number.id), eq(workspaceNumberTable.status, "active")),
     });
     await notifyOps({
       event: "billing.rental_suspended",
@@ -529,7 +529,7 @@ let unsuspended = 0;
       if (number.suspended_at) {
         await tdb.workspace_number.update({
           set: { suspended_at: null },
-          where: eq(workspaceNumberTable.id, number.id),
+          where: and(eq(workspaceNumberTable.id, number.id), eq(workspaceNumberTable.status, "active")),
         });
         number.suspended_at = null;
         unsuspended++;
@@ -610,6 +610,7 @@ export async function runNumberRentalBilling(args: {
       eq(workspaceNumberTable.type, "rented"),
       gte(workspaceNumberTable.created_at, ROLLOUT_CUTOFF_DATE),
       isNotNull(workspaceNumberTable.twilio_phone_number_sid),
+      eq(workspaceNumberTable.status, "active"),
     ),
   });
 
@@ -713,7 +714,7 @@ export async function runNumberRentalBilling(args: {
       try {
         await tdb.workspace_number.update({
           set: { rental_warned_cycle: null },
-          where: eq(workspaceNumberTable.id, number.id),
+          where: and(eq(workspaceNumberTable.id, number.id), eq(workspaceNumberTable.status, "active")),
         });
       } catch (error) {
         technicalFailures++;

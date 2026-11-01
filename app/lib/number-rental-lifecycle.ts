@@ -53,10 +53,11 @@ export function rentalActionForUnpaidCycles(
  * should still receive calls to their number while they sort it out. What it
  * stops is incurring further cost.
  *
- * There is no released state to check: releasing deletes the row.
+ * Released rows stay as history and must never be used to spend.
  */
 export function canSpendFromNumber(number: {
   suspended_at?: string | Date | null;
+  status?: "active" | "released";
 }): boolean {
-  return !number.suspended_at;
+  return number.status !== "released" && !number.suspended_at;
 }

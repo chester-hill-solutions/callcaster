@@ -284,7 +284,7 @@ describe.skipIf(!url)("number release recovers partial work (#2085)", () => {
   }
   async function state() {
     const [row] =
-      await sql`select twilio_data, (select count(*)::int from public.workspace_number where workspace = ${workspaceId}::uuid) as numbers
+      await sql`select twilio_data, (select count(*)::int from public.workspace_number where workspace = ${workspaceId}::uuid and status = 'active') as numbers
       from public.workspace where id = ${workspaceId}::uuid`;
     return {
       active: provider.active.has(sid),
@@ -315,6 +315,10 @@ describe.skipIf(!url)("number release recovers partial work (#2085)", () => {
       state: "completed",
       last_error: null,
     });
+    const [retained] = await sql`select status, released_at from public.workspace_number where id = ${numberId.toString()}::bigint`;
+    expect(retained).toMatchObject({ status: "released", released_at: expect.any(Date) });
+    const [event] = await sql`select payload from public.workspace_events where workspace_id = ${workspaceId} and payload->>'table' = 'workspace_number' order by id desc limit 1`;
+    expect(event.payload.new).toMatchObject({ id: Number(numberId), status: "released" });
   }
   async function api(
     userId = actor,
@@ -374,10 +378,11 @@ describe.skipIf(!url)("number release recovers partial work (#2085)", () => {
     expect((await release()).error).toBeNull();
     await expectClean();
   });
-  test("retry of a completed release returns success without provider work", async () => {
+  test("retry of a completed release is refused without provider work", async () => {
     expect((await release()).error).toBeNull();
     const calls = provider.remove.mock.calls.length;
-    expect((await release()).error).toBeNull();
+    expect((await release()).error?.message).toMatch(/already.*released/i);
+    expect((await api()).status).toBe(409);
     expect(provider.remove).toHaveBeenCalledTimes(calls);
     await expectClean();
   });
@@ -427,7 +432,7 @@ describe.skipIf(!url)("number release recovers partial work (#2085)", () => {
   test.each([
     {
       table: "workspace_number",
-      event: "delete",
+      event: "update of status",
       when: () => `OLD.workspace = '${workspaceId}'::uuid`,
       state: "released",
     },
@@ -713,7 +718,7 @@ describe.skipIf(!url)("number release recovers partial work (#2085)", () => {
   test("completed provider work finishes without credentials through recovery", async () => {
     await installFault(
       "workspace_number",
-      "delete",
+      "update of status",
       `OLD.workspace = '${workspaceId}'::uuid`,
     );
     expect((await release()).error).toBeTruthy();
@@ -736,7 +741,7 @@ describe.skipIf(!url)("number release recovers partial work (#2085)", () => {
   test("recovery retains failing work and retries it on the next run", async () => {
     await installFault(
       "workspace_number",
-      "delete",
+      "update of status",
       `OLD.workspace = '${workspaceId}'::uuid`,
     );
     expect((await release()).error).toBeTruthy();
@@ -897,7 +902,7 @@ describe.skipIf(!url)("number release recovers partial work (#2085)", () => {
   test("a known release finishes after the local row was already removed", async () => {
     await installFault(
       "workspace_number",
-      "delete",
+      "update of status",
       `OLD.workspace = '${workspaceId}'::uuid`,
     );
     expect((await release()).error).toBeTruthy();
@@ -905,12 +910,15 @@ describe.skipIf(!url)("number release recovers partial work (#2085)", () => {
     await sql`delete from public.workspace_number where workspace = ${workspaceId}::uuid and id = ${numberId.toString()}::bigint`;
     expect((await release()).error).toBeNull();
     expect(provider.remove).toHaveBeenCalledOnce();
-    await expectClean();
+    expect(await state()).toMatchObject({ active: false, numbers: 0 });
+    expect(await receipt()).toMatchObject({ state: "completed", last_error: null });
+    const { getWorkspaceNumberHistory } = await import("@/lib/workspace-number-history.server");
+    expect(await getWorkspaceNumberHistory({ workspaceId })).toEqual([expect.objectContaining({ number_id: Number(numberId), phone_number: phone })]);
   });
   test("actual API returns 409 for incomplete release and 200 after retry", async () => {
     await installFault(
       "workspace_number",
-      "delete",
+      "update of status",
       `OLD.workspace = '${workspaceId}'::uuid`,
     );
     const first = await api();
@@ -927,7 +935,7 @@ describe.skipIf(!url)("number release recovers partial work (#2085)", () => {
   test("actual form returns 409 for incomplete release and preserves success shape", async () => {
     await installFault(
       "workspace_number",
-      "delete",
+      "update of status",
       `OLD.workspace = '${workspaceId}'::uuid`,
     );
     const first = await form();

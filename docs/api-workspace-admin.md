@@ -112,6 +112,20 @@ timeout controls still apply.
 | GET | `/api/numbers` | Search/purchase available numbers (query) |
 | POST | `/api/numbers` | Purchase/provision number (form) |
 
+### Released number history
+
+Live number lists include only active numbers. Release keeps the original number
+row with `status: "released"` and `released_at` set. A released number cannot be
+selected for calls or messages, edited, or billed for another rental cycle.
+The workspace numbers page shows read-only history and the release date. Support
+can read the same history in the admin workspace overview while it is archived. Older
+completed release records supply history when the original row was deleted.
+
+A repeated release returns 409 and does not call the provider again. A later
+purchase from an available-number search creates a new row and a new rental;
+it never reactivates the old row. Archive still releases active numbers first
+and stops if provider release fails.
+
 ## Agent presence
 
 | Method | Path | Purpose |

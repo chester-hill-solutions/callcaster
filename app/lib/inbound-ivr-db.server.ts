@@ -1,5 +1,5 @@
 import type { IvrPageLayout } from "@/lib/ivr-page-order";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { script as scriptTable, workspace_number as workspaceNumberTable } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
@@ -27,7 +27,7 @@ async function findWorkspaceNumberById(numberId: number) {
       workspaceId: workspaceNumberTable.workspace,
     })
     .from(workspaceNumberTable)
-    .where(eq(workspaceNumberTable.id, numberId))
+    .where(and(eq(workspaceNumberTable.id, numberId), eq(workspaceNumberTable.status, "active")))
     .limit(1);
 
   if (!row?.workspaceId || row.inbound_script_id == null) {

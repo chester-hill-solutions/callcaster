@@ -40,6 +40,8 @@ import { useWorkspaceRealtime } from "@/hooks/realtime/useWorkspaceRealtime";
 import {
   NumberSummaryList,
 } from "@/components/phone-numbers/NumberSummaryList";
+import { NumberHistory } from "@/components/phone-numbers/NumberHistory";
+import type { WorkspaceNumberHistoryRow } from "@/lib/workspace-number-history.server";
 import { NumberCallerId } from "@/components/phone-numbers/NumberCallerId";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
 import { ServiceAddressGate } from "@/components/phone-numbers/ServiceAddressGate";
@@ -79,6 +81,7 @@ type CallerIDResponse = {
 };
 
 type LoaderData = {
+  numberHistory: WorkspaceNumberHistoryRow[];
   phoneNumbers: WorkspaceNumbers;
   workspaceId: string;
   mediaNames: { id: number; name: string }[];
@@ -94,6 +97,7 @@ type LoaderData = {
 const PhoneNumbersPage = () => {
   const {
     phoneNumbers: initNumbers,
+    numberHistory = [],
     workspaceId,
     user,
     users,
@@ -237,9 +241,8 @@ const PhoneNumbersPage = () => {
             <DialogTitle>Release this phone number?</DialogTitle>
           </DialogHeader>
           <DialogDescription>
-            Releasing this number removes it from your workspace. Inbound calls
-            and texts to it will stop, and you may not be able to get the same
-            number back.
+            Releasing this number stops inbound calls and texts. Its record stays
+            in read-only history. You may not be able to get the same number back.
           </DialogDescription>
           <DialogFooter>
             <Button
@@ -301,6 +304,7 @@ const PhoneNumbersPage = () => {
               isBusy={isBusy}
             />
           </Section>
+          <NumberHistory rows={numberHistory} />
           <div className="min-w-0 space-y-6">
             <ServiceAddressGate
               workspaceId={workspaceId ?? ""}

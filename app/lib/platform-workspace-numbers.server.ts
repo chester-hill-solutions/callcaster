@@ -1,4 +1,4 @@
-import { NumberReleaseIncompleteError } from "@/lib/number-release.server";
+import { NumberReleaseConflictError } from "@/lib/number-release.server";
 import { purchaseNumberForWorkspace } from "@/lib/number-purchase.server";
 import {
   createWorkspaceTwilioInstance,
@@ -201,7 +201,7 @@ export async function deleteWorkspaceNumber(
     return {
       ok: false as const,
       error: message,
-      status: error instanceof NumberReleaseIncompleteError ? 409 : 500,
+      status: error instanceof NumberReleaseConflictError ? 409 : 500,
     };
   }
 

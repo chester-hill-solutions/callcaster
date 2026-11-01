@@ -1,3 +1,4 @@
+import { getWorkspaceNumberHistory } from "@/lib/workspace-number-history.server";
 import { AuthzError } from "@chester-hill-solutions/auth";
 import {
   repointAllWorkspaceTwilioWebhooks,
@@ -376,9 +377,10 @@ export async function getAdminWorkspaceDetail(
     return { ok: false as const, error: "Workspace not found", status: 404 };
   }
 
-  const [workspaceUsers, phoneNumbers] = await Promise.all([
+  const [workspaceUsers, phoneNumbers, numberHistory] = await Promise.all([
     listAdminWorkspaceUsersWithUser(workspaceId),
     listWorkspaceNumbersForWorkspace(workspaceId),
+    getWorkspaceNumberHistory({ workspaceId }),
   ]);
 
   return {
@@ -389,6 +391,7 @@ export async function getAdminWorkspaceDetail(
     },
     workspaceUsers,
     phoneNumbers,
+    numberHistory,
   };
 }
 

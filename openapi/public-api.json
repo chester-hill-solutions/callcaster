@@ -10275,7 +10275,7 @@
             }
           },
           "409": {
-            "description": "Release incomplete; retry to finish sender cleanup and number release",
+            "description": "Number already released, or release incomplete and needs recovery",
             "content": {
               "application/json": {
                 "schema": {
@@ -12244,6 +12244,20 @@
       "WorkspacePhoneNumber": {
         "type": "object",
         "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "released"
+            ],
+            "description": "Number lifecycle. Live lists return active rows only."
+          },
+          "released_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Release completion time. Null for active numbers."
+          },
           "id": {
             "type": "integer"
           },

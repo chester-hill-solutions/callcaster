@@ -96,6 +96,7 @@ const rows = await sql.unsafe(`
            count(*) FILTER (WHERE type = 'caller_id')::int AS caller_id,
            count(*)::int                                   AS total
     FROM workspace_number
+    WHERE status = 'active'
     GROUP BY workspace
   )
   SELECT w.id, w.name, w.disabled, act.last_any::text AS last_any,
@@ -115,7 +116,7 @@ async function checkNumber(wsId, phone, numId) {
 
   const [row] = await sql.unsafe(
     `SELECT twilio_phone_number_sid, friendly_name
-       FROM workspace_number WHERE id = $1`, [numId]);
+       FROM workspace_number WHERE id = $1 AND workspace = $2 AND status = 'active'`, [numId, wsId]);
 
   if (!row) return { blockers: ["number row missing"], notes: [] };
   if (!row.twilio_phone_number_sid) {
@@ -167,7 +168,7 @@ for (const row of rows) {
   if (row.numbers_total > 0) {
     const ns = await sql.unsafe(
       `SELECT id, phone_number, type, twilio_phone_number_sid
-         FROM workspace_number WHERE workspace = $1 ORDER BY id`, [row.id]);
+         FROM workspace_number WHERE workspace = $1 AND status = 'active' ORDER BY id`, [row.id]);
     for (const n of ns) {
       const { blockers, notes } = await checkNumber(row.id, n.phone_number, n.id);
       numbers.push({ ...n, blockers, notes });

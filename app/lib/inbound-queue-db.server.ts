@@ -1,5 +1,6 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import {
+  workspace_number as workspaceNumberTable,
   inbound_queue as inboundQueueTable,
   inbound_queue_member as inboundQueueMemberTable,
   user as userTable,
@@ -35,6 +36,7 @@ export async function loadInboundQueueSettings(
         });
 
   const numbers = await tdb.workspace_number.findMany({
+    where: eq(workspaceNumberTable.status, "active"),
     columns: {
       id: true,
       phone_number: true,
