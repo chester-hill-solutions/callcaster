@@ -1,5 +1,94 @@
 [
   {
+    "issueNumber": 1981,
+    "verdict": "blocked-epic",
+    "summary": "Receipts still show a package as one item. Native dependency #2700 is open; preserve the existing receipt-quantity branch until the Stripe environment is ready.",
+    "currentBehavior": "At dev@0b73c943, Checkout uses quantity 1 and puts the credit count in the product name. This is the alternative rejected in the issue comments.",
+    "resolution": "Complete #2700 first. Reuse and review the existing quantity branch against current dev, then verify the actual sandbox receipt and once-only credit fulfillment before promotion.",
+    "lookIn": [
+      "app/lib/platform-billing.server.ts"
+    ],
+    "existingTests": [
+      "Current unit coverage checks the Checkout request payload, not the actual receipt. The saved branch and its current remote head were confirmed on 2026-11-01."
+    ],
+    "acceptanceCriteria": [
+      "The receipt uses the purchased credit count as quantity.",
+      "The charge total and once-only workspace fulfillment remain correct.",
+      "The actual sandbox receipt is reviewed before the requirement is accepted."
+    ],
+    "rootCause": "PR #1997 did not implement the requested quantity. The existing change-request/1981-credit-receipt-quantity branch remains at 8225f5ce77a47c631595c718a42ea7b570bf1843 and is not merged.",
+    "blockedBy": [
+      2700
+    ],
+    "missingTests": [
+      "A sandbox purchase must show Workspace credits with the number bought as quantity, preserve the package total, and credit the correct workspace exactly once. Include the largest 25,000-credit package."
+    ],
+    "trackerRecommendation": "Native Project Status is In progress, read on 2026-11-01. Type Change Request, Priority Medium, Effort Low, Enviornment dev, assigned to @sai-sy. Open blocker #2700 remains; historical #2699 and parent #1322 are closed. Preserve ownership and the existing branch; do not start a duplicate fix."
+  },
+  {
+    "issueNumber": 1983,
+    "verdict": "blocked-epic",
+    "blockedBy": [
+      2700
+    ],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Native Project Status is Backlog, read on 2026-11-01. Type Change Request, Priority High, Effort Medium, Enviornment unset, assigned to @wra-sol. Open blocker #2700 remains; historical #2699 and parent #1322 are closed. Do not ask the owner to decide the already-stated rate again.",
+    "recommendedTitle": "Receipts and charges should include tax",
+    "summary": "The owner already specified 13% Ontario tax. The open Stripe environment prerequisite #2700 blocks implementation and receipt acceptance.",
+    "currentBehavior": "At dev@0b73c943, Checkout declares tax_behavior exclusive but supplies neither automatic_tax nor tax_rates. No tax is added by this request.",
+    "resolution": "Complete #2700, then implement and verify the stated Ontario tax requirement in the chosen sandbox. Check active tax registration and the applicable Stripe configuration before enabling tax collection. Preserve the credit purchase amount and once-only fulfillment.",
+    "lookIn": [
+      "app/lib/platform-billing.server.ts",
+      "test/platform-billing-checkout.test.ts",
+      "docs/stripe-environments.md"
+    ],
+    "acceptanceCriteria": [
+      "The supported Ontario purchase includes the stated 13% tax and shows it on the receipt.",
+      "The credit quantity and fulfillment remain correct.",
+      "The chosen account configuration and actual sandbox receipt are verified before release."
+    ],
+    "rootCause": "The Checkout flow does not calculate or attach tax. The native issue is explicitly blocked by #2700; the rate itself is not an unanswered decision.",
+    "existingTests": [
+      "Source inspection confirms exclusive pricing without an enabled tax calculation. No real sandbox charge or receipt proves the requested tax."
+    ],
+    "missingTests": [
+      "Verify the tax line, pretax amount and final total on the actual sandbox receipt, plus the purchased credits and once-only fulfillment."
+    ]
+  },
+  {
+    "issueNumber": 2700,
+    "verdict": "blocked-epic",
+    "summary": "A read-only audit confirms dev and QA share one test account with no webhook endpoints. The dedicated dev sandbox, its customer mapping and fulfillment proof remain.",
+    "currentBehavior": "On 2026-11-01, dev and QA use test account acct_1QRvDwFzTNqbqKww; production uses live account acct_1QxCXMCKD626kdKP. App and worker agree within each environment. The shared test account has zero webhook endpoints; production has one enabled Checkout-completed endpoint.",
+    "rootCause": "The required dedicated dev sandbox has not been established. Present webhook-secret variables do not prove a matching endpoint, and existing customer IDs belong to the current account.",
+    "resolution": "Confirm the intended sandbox parent and obtain live-account CLI access. Create the dedicated dev sandbox, plan customer-reference migration, align app and worker, configure its webhook and matching secret, and prove once-only fulfillment. Confirm QA and production intent and Sai dashboard access. Defer stale-resource cleanup to #2701.",
+    "lookIn": [
+      "docs/stripe-environments.md",
+      "app/lib/platform-billing.server.ts",
+      "app/lib/database/stripe.server.ts",
+      "app/routes/api+/stripe-webhook.action.server.ts"
+    ],
+    "existingTests": [
+      "Read-only Railway config and Stripe GET /v1/account checks confirm account/mode agreement. The full webhook endpoint inventory confirms zero test endpoints and one enabled live endpoint.",
+      "Read-only database and customer API checks: dev 35 real customer IDs resolve plus one synthetic fixture; QA 28 resolve plus one synthetic fixture; production all seven resolve. Most old customers have no workspace metadata, so complete ownership matching is not proven."
+    ],
+    "missingTests": [
+      "The intended parent account and dedicated dev sandbox are not confirmed. Sandbox inventory requires an authorized live-account CLI profile.",
+      "Webhook signing-secret matching, Sai access and an actual sandbox purchase with one correct workspace fulfillment remain unverified."
+    ],
+    "acceptanceCriteria": [
+      "Production, QA and dev account or sandbox IDs and dashboard links are documented and confirmed.",
+      "Dev has a dedicated sandbox; app, worker, webhook and customer references match it.",
+      "A sandbox purchase credits the intended workspace exactly once and produces a reviewable receipt.",
+      "Sai can access the intended dashboard for the existing receipt work."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Native Project Status is Backlog, read on 2026-11-01. Type Task, Priority High, Enviornment dev, Effort unset, assigned to @sai-sy. Keep the existing owner. This blocks #1981 and #1983; it is not implemented or on-dev. Read-only audit details are in docs/stripe-environments.md."
+  },
+  {
     "issueNumber": 268,
     "verdict": "blocked-epic",
     "recommendedTitle": "i18n epic: fr-CA as the first locale (6 slices, one PR each)",

@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Base inventory: complete native Issue and Project snapshots from 2026-10-29 UTC, 401 open issues. Selected refresh: #1724, #2546, #2943, #2992, #2993, #2994, #2995, #3085, #3088 and new child #3091 on 2026-10-31. Refresh the full board with npm run tools:issues:board.
+Base inventory: complete native Issue and Project snapshots from 2026-10-29 UTC, 401 open issues. Selected refresh: #1724, #2546, #2943, #2992, #2993, #3085, #3088 and new child #3091 on 2026-10-31; #1981, #1983, #2700, #2994 and #2995 on 2026-11-01. Refresh the full board with npm run tools:issues:board.
 
 Live native Issue metadata covers all 401 open issues. Type, Priority, Effort and Environment come from those Issue fields. The complete authenticated Project export has 398 unique issue URLs, matching the visible filtered count after hierarchy was turned off and all rows loaded. #100, #2902 and #2906 are absent from that complete Project view and retain unknown Project Status. No status is inferred from a PR, label or issue state.
 
@@ -14,9 +14,11 @@ Question #1724 is answered and closed as completed on 2026-10-31. The real rende
 
 Restore slice #3094 is merged and deployed to dev. #2992 and #2993 are on-dev, assigned @wra-sol and linked as children of High-priority #2732. Their own Priority, Effort and Enviornment fields remain unset. The keep-address decision for #2943 is recorded; that styling fix is on-dev for mail-client acceptance.
 
-Archive-key rule #2994 was decided by the owner on 2026-10-31: revoke keys permanently; restore needs new keys. The active branch is in progress, with the task linked to #2732. Full CI, merge and deployed acceptance remain. Other sections retain their dated evidence.
+Archive-key rule #2994 is merged in PR #3096 at dev@05195e1e. The app and worker were healthy, and /readyz returned 200. Archive permanently revokes keys; restore needs new keys. Native Status is on-dev. Operator and release acceptance remain.
 
-Released-number task #2995 is In progress in the authenticated board on 2026-10-31. Draft PR #3097 retains dated history and filters live use; final CI, merge and acceptance remain. Parent #2732 is High priority; #2995 has no own Priority, Effort or Enviornment value. Other sections retain their dated evidence.
+Released-number task #2995 is merged in PR #3097 at dev@0b73c943. All applicable CI passed, including 1,358 PostgreSQL cases; the app and worker were healthy and /readyz returned 200. Native Status is on-dev. Operator and release acceptance remain. Parent #2732 is High priority; neither child has its own Priority, Effort or Enviornment value.
+
+Stripe prerequisites, 2026-11-01: #1983 already specifies 13% Ontario tax and is blocked by #2700. #1981 also has that native open blocker; preserve its existing receipt-quantity branch. A read-only audit found that dev and QA share a test account with no webhook endpoints. Production uses a separate live account. The dedicated dev sandbox, customer-reference plan and once-only fulfillment proof remain. See [the current account map](docs/stripe-environments.md). These selected entries are refreshed; unrelated entries retain their dated evidence.
 
 ## How to use this board
 
@@ -45,33 +47,9 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 26
+## Fix now — 23
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
-
-### [#2995](https://github.com/chester-hill-solutions/callcaster/issues/2995) Task: keep a released number's row with a released status
-- **IN PROGRESS** · Verdict: **Fix now** · Type: Task · Priority: unset · Effort: unset · Environment: unset · Size: L · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
-- Retain released numbers as dated, read-only history while all live paths exclude them. The active candidate is in progress; final CI, merge and acceptance remain.
-- Current behavior: At dev@05195e1e, release deletes the original workspace_number row. The candidate marks it released and retains its release date, keeps legacy receipt history, and filters live lists, routing, billing and reports.
-- Root cause: Number consumers assume every row is live. Retaining rows requires the lifecycle filter and read-only protection to land with the release write.
-- Resolution: Complete #2995 as one change: retain the row after confirmed provider release, show workspace and support history, exclude released rows from live reads and writes, refuse repeat release, and keep the existing recovery and release-first archive order. A later explicit purchase creates a new rental row.
-- Look in: `app/server/number-release-intent.server.ts`; `app/lib/workspace-number-history.server.ts`; `app/components/phone-numbers/NumberHistory.tsx`; `client/migrations/20261031000001_workspace_number_release_history.sql`; `test/integration-db/number-history-live-paths.test.ts`
-- Existing tests: Original runtime fails 15 of 56 initial cases. The candidate passes the full owned PostgreSQL tier (1,358 cases), 23 UI cases and 48 admin-response/API contract checks. Final exact-head checks and GitHub CI remain.
-- Missing tests: Require final exact-head local checks and full GitHub CI before merge; then verify dev deployment and operator/release acceptance. Provider boundaries use an isolated fake; no live number was released.
-- Done when: Release retains the original row with released status and a date.; Live lists, routing, senders, billing and reports exclude released rows.; Workspace and support history show the release date without mutation controls.; Repeat release and attempts to reactivate the same row are refused without repeated provider work or charges.; Archive keeps release-first ordering and failure recovery; script/queue cleanup preserves valid history references.
-- Tracker: Native Project Status is In progress, read in the authenticated board on 2026-10-31. Assigned to @wra-sol, child of High-priority #2732. Its own Priority, Effort and Enviornment fields are unset. Keep open for release acceptance.
-
-### [#2994](https://github.com/chester-hill-solutions/callcaster/issues/2994) Task: decide whether an archived workspace's API keys stay valid
-- **IN PROGRESS** · Verdict: **Fix now** · Type: Task · Priority: unset · Effort: unset · Environment: unset · Size: M · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
-- The owner chose permanent API-key revocation on archive on 2026-10-31. The active branch implements the rule; CI, merge, deployed and release acceptance remain.
-- Current behavior: At dev@86e4d3a, archive retains API keys and shared member access does not check archived_at. Old keys can still authenticate. Restore can revive their access.
-- Root cause: The final archive write does not revoke keys. API-key creation and archive do not share a lock. The shared membership check accepts archived workspaces.
-- Resolution: Commit archive and key deletion in one transaction. Use the same workspace row lock for key creation, require an active workspace in shared membership checks, remove legacy keys before restore and return the revoked-key count. Keep release-first behavior and owner-only archive.
-- Look in: `app/server/workspace-credentials.server.ts`, `app/lib/workspace-membership.server.ts`, `app/server/workspace-restore.server.ts`, `test/integration-db/workspace-archive-credentials.test.ts`
-- Existing tests: The original implementation fails seven of nine initial database cases; two controls pass. The candidate passes 23 real-session database tests, 149 affected Node tests and 10 UI tests. Coverage includes archived sessions and keys, legacy restore, exact counts, foreign isolation, provider failure, rollback and concurrent key creation.
-- Missing tests: Full exact-head GitHub CI, merge, deployed acceptance and release acceptance remain. Provider tests use an isolated fake; no deployed keys or provider resources were changed.
-- Done when: Archive permanently revokes the workspace keys and reports the exact count.; Archived workspaces refuse key and session access.; Restore requires new keys, including for workspaces archived under the old rule.; Concurrent key creation cannot leave a valid key after archive.; Failed number release keeps the workspace and its keys active; database failures roll back key deletion.
-- Tracker: Native Project Status is In progress. The task is assigned to @wra-sol and is a child of High-priority #2732; its own Priority, Effort and Enviornment fields are unset. Decision: https://github.com/chester-hill-solutions/callcaster/issues/2994#issuecomment-6549744222 . Keep open for dev and release acceptance.
 
 ### [#3073](https://github.com/chester-hill-solutions/callcaster/issues/3073) Align the patched Twilio redirect dependency
 - **IN PROGRESS** · Verdict: **Fix now** · Type: Task · Priority: High · Effort: Low · Environment: unset · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-29
@@ -92,15 +70,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Resolution: Implement the missing mechanism named in the root cause.
 - Look in: `test/integration-twilio/twilio-test-credentials.test.ts`
 - Existing tests: None. `git ls-tree -r origin/master --name-only | grep -i acceptance` returns nothing, and there is no dev-environment Playwright project (e2e/playwright.config.ts and e2e/playwright.sim.config.ts both target the local compose/sim stack).
-
-### [#1981](https://github.com/chester-hill-solutions/callcaster/issues/1981) Receipts: state how many credits were bought
-- **IN PROGRESS** · Verdict: **Fix now** · Type: Change Request · Priority: Medium · Effort: Low · Environment: dev · Labels: none · Assignee: @sai-sy · Updated: 2026-10-19
-- Nothing in origin/master changes the Stripe receipt to say how many credits were bought: the Checkout Session still creates ONE line item with `quantity: 1` and the whole package price in `unit_amount`, with the credit count folded into the product name — so the receipt still reads '500 workspace credits x 1', not 'Workspace credits x 500'.
-- Current behavior: The claimed fix does not resolve the reported symptom.
-- Root cause: The claimed fix (070f04f4 'fix(billing): receipts state credit count + contact@callcaster.ca ... (#1997)', PR #1997) IS an ancestor of origin/master (merged by 61594cdf on 2026-09-24) — but it does not implement the requested behaviour, it implements the rejected alternative. What is missing from origin/master: a Checkout Session whose line item is `name: 'Workspace credits'` with `quantity: <credits bought>` and a per-credit `unit_amount`, so the receipt states the count. The fix for that lives only on `origin/change-request/1981-credit-receipt-quantity` (8225f5ce) and has not been promoted. manual: true — the symptom is a real Stripe receipt (or a real credit balance on the account) that a person has to read; the unit test only inspects the request payload.
-- Resolution: Implement the missing mechanism named in the root cause.
-- Look in: `app/lib/platform-billing.server.ts`
-- Existing tests: None that proves the receipt text. test/platform-billing-checkout.test.ts asserts the Checkout request SHAPE (`quantity === 1`, name contains the formatted count) rather than the rendered receipt, so it passes while the reported symptom remains. There is no Stripe test-mode session, no receipt assertion and no screenshot of a real receipt in the repo.
 
 ### [#3080](https://github.com/chester-hill-solutions/callcaster/issues/3080) Rate-limit failed password checks when disabling 2FA in account security
 - Verdict: **Fix now** · Type: Bug · Priority: Low · Effort: Low · Environment: unset · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-29
@@ -352,7 +321,31 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 59
+## Verify and close — 61
+
+### [#2994](https://github.com/chester-hill-solutions/callcaster/issues/2994) Task: decide whether an archived workspace's API keys stay valid
+- Verdict: **Verify and close** · Type: Task · Priority: unset · Effort: unset · Environment: unset · Size: M · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
+- Permanent API-key revocation is merged and deployed to dev in PR #3096. Restore needs new keys. Operator and release acceptance remain.
+- Current behavior: At dev@05195e1e and later, archive deletes the workspace keys in its final transaction. Archived keys and sessions cannot use workspace APIs; restore also removes legacy keys before reopening access.
+- Root cause: The old archive write retained keys, and key creation did not share its workspace lock. PR #3096 adds the shared lock and active-workspace checks.
+- Resolution: Verify the merged archive and restore flow, then follow the release process. Do not implement another revocation patch.
+- Look in: `app/server/workspace-credentials.server.ts`, `app/lib/workspace-membership.server.ts`, `app/server/workspace-restore.server.ts`, `test/integration-db/workspace-archive-credentials.test.ts`
+- Existing tests: The original runtime failed seven of nine initial database cases. The merged fix passed 23 real-session database tests, 149 affected Node tests and 10 UI tests, plus full local and exact-head GitHub CI.; The dev app and worker were healthy at merge 05195e1e; /readyz returned 200.
+- Missing tests: Operator acceptance and promotion to master remain. Provider tests used an isolated fake; they did not revoke deployed keys or release live numbers.
+- Done when: Archive permanently revokes the workspace keys and reports the exact count.; Archived workspaces refuse key and session access.; Restore requires new keys, including for workspaces archived under the old rule.; Concurrent key creation cannot leave a valid key after archive.; Failed number release keeps the workspace and its keys active; database failures roll back key deletion.
+- Tracker: Native Project Status is on-dev, read in the authenticated board on 2026-11-01. Assigned to @wra-sol, child of High-priority #2732; own Priority, Effort and Enviornment fields are unset. The owner decision is recorded at https://github.com/chester-hill-solutions/callcaster/issues/2994#issuecomment-6549744222 . Keep open for operator and release acceptance.
+
+### [#2995](https://github.com/chester-hill-solutions/callcaster/issues/2995) Task: keep a released number's row with a released status
+- Verdict: **Verify and close** · Type: Task · Priority: unset · Effort: unset · Environment: unset · Size: L · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-11-01
+- Released-number history is merged and deployed to dev in PR #3097. Operator and release acceptance remain.
+- Current behavior: At dev@0b73c943, release retains the original workspace_number row with released status and a date. Workspace and support views show read-only history; live lists, routing, senders, rental billing and reports exclude it.
+- Root cause: The old release path deleted the original row, and number consumers assumed every stored row was live. PR #3097 adds the lifecycle filter and database protection with the release write.
+- Resolution: Verify the merged history and live-use exclusions, then follow the release process. A later explicit purchase creates a new rental row; do not reactivate the retained row.
+- Look in: `app/server/number-release-intent.server.ts`, `app/lib/workspace-number-history.server.ts`, `app/components/phone-numbers/NumberHistory.tsx`, `client/migrations/20261031000001_workspace_number_release_history.sql`, `test/integration-db/number-history-live-paths.test.ts`
+- Existing tests: The original runtime failed 15 of 56 initial cases. The final source passed 37 local gates, 3,523 affected Node tests, 125 focused database tests, 23 UI tests and 48 response/API contract checks.; Full PostgreSQL 18 CI passed 1,358 cases, including 40 new live-path cases. All 19 applicable exact-head checks and both post-merge drift checks passed.; Dev app and worker were healthy at merge 0b73c943; /readyz returned 200.
+- Missing tests: Operator acceptance and promotion to master remain. Provider tests used an isolated fake; no live number was released.
+- Done when: Release retains the original row with released status and a date.; Live lists, routing, senders, billing and reports exclude released rows.; Workspace and support history show the release date without mutation controls.; Repeat release and attempts to reactivate the same row are refused without repeated provider work or charges.; Archive keeps release-first ordering and failure recovery; script/queue cleanup preserves valid history references.
+- Tracker: Native Project Status is on-dev, confirmed in the authenticated board on 2026-11-01. Assigned to @wra-sol, child of High-priority #2732; own Priority, Effort and Enviornment fields are unset. Keep open for operator and release acceptance.
 
 ### [#2992](https://github.com/chester-hill-solutions/callcaster/issues/2992) Task: restore an archived workspace
 - Verdict: **Verify and close** · Status: on-dev · Type: Task · Priority: unset · Effort: unset · Environment: unset · Size: M · Risk: medium · Assignee: @wra-sol · Updated: 2026-10-31
@@ -1158,7 +1151,7 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 
 ---
 
-## Needs decision — 43
+## Needs decision — 42
 
 Product, security, or operations decision required before implementation can be scoped.
 
@@ -1195,14 +1188,6 @@ Product, security, or operations decision required before implementation can be 
 - Blocked by: [#2216](https://github.com/chester-hill-solutions/callcaster/issues/2216)
 - Tracker: Native Feature, Priority High, Effort Medium, Project Status Backlog. Preserve the native #2216 dependency until its required verification is done.
 
-
-### [#1983](https://github.com/chester-hill-solutions/callcaster/issues/1983) Receipts and charges should include tax
-- Verdict: **Needs decision** · Type: Change Request · Priority: High · Effort: Medium · Environment: unset · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-15
-- Product/legal decision: receipts currently show untaxed charges. Adding tax display (and taxing charges) needs a jurisdiction/tax-configuration decision (rates, exemptions, remittance) before implementation.
-- Current behavior: Billing shows amounts without tax; receipts have no tax line; ledgers store pretax totals.
-- Resolution: Decide: (1) tax on CallCaster charges scope (which products, jurisdictions, rate config), (2) display-only receipts vs taxed ledger amounts. Then implement in the receipt builder + pricing path.
-- Look in: `app/routes/api+/workspaces+/$workspaceId/billing/receipt.route.tsx`, `shared/pricing.ts`
-- Done when: No implementation until the tax decision is recorded
 
 ### [#2546](https://github.com/chester-hill-solutions/callcaster/issues/2546) Audience imports create duplicate workspace contacts and block or duplicate SMS
 - **IN PROGRESS** · Verdict: **Needs decision** · Type: Bug · Priority: High · Effort: Medium · Environment: unset · Size: L · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-31
@@ -1588,9 +1573,47 @@ Product, security, or operations decision required before implementation can be 
 
 ---
 
-## Blocked / split first — 32
+## Blocked / split first — 35
 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
+
+### [#1981](https://github.com/chester-hill-solutions/callcaster/issues/1981) Receipts: state how many credits were bought
+- **IN PROGRESS** · Verdict: **Blocked / split first** · Type: Change Request · Priority: Medium · Effort: Low · Environment: dev · Labels: none · Assignee: @sai-sy · Updated: 2026-10-19
+- Receipts still show a package as one item. Native dependency #2700 is open; preserve the existing receipt-quantity branch until the Stripe environment is ready.
+- Current behavior: At dev@0b73c943, Checkout uses quantity 1 and puts the credit count in the product name. This is the alternative rejected in the issue comments.
+- Root cause: PR #1997 did not implement the requested quantity. The existing change-request/1981-credit-receipt-quantity branch remains at 8225f5ce77a47c631595c718a42ea7b570bf1843 and is not merged.
+- Resolution: Complete #2700 first. Reuse and review the existing quantity branch against current dev, then verify the actual sandbox receipt and once-only credit fulfillment before promotion.
+- Look in: `app/lib/platform-billing.server.ts`
+- Blocked by: [#2700](https://github.com/chester-hill-solutions/callcaster/issues/2700)
+- Existing tests: Current unit coverage checks the Checkout request payload, not the actual receipt. The saved branch and its current remote head were confirmed on 2026-11-01.
+- Missing tests: A sandbox purchase must show Workspace credits with the number bought as quantity, preserve the package total, and credit the correct workspace exactly once. Include the largest 25,000-credit package.
+- Done when: The receipt uses the purchased credit count as quantity.; The charge total and once-only workspace fulfillment remain correct.; The actual sandbox receipt is reviewed before the requirement is accepted.
+- Tracker: Native Project Status is In progress, read on 2026-11-01. Type Change Request, Priority Medium, Effort Low, Enviornment dev, assigned to @sai-sy. Open blocker #2700 remains; historical #2699 and parent #1322 are closed. Preserve ownership and the existing branch; do not start a duplicate fix.
+
+### [#1983](https://github.com/chester-hill-solutions/callcaster/issues/1983) Receipts and charges should include tax
+- Verdict: **Blocked / split first** · Type: Change Request · Priority: High · Effort: Medium · Environment: unset · Size: M · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-15
+- The owner already specified 13% Ontario tax. The open Stripe environment prerequisite #2700 blocks implementation and receipt acceptance.
+- Current behavior: At dev@0b73c943, Checkout declares tax_behavior exclusive but supplies neither automatic_tax nor tax_rates. No tax is added by this request.
+- Root cause: The Checkout flow does not calculate or attach tax. The native issue is explicitly blocked by #2700; the rate itself is not an unanswered decision.
+- Resolution: Complete #2700, then implement and verify the stated Ontario tax requirement in the chosen sandbox. Check active tax registration and the applicable Stripe configuration before enabling tax collection. Preserve the credit purchase amount and once-only fulfillment.
+- Look in: `app/lib/platform-billing.server.ts`, `test/platform-billing-checkout.test.ts`, `docs/stripe-environments.md`
+- Blocked by: [#2700](https://github.com/chester-hill-solutions/callcaster/issues/2700)
+- Existing tests: Source inspection confirms exclusive pricing without an enabled tax calculation. No real sandbox charge or receipt proves the requested tax.
+- Missing tests: Verify the tax line, pretax amount and final total on the actual sandbox receipt, plus the purchased credits and once-only fulfillment.
+- Done when: The supported Ontario purchase includes the stated 13% tax and shows it on the receipt.; The credit quantity and fulfillment remain correct.; The chosen account configuration and actual sandbox receipt are verified before release.
+- Tracker: Native Project Status is Backlog, read on 2026-11-01. Type Change Request, Priority High, Effort Medium, Enviornment unset, assigned to @wra-sol. Open blocker #2700 remains; historical #2699 and parent #1322 are closed. Do not ask the owner to decide the already-stated rate again.
+
+### [#2700](https://github.com/chester-hill-solutions/callcaster/issues/2700) Align Stripe workspaces across environments
+- Verdict: **Blocked / split first** · Type: Task · Priority: High · Effort: unset · Environment: dev · Size: M · Risk: high · Labels: question · Assignee: @sai-sy · Updated: 2026-10-20
+- A read-only audit confirms dev and QA share one test account with no webhook endpoints. The dedicated dev sandbox, its customer mapping and fulfillment proof remain.
+- Current behavior: On 2026-11-01, dev and QA use test account acct_1QRvDwFzTNqbqKww; production uses live account acct_1QxCXMCKD626kdKP. App and worker agree within each environment. The shared test account has zero webhook endpoints; production has one enabled Checkout-completed endpoint.
+- Root cause: The required dedicated dev sandbox has not been established. Present webhook-secret variables do not prove a matching endpoint, and existing customer IDs belong to the current account.
+- Resolution: Confirm the intended sandbox parent and obtain live-account CLI access. Create the dedicated dev sandbox, plan customer-reference migration, align app and worker, configure its webhook and matching secret, and prove once-only fulfillment. Confirm QA and production intent and Sai dashboard access. Defer stale-resource cleanup to #2701.
+- Look in: `docs/stripe-environments.md`, `app/lib/platform-billing.server.ts`, `app/lib/database/stripe.server.ts`, `app/routes/api+/stripe-webhook.action.server.ts`
+- Existing tests: Read-only Railway config and Stripe GET /v1/account checks confirm account/mode agreement. The full webhook endpoint inventory confirms zero test endpoints and one enabled live endpoint.; Read-only database and customer API checks: dev 35 real customer IDs resolve plus one synthetic fixture; QA 28 resolve plus one synthetic fixture; production all seven resolve. Most old customers have no workspace metadata, so complete ownership matching is not proven.
+- Missing tests: The intended parent account and dedicated dev sandbox are not confirmed. Sandbox inventory requires an authorized live-account CLI profile.; Webhook signing-secret matching, Sai access and an actual sandbox purchase with one correct workspace fulfillment remain unverified.
+- Done when: Production, QA and dev account or sandbox IDs and dashboard links are documented and confirmed.; Dev has a dedicated sandbox; app, worker, webhook and customer references match it.; A sandbox purchase credits the intended workspace exactly once and produces a reviewable receipt.; Sai can access the intended dashboard for the existing receipt work.
+- Tracker: Native Project Status is Backlog, read on 2026-11-01. Type Task, Priority High, Enviornment dev, Effort unset, assigned to @sai-sy. Keep the existing owner. This blocks #1981 and #1983; it is not implemented or on-dev. Read-only audit details are in docs/stripe-environments.md.
 
 ### [#1165](https://github.com/chester-hill-solutions/callcaster/issues/1165) Prune stale non-production Twilio resources safely
 - **IN PROGRESS** · Verdict: **Blocked / split first** · Type: Feature · Priority: Urgent · Effort: Medium · Environment: unset · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-10-19
@@ -1980,13 +2003,9 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 225
+## Needs triage — 224
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
-
-### [#2700](https://github.com/chester-hill-solutions/callcaster/issues/2700) Align Stripe workspaces across environments
-- Status: Backlog · Type: Task · Priority: High · Effort: unset · Environment: dev · Labels: question · Assignee: @sai-sy · Updated: 2026-10-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2501](https://github.com/chester-hill-solutions/callcaster/issues/2501) SMS campaigns should have the same sendnidefault as other campaigns
 - Status: on-dev · Type: Change Request · Priority: Medium · Effort: Low · Environment: prod · Labels: ux · Assignee: none · Updated: 2026-10-24
