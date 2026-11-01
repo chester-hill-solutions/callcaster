@@ -82,7 +82,15 @@ jobs:
           export PATH="$HOME/.opencode/bin:$PATH"
           bin_dir=$(dirname "$(command -v opencode)")
           echo "$bin_dir" >> "$GITHUB_PATH"
-          opencode --version
+          version=$(opencode --version)
+          echo "opencode $version"
+          case "$version" in
+            *2.*) ;;
+            *)
+              echo "::error::the agent config targets OpenCode V2, but $version was installed"
+              exit 1
+              ;;
+          esac
 
       - name: Collect the issue
         if: steps.preflight.outputs.ready == 'true'

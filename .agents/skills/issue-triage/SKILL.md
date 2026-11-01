@@ -75,9 +75,8 @@ manual run ignores the bot and `skip-triage` filters.
 | `triage.json is not valid JSON` | The agent stopped before writing, or wrote prose | Re-run; if it repeats, tighten the prompt in `.opencode/agents/issue-triage.md`. |
 | `unknown key` | The agent added a field | Remove the key from the prompt or extend `TOP_LEVEL_KEYS` in `scripts/issue-triage-lib.mjs`. |
 | `dropped unknown path` | The agent cited a path that does not exist | Expected safety net. The comment ships without that link. |
-| `Priority field has no option` | The organization renamed an option | Update the rubric in the agent prompt, and `PRIORITIES` in
-`scripts/issue-triage-lib.mjs` if an option is renamed. The script resolves the
-field and option IDs live, but the accepted names are validated locally. |
+| `Priority field has no option` | The organization renamed an option | Update the rubric in the agent prompt and `PRIORITIES` in `scripts/issue-triage-lib.mjs`. IDs resolve live; names are validated locally. |
+| `the agent config targets OpenCode V2` | PATH resolved to a V1 CLI | The install step prepends `$HOME/.opencode/bin` and fails when the version is not 2.x. |
 | `no single-select Issue field "Priority"` | Field renamed or removed | Re-check with `gh api graphql` on `organization.issueFields`. |
 
 ## Changing the rubric
