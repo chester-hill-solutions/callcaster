@@ -176,6 +176,23 @@ a retry cannot borrow a successor's capture after the shared part ends.
 Keep distinct parts and storage keys when a fresh capture is needed. Test fresh-room
 retry, terminal-part retry and old-intent replay as separate behaviors.
 
+For shared room media, retain signed customer joins and leaves with the provider
+SequenceNumber and Timestamp. Keep them under the original account, room and
+funded customer. Arrival time and a parent join cannot establish a customer
+interval. Save uncertain timing as unknown; do not drop that evidence and later
+infer a complete interval. Keep delayed and out-of-order events, and reject a
+conflicting replay of one sequence without replacing history. Intersect closed
+customer visits with each recording's own time range before assembly. Waiting
+audio and gaps between visits are not customer media. An open visit or missing,
+conflicting or truncated history keeps assembly pending. Save neutral room events
+as sequence witnesses too. A missing sequence can hide a delayed leave and rejoin;
+do not count only customer events as a complete range. Even covered observed
+offsets stay provisional until assembly proves its call and recording boundaries.
+Test the signed route, database rollback, rejoin gaps and delayed callbacks after
+the first phone ends. A schema extension must retain the persisted customer event
+key encoding. Test exact callback replay against a retained pre-extension row;
+adding new witness identity must not change existing customer keys.
+
 ### ConversationRelay Recording
 
 **Critical:** `record:true` on the REST API call is **silently ignored** with ConversationRelay. No error. No recording.

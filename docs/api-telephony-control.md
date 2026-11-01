@@ -213,6 +213,23 @@ original logical customer call. Completed parts use distinct storage keys and
 cannot replace the initial playback pointer. Provider GET `processing` proves
 identity, not active capture. Idle phone connection alone starts no recording.
 
+Direct manual customer joins and leaves also retain the provider's sequence
+number and timestamp under the original funded owner and physical room. These
+receipts survive delayed delivery and the first phone ending. A retry cannot
+replace a saved sequence with different customer facts or times. Parent joins
+do not establish a customer recording interval. Missing or invalid timing stays
+unknown; receipt arrival time cannot replace it. See the
+[Twilio Conference callback fields](https://www.twilio.com/docs/voice/twiml/conference#statuscallback).
+
+The journal also retains neutral room events as sequence witnesses. The interval
+reader requires a covered observed sequence range and selects only closed customer
+visits within each physical recording. Waiting audio and gaps between visits are
+excluded. Missing joins, missing leaves, sequence gaps, reversed time and uncertain
+history keep offsets pending. Even a covered range returns provisional offsets:
+complete call and recording boundaries still need proof before assembly. These
+offsets do not publish a combined recording, enable batch transcription of partial
+media, or enable live customer promotion.
+
 `DELETE` with the same query cancels only the selected pending attempt or an
 idle connection. An uncertain create keeps its pending state until recovery
 can stop the accepted agent leg. It cannot end or advance the customer. End a

@@ -9,6 +9,7 @@ import { hasFundedAgentVoice, hasPendingVoiceAudioConferenceStop } from "./voice
 import { voiceAudioSavedInput, withVoiceAudioConnection, type VoiceAudioConnection } from "./voice-audio-connection.server";
 import { getOutboundHeldCredits, type CreditTransaction } from "./outbound-credit-reservations.server";
 import { bindVoiceConferenceRecording, issueVoiceConferenceRecording } from "./voice-conference-recording.server";
+import { recordVoiceCustomerConferenceEvent } from "./voice-recording-customer-events.server";
 
 async function refuseInstruction(tx: CreditTransaction, row: VoiceAudioConnection, reason: VoiceAudioFailureReason) {
   await tx.update(connections).set({ cancel_requested_at: row.cancel_requested_at ?? new Date(), lease_expires_at: new Date(), updated_at: new Date() })
@@ -119,11 +120,13 @@ export async function observeVoiceAudioConferenceEvent(input: VoiceAudioConferen
 /** The promoted customer and original parent retain their customer call identities. */
 export async function observeVoiceAudioBridgeEvent(owner: VoiceAudioConnection, input: {
   accountSid: string; requestUrl: string; conferenceId: string; conferenceSid: string; callSid: string; joined: boolean;
+  sequenceNumber?: string; timestamp?: string | null;
 }) {
   return withVoiceAudioConnection(owner, async (tx, current) => {
     if (!current.promotion_requested_at || current.account_sid !== input.accountSid || current.conference_callback !== input.requestUrl ||
       current.conference_id !== input.conferenceId || current.conference_sid !== input.conferenceSid ||
       ![current.customer_sid, current.original_agent_sid].includes(input.callSid)) throw new VoiceAudioBindingError("Agent audio bridge participant is not owned");
+    await recordVoiceCustomerConferenceEvent(tx, current, { ...input, event: input.joined ? "participant-join" : "participant-leave" });
     if (!input.joined) return current;
     const [saved] = await tx.update(connections).set({
       customer_joined_at: input.callSid === current.customer_sid ? current.customer_joined_at ?? new Date() : current.customer_joined_at,

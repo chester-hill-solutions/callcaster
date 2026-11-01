@@ -38,6 +38,7 @@ export async function handleBoundVoiceAudioBridgeParticipant(owner: VoiceAudioCo
   const row = await observeVoiceAudioBridgeEvent(owner, { accountSid: event.accountSid ?? "", requestUrl,
     conferenceId: event.conferenceName ?? "", conferenceSid: event.conferenceSid ?? "", callSid,
     joined: event.event === "participant-join",
+    sequenceNumber: event.raw.SequenceNumber, timestamp: event.timestamp,
   });
   if (isParticipantHangup(event)) await stopVoiceAudioConferenceForParticipant(row, callSid);
   return row;

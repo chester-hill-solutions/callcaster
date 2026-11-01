@@ -11,6 +11,7 @@ import { VoiceAudioBindingError } from "@/lib/voice-audio-connection";
 import { handleBoundVoiceAudioParticipant, handleBoundVoiceAudioBridgeParticipant, handleBoundVoiceAudioCustomerParticipant } from "@/lib/voice-audio-participant.server";
 import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 import { VoiceRecordingBindingError } from "@/lib/voice-recording";
+import { recordBoundVoiceRecordingRoomEvent } from "@/server/voice-recording-customer-events.server";
 
 type VerifiedContext = { owner: VoiceAudioConnection; params: Record<string, string>; event: "voice" | "status" | "conference" };
 
@@ -21,12 +22,16 @@ function conferenceMatches(owner: VoiceAudioConnection, params: Record<string, s
 
 async function handleConference(owner: VoiceAudioConnection, params: Record<string, string>, requestUrl: string) {
   if (!conferenceMatches(owner, params, requestUrl)) return twilioWebhookForbiddenHangup();
-  if (params.StatusCallbackEvent !== "participant-join" && params.StatusCallbackEvent !== "participant-leave") return new Response(null, { status: 204 });
   const event = parseTwilioVoiceCallback(params);
-  if (event.kind !== "participant") return twilioWebhookForbiddenHangup();
-  if (!await handleBoundVoiceAudioParticipant(owner.workspace, requestUrl, event) &&
-    !await handleBoundVoiceAudioCustomerParticipant(owner, requestUrl, event))
-    await handleBoundVoiceAudioBridgeParticipant(owner, requestUrl, event);
+  if (event.kind !== "participant") return new Response(null, { status: 204 });
+  if (event.event === "participant-join" || event.event === "participant-leave") {
+    if (!await handleBoundVoiceAudioParticipant(owner.workspace, requestUrl, event) &&
+      !await handleBoundVoiceAudioCustomerParticipant(owner, requestUrl, event))
+      await handleBoundVoiceAudioBridgeParticipant(owner, requestUrl, event);
+  }
+  await recordBoundVoiceRecordingRoomEvent(owner, { requestUrl, accountSid: event.accountSid ?? "",
+    conferenceId: event.conferenceName ?? "", conferenceSid: event.conferenceSid ?? "", callSid: event.callSid,
+    event: event.event, sequenceNumber: event.raw.SequenceNumber, timestamp: event.timestamp });
   return new Response(null, { status: 204 });
 }
 

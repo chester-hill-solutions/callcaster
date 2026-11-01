@@ -38,6 +38,7 @@ import {
   workspace_voice_audio_intent,
   workspace_voice_dialer_intent,
   workspace_voice_recording_operation,
+  workspace_voice_recording_customer_event,
   workspace_number_release,
   workspace_users,
 } from "./schema";
@@ -76,6 +77,7 @@ export const WORKSPACE_SCOPED_TABLES = {
   workspace_voice_audio_intent: { table: workspace_voice_audio_intent, workspaceColumn: workspace_voice_audio_intent.workspace, workspaceColumnName: "workspace" },
   workspace_voice_dialer_intent: { table: workspace_voice_dialer_intent, workspaceColumn: workspace_voice_dialer_intent.workspace, workspaceColumnName: "workspace" },
   workspace_voice_recording_operation: { table: workspace_voice_recording_operation, workspaceColumn: workspace_voice_recording_operation.workspace, workspaceColumnName: "workspace" },
+  workspace_voice_recording_customer_event: { table: workspace_voice_recording_customer_event, workspaceColumn: workspace_voice_recording_customer_event.workspace, workspaceColumnName: "workspace" },
   workspace_number_release: { table: workspace_number_release, workspaceColumn: workspace_number_release.workspace, workspaceColumnName: "workspace" },
   workspace_audio: { table: workspace_audio, workspaceColumn: workspace_audio.workspace_id, workspaceColumnName: "workspace_id" },
   workspace_invite: { table: workspace_invite, workspaceColumn: workspace_invite.workspace, workspaceColumnName: "workspace" },

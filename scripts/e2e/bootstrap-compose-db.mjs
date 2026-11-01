@@ -118,6 +118,8 @@ const steps = [
   "client/migrations/20261101000008_voice_conference_recording.sql",
   "client/migrations/20261101000009_voice_recording_conference_phases.sql",
   "client/migrations/20261101000010_voice_audio_recording_owner.sql",
+  "client/migrations/20261101000011_voice_recording_customer_events.sql",
+  "client/migrations/20261101000012_voice_recording_room_event_coverage.sql",
 ];
 
 /**

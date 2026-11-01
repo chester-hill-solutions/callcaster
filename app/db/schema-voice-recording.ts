@@ -34,3 +34,22 @@ export const workspace_voice_recording_operation = pgTable("workspace_voice_reco
   created_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updated_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
+
+/** Signed customer membership. Unknown provider timing remains unknown. */
+export const workspace_voice_recording_customer_event = pgTable("workspace_voice_recording_customer_event", {
+  id: uuid().primaryKey(),
+  workspace: uuid().notNull(),
+  reservation_id: uuid().notNull(),
+  user_id: text().notNull(),
+  logical_call_sid: text().notNull(),
+  customer_call_sid: text().notNull(),
+  account_sid: text().notNull(),
+  conference_sid: text().notNull(),
+  conference_name: text().notNull(),
+  participant_call_sid: text(),
+  event: text().notNull(),
+  sequence_number: integer(),
+  occurred_at: timestamp({ withTimezone: true, mode: "date" }),
+  event_key: text().notNull(),
+  received_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});

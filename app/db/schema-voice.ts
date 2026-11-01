@@ -1,5 +1,5 @@
 import { bigint, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-export { workspace_voice_recording_operation } from "./schema-voice-recording";
+export { workspace_voice_recording_operation, workspace_voice_recording_customer_event } from "./schema-voice-recording";
 export { workspace_voice_audio_intent } from "./schema-voice-audio-intent";
 export { workspace_voice_dialer_intent } from "./schema-voice-dialer-intent";
 
