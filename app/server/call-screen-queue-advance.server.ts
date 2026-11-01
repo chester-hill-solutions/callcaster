@@ -1,21 +1,17 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
-import { call, campaign_queue, contact, workspace_voice_reservation } from "@/db/schema";
+import { call, campaign_queue, workspace_voice_reservation } from "@/db/schema";
 import { db } from "./db";
 import { lockVoiceWorkspaceMember } from "./voice-workspace-member.server";
 import { isTerminalStatus, normalizeProviderStatus } from "@/lib/call-status";
 import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { logger } from "@/lib/logger.server";
-import { assignedElsewhere, eligibleHouseholdSibling, hasLiveQueueCustomer, matchesAdvanceEntry, wasDequeued } from "./queue-advance-ownership.server";
+import { eligibleHouseholdSibling, validatePrimaryAdvance, wasDequeued } from "./queue-advance-ownership.server";
 import type { QueueAdvanceRequest, QueueRemovedEntry } from "@/lib/schemas/api/queue-advance";
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
-import type { VoiceReservation } from "./voice-credit-reservation.server";
 
 const conflict = () => ({ ok: false as const, reason: "queue_changed" as const });
 function confirmed(advance_state: "dequeued" | "already_dequeued" | "superseded", removed_entries: QueueRemovedEntry[] = []) {
   return { ok: true as const, dequeued: advance_state === "dequeued", advance_state, removed_entries };
-}
-function changedQueue(request: QueueAdvanceRequest) {
-  return request.call_sid ? confirmed("superseded") : conflict();
 }
 
 async function readCompletedCustomer(tx: CreditTransaction, request: QueueAdvanceRequest, userId: string) {
@@ -32,10 +28,6 @@ async function readCompletedCustomer(tx: CreditTransaction, request: QueueAdvanc
   return { ok: true as const, reservation: reservation ?? null };
 }
 
-function ownsFundedQueue(reservation: VoiceReservation, row: typeof campaign_queue.$inferSelect, request: QueueAdvanceRequest) {
-  return reservation.queue_id === row.id && reservation.queue_generation === request.dispatch_generation &&
-    row.voice_reservation_id === reservation.id;
-}
 
 export async function advanceCallScreenQueue(request: QueueAdvanceRequest, userId: string) {
   const publish: Array<() => Promise<void>> = [];
@@ -53,15 +45,10 @@ export async function advanceCallScreenQueue(request: QueueAdvanceRequest, userI
       inArray(campaign_queue.id, captured.map(entry => entry.queue_id)),
     )).orderBy(asc(campaign_queue.id)).for("no key update");
     const row = rows.find(candidate => candidate.id === request.queue_id);
-    if (!row || !matchesAdvanceEntry(row, request)) return changedQueue(request);
-    if (subject.reservation && !ownsFundedQueue(subject.reservation, row, request)) return confirmed("superseded");
-    if (assignedElsewhere(row, userId)) return request.call_sid ? confirmed("superseded") : { ok: false as const, reason: "assigned_elsewhere" as const };
-    const primary = await member.tdb.contact.findFirst({ where: eq(contact.id, request.contact_id), columns: { household_id: true } });
-    if (request.household && primary?.household_id !== request.household_snapshot?.household_id) return conflict();
-    const alreadyDequeued = wasDequeued(row);
-    if (!alreadyDequeued && (await hasLiveQueueCustomer(member.tdb, request.campaign_id, request.contact_id) ||
-      row.voice_reservation_id !== (subject.reservation?.id ?? null) ||
-      (row.queue_state !== null && !["queued", "assigned"].includes(row.queue_state)))) return conflict();
+    const state = await validatePrimaryAdvance({ tdb: member.tdb, row, request, userId, reservation: subject.reservation });
+    if (state === "superseded") return confirmed(state);
+    if (state === "queue_changed" || state === "assigned_elsewhere") return { ok: false as const, reason: state };
+    if (!row) return conflict();
     const removed: QueueRemovedEntry[] = [];
     const remove = async (candidate: typeof row) => {
       if (!wasDequeued(candidate)) {
@@ -75,9 +62,9 @@ export async function advanceCallScreenQueue(request: QueueAdvanceRequest, userI
     await remove(row);
     for (const entry of request.household_snapshot?.entries ?? []) {
       const sibling = rows.find(candidate => candidate.id === entry.queue_id);
-      if (sibling && await eligibleHouseholdSibling(member.tdb, sibling, entry, request, userId, subject.reservation)) await remove(sibling);
+      if (sibling && await eligibleHouseholdSibling({ tdb: member.tdb, row: sibling, entry, request, userId, primaryReservation: subject.reservation })) await remove(sibling);
     }
-    return confirmed(alreadyDequeued ? "already_dequeued" : "dequeued", removed);
+    return confirmed(state === "already_dequeued" ? state : "dequeued", removed);
   });
   for (const emit of publish) {
     try { await emit(); } catch (error) { logger.error("queue.advance_event_failed", error); }
