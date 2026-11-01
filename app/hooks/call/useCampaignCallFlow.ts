@@ -5,8 +5,7 @@ import {
   getStateMachineAction,
   type CallStatusEnum,
 } from "@/lib/call-status";
-import { useCallStatusPolling } from "@/hooks/call/useCallStatusPolling";
-import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceEventSubscription";
+import { useCustomerCallEvents } from "@/hooks/call/useCustomerCallEvents";
 import {
   callLifecycleReducer,
   type CallLifecycleEvent,
@@ -23,6 +22,7 @@ import type {
 } from "@/lib/types";
 import { logger } from "@/lib/logger.client";
 import { recordFlashBreadcrumb } from "@/lib/flash-telemetry.client";
+import type { RecoveredManualCustomer } from "@/lib/schemas/api/voice-audio";
 
 type CallStateMachineSend = (action: { type: string }) => void;
 
@@ -34,6 +34,9 @@ type PredictiveState = {
 type UseCampaignCallFlowOptions = {
   callSid: string | null;
   confirmedCustomerSid?: string | null;
+  manualRecovery?: RecoveredManualCustomer | null;
+  allowManualRecovery?: boolean;
+  onServerCustomerOwned?: (owned: boolean) => void;
   agentLegSid: string | null;
   workspaceId: string;
   state: string;
@@ -143,6 +146,9 @@ function getCallDisplayState({ lifecycle, providerStatus, isPredictive, predicti
 export function useCampaignCallFlow({
   callSid,
   confirmedCustomerSid = null,
+  manualRecovery = null,
+  allowManualRecovery = false,
+  onServerCustomerOwned,
   agentLegSid,
   workspaceId,
   state: fsmState,
@@ -164,6 +170,8 @@ export function useCampaignCallFlow({
   lifecycleRef.current = lifecycle;
   const previousFsmRef = useRef(fsmState);
   const previousSourceRef = useRef(callSid);
+  const recoveryRetired = useRef(false);
+  const [recoveredManual, setRecoveredManual] = useState<RecoveredManualCustomer | null>(null);
 
   // A current source can bootstrap before SSE arrives. The source captured
   // before a new Dial belongs to the previous request and cannot bootstrap it.
@@ -214,65 +222,22 @@ export function useCampaignCallFlow({
     else if (action === "FAIL") send({ type: "FAIL" });
   }
 
-  // Polling: use the customer leg SID if known, otherwise fall back to
-  // the parent/SDK SID (the server will resolve the child for us).
-  useCallStatusPolling({
-    callSid: pollingTargetSid,
-    workspaceId,
-    enabled: pollingEnabled,
-    intervalMs: 5000,
-    agentLegSid,
-    onStatus: (status, resolvedSid) => {
-      if (!pollingEnabled) return;
-      const normalized = normalizeProviderStatus(status);
-      if (!normalized) return;
-      const sid = resolvedSid ?? pollingTargetSid;
-      if (sid) {
-        acceptCustomerStatus(sid, normalized);
-      }
-    },
-  });
-
-  // SSE events: accept direct matches OR child events keyed on parent_call_sid
-  useWorkspaceEventSubscription({
-    workspaceId,
-    table: "call",
-    filter: `workspace=eq.${workspaceId}`,
-    onChange: (payload) => {
-      const callRow = payload.new as {
-        sid?: string;
-        parent_call_sid?: string;
-        status?: string;
-      } | null;
-      if (!callRow?.sid || !callRow?.status) return;
-
-      if (customerLegSid != null) {
-        if (callRow.sid !== customerLegSid) return;
-      } else {
-        const matchesDirect = sourceSid !== agentLegSid && callRow.sid === sourceSid;
-        const matchesParent =
-          sourceSid != null && sourceSid === agentLegSid &&
-          callRow.parent_call_sid === sourceSid;
-        if (!matchesDirect && !matchesParent) return;
-      }
-
-      const normalized = normalizeProviderStatus(callRow.status);
-      if (!normalized) return;
-
-      acceptCustomerStatus(callRow.sid, normalized);
-    },
-  });
+  useCustomerCallEvents({ workspaceId, pollingTargetSid, pollingEnabled, agentLegSid, customerLegSid, sourceSid,
+    onStatus: acceptCustomerStatus });
 
   const resetCustomer = useCallback((previousSourceSid: string | null) => {
     // A new request does not own the previous dial's bootstrap SID.
     const nextOwner: CustomerOwner = { previousSourceSid, customerSid: null };
     ownerRef.current = nextOwner;
     setCustomer({ sid: null, status: null });
+    setRecoveredManual(null);
+    onServerCustomerOwned?.(false);
     return nextOwner;
-  }, []);
+  }, [onServerCustomerOwned]);
 
   // Reset in the click's batch: waiting for the FSM effect repaints the old outcome (#1220).
   const beginDial = useCallback(() => {
+    recoveryRetired.current = true;
     const requestedOwner = resetCustomer(callSid);
     recordFlashBreadcrumb("begin-dial", "lifecycle reset for new dial");
     setLifecycle((prev) => callLifecycleReducer(prev, { type: "START_DIALING" }));
@@ -285,6 +250,37 @@ export function useCampaignCallFlow({
       return true;
     };
   }, [callSid, resetCustomer, agentLegSid]);
+  const retireManualRecovery = useCallback(() => { recoveryRetired.current = true; }, []);
+
+  /**
+   * @effect Restore the saved manual customer into the canonical customer owner.
+   * @effect-deps manualRecovery, allowManualRecovery, workspaceId, isPredictive, fsmState, onServerCustomerOwned, send (committed recovery).
+   * @effect-side-effects Logical customer state and SDK ownership bridge; no provider command.
+   * @effect-why-not-loader Current discovery completes after the page has mounted.
+   */
+  useEffect(() => {
+    if (!manualRecovery || recoveryRetired.current && !allowManualRecovery || isPredictive || manualRecovery.workspace_id !== workspaceId) return;
+    const existing = ownerRef.current.customerSid;
+    if (existing && existing !== manualRecovery.call_sid) return;
+    recoveryRetired.current = true;
+    setRecoveredManual(manualRecovery);
+    onServerCustomerOwned?.(true);
+    // An existing customer can have newer status from SSE or a local Hang Up.
+    if (existing) return;
+    ownerRef.current.customerSid = manualRecovery.call_sid;
+    const status = manualRecovery.provider_status;
+    setCustomer({ sid: manualRecovery.call_sid, status });
+    setLifecycle(previous => {
+      let next = callLifecycleReducer(previous, { type: "START_DIALING" });
+      if (status === "in-progress") next = callLifecycleReducer(next, { type: "CONNECT" });
+      if (isTerminalForOutcome(status)) next = callLifecycleReducer(next, { type: "PROVIDER_ENDED", outcome: normalizedToOutcome(status) });
+      return next;
+    });
+    previousFsmRef.current = fsmState;
+    if (fsmState !== "dialing") send({ type: "START_DIALING" });
+    const action = getStateMachineAction(status);
+    if (action) send({ type: action });
+  }, [manualRecovery, allowManualRecovery, workspaceId, isPredictive, fsmState, onServerCustomerOwned, send]);
 
   /**
    * @effect Bind the confirmed room customer and bridge legacy FSM transitions into the canonical lifecycle.
@@ -329,6 +325,7 @@ export function useCampaignCallFlow({
     // the lifecycle too — the reducer ignores RESET mid-call, so this only
     // wipes terminal outcomes, never a live dial.
     if (fsmState === "idle") {
+      recoveryRetired.current = true;
       resetCustomer(callSid);
       dispatch({ type: "RESET" });
       return;
@@ -366,6 +363,7 @@ export function useCampaignCallFlow({
 
   const confirmCustomerEnded = useCallback(() => {
     if (!isCurrentCustomer()) return false;
+    recoveryRetired.current = true;
     setLifecycle(previous => callLifecycleReducer(previous, { type: "HANG_UP" }));
     send({ type: "HANG_UP" });
     return true;
@@ -377,6 +375,8 @@ export function useCampaignCallFlow({
     beginDial,
     terminalCallSid,
     customerCallSid: customerLegSid,
+    recoveredManual,
+    retireManualRecovery,
     isCurrentCustomer,
     confirmCustomerEnded,
     getDisplayState: (

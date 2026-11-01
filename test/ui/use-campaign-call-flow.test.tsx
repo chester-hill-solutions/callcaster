@@ -3,6 +3,7 @@ import { useState } from "react";
 import { describe, expect, test, vi } from "vitest";
 import { useCampaignCallFlow } from "@/hooks/call/useCampaignCallFlow";
 import type { UseCallStatusPollingOptions } from "@/hooks/call/useCallStatusPolling";
+import { manualRecovery } from "../helpers/manual-recovery-fixture";
 
 const polling = vi.hoisted(() => ({
   onStatus: null as UseCallStatusPollingOptions["onStatus"],
@@ -27,6 +28,30 @@ vi.mock("@/hooks/realtime/useWorkspaceEventSubscription", async (importOriginal)
 describe("current customer control ownership", () => {
   const previous = "CA11111111111111111111111111111111", current = "CA22222222222222222222222222222222";
   const agent = "CAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  test.each(["ringing", "in-progress", "completed"] as const)("manual recovery keeps the actual %s state and terminal status wins over later reads", status => {
+    const saved = manualRecovery({ provider_status: status }), send = vi.fn(), onServerCustomerOwned = vi.fn();
+    const { result, rerender } = renderHook(({ recovery }) => useCampaignCallFlow({
+      callSid: null, agentLegSid: saved.agent_call_sid, workspaceId: saved.workspace_id, state: "idle", activeCall: null,
+      recentAttemptDisposition: null, predictiveState: { status: "idle", contact_id: null }, isPredictive: false, send,
+      manualRecovery: recovery, onServerCustomerOwned,
+    }), { initialProps: { recovery: saved } });
+    expect(result.current.customerCallSid).toBe(saved.call_sid);
+    expect(result.current.displayState).toBe(status === "ringing" ? "dialing" : status === "in-progress" ? "connected" : "completed");
+    expect(onServerCustomerOwned).toHaveBeenCalledWith(true);
+    act(() => result.current.confirmCustomerEnded());
+    rerender({ recovery: { ...saved, provider_status: "in-progress" } });
+    expect(result.current.displayState).toBe("completed");
+  });
+  test.each(["Start", "Next", "Hangup"])("a local %s retires an older manual current read even while idle", command => {
+    const saved = manualRecovery(), send = vi.fn();
+    const { result, rerender } = renderHook(({ recovery }: { recovery: ReturnType<typeof manualRecovery> | null }) => useCampaignCallFlow({
+      callSid: null, agentLegSid: saved.agent_call_sid, workspaceId: saved.workspace_id, state: "idle", activeCall: null,
+      recentAttemptDisposition: null, predictiveState: { status: "idle", contact_id: null }, isPredictive: false, send, manualRecovery: recovery,
+    }), { initialProps: { recovery: null } });
+    act(() => { if (command === "Start") result.current.beginDial(); else if (command === "Hangup") result.current.confirmCustomerEnded(); else result.current.retireManualRecovery(); }); rerender({ recovery: saved });
+    expect(result.current.customerCallSid).toBeNull(); expect(result.current.recoveredManual).toBeNull();
+    expect(result.current.displayState).toBe(command === "Start" ? "dialing" : command === "Hangup" ? "completed" : "idle");
+  });
   function renderCustomer() {
     const send = vi.fn();
     const view = renderHook(({ callSid }) => useCampaignCallFlow({

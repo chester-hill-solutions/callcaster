@@ -1,23 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchCampaignQueueItemWithContact } from "@/lib/chats/messaging-client";
-import type { RecoveredPredictiveCustomer } from "@/lib/schemas/api/voice-audio";
+import type { RecoveredCallCustomer } from "@/lib/schemas/api/voice-audio";
 import type { OutreachAttempt, QueueItem } from "@/lib/types";
 
 type Subject = { key: string; contact: QueueItem | null; error: string | null };
 
-function matchesAttempt(customer: RecoveredPredictiveCustomer, attempt: OutreachAttempt) {
+function matchesAttempt(customer: RecoveredCallCustomer, attempt: OutreachAttempt) {
   return attempt.id === customer.outreach_attempt_id && attempt.workspace === customer.workspace_id &&
     attempt.user_id === customer.user_id && attempt.campaign_id === customer.campaign_id && attempt.contact_id === customer.contact_id;
 }
-function findAttempt(customer: RecoveredPredictiveCustomer | null, attempts: OutreachAttempt[]) {
+function findAttempt(customer: RecoveredCallCustomer | null, attempts: OutreachAttempt[]) {
   return customer ? attempts.find(attempt => matchesAttempt(customer, attempt)) : undefined;
 }
-function changedAttempt(customer: RecoveredPredictiveCustomer | null, current: OutreachAttempt | null, entry: OutreachAttempt | null) {
+function changedAttempt(customer: RecoveredCallCustomer | null, current: OutreachAttempt | null, entry: OutreachAttempt | null) {
   return customer && current && current !== entry && matchesAttempt(customer, current) ? current : null;
 }
 
 /** Resolve the dequeued contact without returning it to the waiting queue. */
-export function useRecoveredPredictiveSubject(customer: RecoveredPredictiveCustomer | null, attempts: OutreachAttempt[], recentAttempt: OutreachAttempt | null = null) {
+export function useRecoveredPredictiveSubject(customer: RecoveredCallCustomer | null, attempts: OutreachAttempt[], recentAttempt: OutreachAttempt | null = null) {
   const key = customer ? JSON.stringify([customer.workspace_id, customer.user_id, customer.campaign_id,
     customer.conference_id, customer.call_sid, customer.queue_id, customer.contact_id, customer.outreach_attempt_id]) : "";
   const [subject, setSubject] = useState<Subject>({ key: "", contact: null, error: null });

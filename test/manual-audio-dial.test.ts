@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { ManualAudioDial } from "@/lib/manual-audio-dial";
 import type { StartCallArgs } from "@/lib/manual-dial-client";
+import { manualRecovery } from "./helpers/manual-recovery-fixture";
 
 const owner = { workspaceId: "10000000-0000-4000-8000-000000000001", userId: "agent", campaignId: 1 };
 function request(acceptCustomer = vi.fn(() => true)): StartCallArgs {
@@ -65,4 +66,38 @@ describe("manual customer request over confirmed phone audio", () => {
     reply(Response.json({ success: true, callSid: root })); await sending;
     expect(accept).not.toHaveBeenCalled();
   });
+  function matchingRecovery(fields: Record<string, string>) {
+    const customer = manualRecovery({ workspace_id: owner.workspaceId, user_id: owner.userId, campaign_id: 1, contact_id: 2, queue_id: 3,
+      call_sid: root, dial_intent_id: fields.dial_intent_id });
+    customer.attempt = { ...customer.attempt, workspace: owner.workspaceId, user_id: owner.userId, campaign_id: 1, contact_id: 2 };
+    return customer;
+  }
+  test("a confirmed saved customer clears the exact request and retires its delayed POST reply without another send", async () => {
+    let reply!: (response: Response) => void;
+    const fetcher = vi.fn(() => new Promise<Response>(resolve => { reply = resolve; })); vi.stubGlobal("fetch", fetcher);
+    const { resource, close } = fixture(), accept = vi.fn(() => true), sending = resource.begin(request(accept));
+    const fields = JSON.parse(fetcher.mock.calls[0][1].body), customer = matchingRecovery(fields);
+    expect(resource.confirmRecovered(customer)).toBe(true);
+    expect(resource.getSnapshot()).toEqual({ pending: false, sending: false, error: null });
+    reply(Response.json({ success: true, callSid: `CA${"9".repeat(32)}` })); await sending;
+    expect(accept).not.toHaveBeenCalled(); expect(fetcher).toHaveBeenCalledTimes(1); close();
+  });
+  test.each(["intent", "actor", "contact", "queue", "recipient", "caller", "device", "generation", "attempt", "audio"])(
+    "a mismatched recovered %s cannot clear the saved request", async mismatch => {
+      const fetcher = vi.fn().mockRejectedValue(new TypeError("lost reply")); vi.stubGlobal("fetch", fetcher);
+      const { resource, close } = fixture(); await resource.begin(request());
+      const customer = matchingRecovery(JSON.parse(fetcher.mock.calls[0][1].body));
+      if (mismatch === "intent") customer.dial_intent_id = "60000000-0000-4000-8000-000000000099";
+      if (mismatch === "actor") customer.user_id = "another-agent";
+      if (mismatch === "contact") customer.contact_id = 99;
+      if (mismatch === "queue") customer.queue_id = 99;
+      if (mismatch === "recipient") customer.request.to_number = "+16135550999";
+      if (mismatch === "caller") customer.request.caller_id = "+16135550999";
+      if (mismatch === "device") customer.request.selected_device = "+16135550999";
+      if (mismatch === "generation") customer.request.queue_generation = "40000000-0000-4000-8000-000000000099";
+      if (mismatch === "attempt") customer.request.requested_outreach_attempt_id = 99;
+      if (mismatch === "audio") customer.request.audio_generation = 99;
+      expect(resource.confirmRecovered(customer)).toBe(false); expect(resource.getSnapshot().pending).toBe(true);
+      expect(fetcher).toHaveBeenCalledTimes(1); close();
+    });
 });

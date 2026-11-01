@@ -3,6 +3,7 @@ import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-li
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { intent as recoveredIntent } from "../helpers/voice-audio-current-fixture";
 import { recoveredContact, recoveredCustomer, recovery } from "../helpers/predictive-recovery-fixture";
+import { manualRecovery } from "../helpers/manual-recovery-fixture";
 import type { RecoveredPredictiveCustomer } from "@/lib/schemas/api/voice-audio";
 import {
   createMockFetcher,
@@ -244,6 +245,63 @@ describe("useCallScreen", () => {
     }
     vi.stubGlobal("AudioContext", MockAudioContext);
     vi.stubGlobal("webkitAudioContext", MockAudioContext);
+  });
+
+  test.each(["phone", "computer"])("manual reload over %s restores the exact contact and answers without another call", async transport => {
+    screenUserId = recoveredCustomer.user_id; screenCampaignId = 42;
+    const manual = manualRecovery();
+    if (transport === "computer") { manual.request.selected_device = "computer"; manual.request.audio_connection_id = null; manual.request.audio_generation = null; }
+    let finish!: (response: Response) => void;
+    const pendingContact = new Promise<Response>(resolve => { finish = resolve; });
+    const network = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("current=1")) return Response.json({ workspace_id: audioWorkspaceId, user_id: screenUserId,
+        active: transport === "phone" ? { ...recoveredIntent(), user_id: screenUserId, connection: { ...recoveredIntent().connection, user_id: screenUserId } } : null,
+        pending: null, recovery_required: false, customer_pending: true, predictive: { revision: "0", customer: null }, manual });
+      if (url.includes("/queue?queue_id=27")) return pendingContact;
+      return Response.json({ success: true, status: "in-progress" });
+    });
+    vi.stubGlobal("fetch", network);
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const { result } = renderHook(() => useCallScreen());
+    await waitFor(() => expect(result.current.callControls.displayState).toBe("connected"));
+    const physicalListeners = new Map<string, (...args: unknown[]) => void>();
+    const physical = { parameters: { CallSid: "CA99999999999999999999999999999999", To: "client:other" },
+      status: () => "open", accept: vi.fn(), disconnect: vi.fn(), mute: vi.fn(),
+      on: vi.fn((event: string, listener: (...args: unknown[]) => void) => { physicalListeners.set(event, listener); }),
+      off: vi.fn(), removeListener: vi.fn(), getLocalStream: () => undefined, getRemoteStream: () => undefined };
+    if (transport === "computer") {
+      act(() => result.current.dialogControls.onJoin());
+      await waitFor(() => expect(result.current.currentState.deviceStatus).toBe("Registered"));
+      const { mockTwilioDevice } = await import("../mocks/twilio-voice-sdk");
+      act(() => mockTwilioDevice.emit("incoming", physical));
+      expect(result.current.callControls.activeCall).toBe(physical);
+      expect(result.current.callControls.displayState).toBe("connected");
+    }
+    expect(result.current.formState.questionContact).toBeNull();
+    act(() => result.current.formState.saveData()); expect(saveFetcher.submit).not.toHaveBeenCalled();
+    await act(async () => { finish(Response.json({ item: recoveredContact })); });
+    await waitFor(() => expect(result.current.formState.questionContact?.contact.id).toBe(7));
+    expect(result.current.formState.update).toEqual({ q1: "saved answer" });
+    act(() => result.current.callControls.setDisposition("no-answer"));
+    expect(result.current.callControls.disposition).toBe("no-answer");
+    act(() => result.current.formState.handleResponse({ blockId: "q1", value: "manual edit" }));
+    act(() => result.current.formState.saveData());
+    expect(saveFetcher.submit).toHaveBeenLastCalledWith(expect.objectContaining({ callId: 17, contact_id: 7, queue_id: 27, disposition: "no-answer", update: { q1: "manual edit" } }), expect.anything());
+    await act(async () => { await result.current.callControls.hangUp(); });
+    const api = await import("@/lib/services/hooks-api");
+    expect(api.hangupCall).toHaveBeenCalledWith({ callSid: manual.call_sid, workspaceId: audioWorkspaceId });
+    expect(result.current.callControls.displayState).toBe("completed");
+    expect(physical.disconnect).not.toHaveBeenCalled();
+    if (transport === "computer") {
+      act(() => physicalListeners.get("disconnect")?.());
+      expect(result.current.callControls.displayState).toBe("completed");
+    }
+    expect(result.current.formState.questionContact?.contact.id).toBe(7);
+    expect(result.current.formState.update).toEqual({ q1: "manual edit" });
+    expect(result.current.phoneVerification.selectedDevice).toBe(transport === "phone" ? recoveredIntent().connection.destination : "computer");
+    expect(network.mock.calls.every(([input]) => String(input) !== "/api/dial")).toBe(true);
+    expect(fetcher.submit).not.toHaveBeenCalled();
   });
 
   test("a recovered customer owns the contact, saved answers and disposition; another attempt cannot inherit draft answers", async () => {

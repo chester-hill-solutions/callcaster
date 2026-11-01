@@ -4843,7 +4843,8 @@
                         "pending",
                         "recovery_required",
                         "customer_pending",
-                        "predictive"
+                        "predictive",
+                        "manual"
                       ],
                       "properties": {
                         "workspace_id": {
@@ -5379,6 +5380,228 @@
                               },
                               "nullable": true,
                               "description": "The one pending or joined funded predictive customer. This is never the phone or SDK agent leg. Pending does not prove that a human joined. Refused, ended, foreign and terminal Calls are excluded."
+                            }
+                          }
+                        },
+                        "manual": {
+                          "type": "object",
+                          "nullable": true,
+                          "description": "The one unresolved funded manual customer, for browser or phone audio. Includes its actual provider status and exact saved contact and answers. Terminal Calls remain recoverable while settlement is pending. This read never places another call or admits a predictive human.",
+                          "required": [
+                            "workspace_id",
+                            "user_id",
+                            "call_sid",
+                            "campaign_id",
+                            "contact_id",
+                            "outreach_attempt_id",
+                            "queue_id",
+                            "attempt",
+                            "conference_id",
+                            "reservation_id",
+                            "dial_intent_id",
+                            "agent_call_sid",
+                            "provider_status",
+                            "request"
+                          ],
+                          "properties": {
+                            "workspace_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "user_id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "call_sid": {
+                              "type": "string",
+                              "pattern": "^CA[0-9a-fA-F]{32}$"
+                            },
+                            "campaign_id": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "contact_id": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "outreach_attempt_id": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "queue_id": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "attempt": {
+                              "type": "object",
+                              "required": [
+                                "answered_at",
+                                "campaign_id",
+                                "callback_audit",
+                                "contact_id",
+                                "created_at",
+                                "current_step",
+                                "disposition",
+                                "ended_at",
+                                "id",
+                                "issue_tags",
+                                "lawn_sign",
+                                "membership_sold",
+                                "result",
+                                "support_level",
+                                "user_id",
+                                "volunteer_interest",
+                                "vote_by_mail",
+                                "workspace"
+                              ],
+                              "properties": {
+                                "answered_at": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "campaign_id": {
+                                  "type": "integer"
+                                },
+                                "callback_audit": {
+                                  "type": "boolean",
+                                  "nullable": true
+                                },
+                                "contact_id": {
+                                  "type": "integer"
+                                },
+                                "created_at": {
+                                  "type": "string"
+                                },
+                                "current_step": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "disposition": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "ended_at": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "id": {
+                                  "type": "integer"
+                                },
+                                "issue_tags": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "nullable": true
+                                },
+                                "lawn_sign": {
+                                  "type": "boolean",
+                                  "nullable": true
+                                },
+                                "membership_sold": {
+                                  "type": "boolean",
+                                  "nullable": true
+                                },
+                                "result": {},
+                                "support_level": {
+                                  "type": "integer",
+                                  "nullable": true
+                                },
+                                "user_id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "volunteer_interest": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "vote_by_mail": {
+                                  "type": "boolean",
+                                  "nullable": true
+                                },
+                                "workspace": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                }
+                              }
+                            },
+                            "conference_id": {
+                              "type": "string",
+                              "nullable": true,
+                              "minLength": 1
+                            },
+                            "reservation_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "dial_intent_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "agent_call_sid": {
+                              "type": "string",
+                              "pattern": "^CA[0-9a-fA-F]{32}$"
+                            },
+                            "provider_status": {
+                              "type": "string",
+                              "enum": [
+                                "queued",
+                                "ringing",
+                                "in-progress",
+                                "canceled",
+                                "completed",
+                                "failed",
+                                "busy",
+                                "no-answer",
+                                "initiated"
+                              ]
+                            },
+                            "request": {
+                              "type": "object",
+                              "required": [
+                                "to_number",
+                                "caller_id",
+                                "selected_device",
+                                "requested_outreach_attempt_id",
+                                "queue_generation",
+                                "audio_connection_id",
+                                "audio_generation"
+                              ],
+                              "properties": {
+                                "to_number": {
+                                  "type": "string",
+                                  "pattern": "^\\+[1-9][0-9]{1,14}$",
+                                  "description": "Verified number owned by this user. Outer whitespace is trimmed."
+                                },
+                                "caller_id": {
+                                  "type": "string",
+                                  "pattern": "^\\+[1-9][0-9]{1,14}$",
+                                  "description": "Verified number owned by this user. Outer whitespace is trimmed."
+                                },
+                                "selected_device": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "requested_outreach_attempt_id": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "nullable": true
+                                },
+                                "queue_generation": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "audio_connection_id": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "nullable": true
+                                },
+                                "audio_generation": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "nullable": true
+                                }
+                              }
                             }
                           }
                         }

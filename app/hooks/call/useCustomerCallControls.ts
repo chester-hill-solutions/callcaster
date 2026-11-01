@@ -16,11 +16,12 @@ type Options = {
   isCurrentCustomer: () => boolean;
   confirmCustomerEnded: () => boolean;
   managesCustomerAudio: () => boolean;
+  onHangUp?: () => void;
 };
 
 /** Customer commands share the call lifecycle and the committed page lifetime. */
 export function useCustomerCallControls({ userId, workspaceId, campaignId, callSid,
-  isPredictive, activeCall, sdkHangUp, send, isCurrentCustomer, confirmCustomerEnded, managesCustomerAudio }: Options) {
+  isPredictive, activeCall, sdkHangUp, send, isCurrentCustomer, confirmCustomerEnded, managesCustomerAudio, onHangUp }: Options) {
   const scope = JSON.stringify([userId, workspaceId, campaignId]);
   const owner = useMemo(() => ({ scope, active: false, epoch: 0 }), [scope]);
   const currentSdkCall = useRef(activeCall);
@@ -45,6 +46,7 @@ export function useCustomerCallControls({ userId, workspaceId, campaignId, callS
     const epoch = owner.epoch;
     const isCurrent = () => canControlCustomer() && owner.epoch === epoch;
     if (!isCurrent()) return;
+    onHangUp?.();
     try {
       if (!callSid) {
         if (isPredictive || managesCustomerAudio()) return;
@@ -63,7 +65,7 @@ export function useCustomerCallControls({ userId, workspaceId, campaignId, callS
     } catch (error) {
       if (isCurrent()) toast.error(error instanceof Error ? error.message : "Could not end the customer call. Try again.");
     }
-  }, [owner, canControlCustomer, callSid, workspaceId, isPredictive, sdkHangUp, send, confirmCustomerEnded, activeCall, managesCustomerAudio]);
+  }, [owner, canControlCustomer, callSid, workspaceId, isPredictive, sdkHangUp, send, confirmCustomerEnded, activeCall, managesCustomerAudio, onHangUp]);
 
   return { hangUp, canControlCustomer };
 }

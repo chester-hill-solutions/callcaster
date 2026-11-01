@@ -1,4 +1,4 @@
-import { accountSid, actor, baseUrl, callerId, customer, foreignId, journal, otherPhone, phone, rooms,
+import { accountSid, actor, baseUrl, callerId, customer, foreignId, journal, otherActor, otherPhone, phone, rooms,
   signedAudio, sql, state, useOwnedAudioFixture, web, workspaceId } from "../helpers/voice-audio-fixture";
 import { confirmed } from "../helpers/voice-audio-customer-fixture";
 import { randomUUID } from "node:crypto";
@@ -43,6 +43,12 @@ async function hangupCustomer(callSid: string) {
     headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, callSid }) }))));
 }
 
+async function recoverManualCustomer() {
+  const { loader } = await import("../../app/routes/api+/connect-phone-device.loader.server");
+  return asRouteResponse(loader(routeArgs(new Request(`${baseUrl}/api/connect-phone-device?workspaceId=${workspaceId}&current=1`,
+    { headers: { "X-Callcaster-Audio-Actor": actor } }))));
+}
+
 async function dropCustomer(callSid: string, campaignId: string, selectedWorkspace = workspaceId) {
   const { action } = await import("../../app/routes/api+/audiodrop.action.server");
   const body = new FormData(); body.set("workspaceId", selectedWorkspace); body.set("callId", callSid); body.set("campaignId", campaignId);
@@ -79,6 +85,44 @@ describe("manual Start reuses confirmed phone audio", () => {
     expect(reservation).toMatchObject({ provider_sid: body.callSid, setup_sid: null, audio_agent_sid: f.call.sid,
       conference_id: f.row.conference_id, credits: 4 });
     expect(await state()).toMatchObject({ credits: 100, reservations: 1, attempts: 1, ledger: 0, operations: 1 });
+  });
+
+  test.each(["initiated", "ringing", "in-progress", "completed"])("reload recovers the manual %s customer and exact saved answers without another send", async status => {
+    const f = await scenario(), sent = await start(f.payload);
+    expect(sent.status).toBe(200);
+    const { callSid } = await sent.json();
+    const [reservation] = await sql`select * from public.workspace_voice_reservation where provider_sid = ${callSid}`;
+    await sql`update public.call set status = ${status} where sid = ${callSid}`;
+    await sql`update public.outreach_attempt set result = '{"q1":"saved manual answer"}'::jsonb, current_step = 'question-2'
+      where id = ${reservation.outreach_attempt_id}`;
+    await sql`update public.campaign_queue set queue_state = 'dequeued', dequeued_at = now() where id = ${f.queueId}`;
+    const before = await state(); web.fetch.mockClear(); web.update.mockClear();
+    const response = await recoverManualCustomer(); expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.manual).toMatchObject({ reservation_id: reservation.id, dial_intent_id: f.payload.dial_intent_id,
+      workspace_id: workspaceId, user_id: actor, campaign_id: Number(f.payload.campaign_id),
+      call_sid: callSid, provider_status: status, contact_id: Number(f.payload.contact_id), queue_id: f.queueId,
+      outreach_attempt_id: Number(reservation.outreach_attempt_id), conference_id: f.row.conference_id,
+      attempt: { id: Number(reservation.outreach_attempt_id), current_step: "question-2", result: { q1: "saved manual answer" } } });
+    expect(body.manual.call_sid).not.toBe(f.row.provider_sid);
+    expect(body.customer_pending).toBe(true);
+    expect(await state()).toEqual(before);
+    expect(web.create).toHaveBeenCalledTimes(1); expect(web.fetch).not.toHaveBeenCalled(); expect(web.update).not.toHaveBeenCalled();
+  });
+
+  test.each(["account", "parent", "direction", "recipient", "attempt-actor"])("manual recovery refuses mismatched %s without commands or writes", async mismatch => {
+    const f = await scenario(), sent = await start(f.payload); expect(sent.status).toBe(200);
+    const { callSid } = await sent.json();
+    if (mismatch === "account") await sql`update public.call set account_sid = ${`AC${"9".repeat(32)}`} where sid = ${callSid}`;
+    if (mismatch === "parent") await sql`update public.call set parent_call_sid = ${f.call.sid} where sid = ${callSid}`;
+    if (mismatch === "direction") await sql`update public.call set direction = 'outbound-dial' where sid = ${callSid}`;
+    if (mismatch === "recipient") await sql`update public.call set "to" = ${otherPhone} where sid = ${callSid}`;
+    if (mismatch === "attempt-actor") await sql`update public.outreach_attempt set user_id = ${otherActor}::uuid where id =
+      (select outreach_attempt_id from public.workspace_voice_reservation where provider_sid = ${callSid})`;
+    const before = await state(); web.fetch.mockClear(); web.update.mockClear();
+    expect((await recoverManualCustomer()).status).toBe(409);
+    expect(await state()).toEqual(before); expect(web.create).toHaveBeenCalledTimes(1);
+    expect(web.fetch).not.toHaveBeenCalled(); expect(web.update).not.toHaveBeenCalled();
   });
 
   test("Voice Drop redirects the funded customer root and retains the phone, queue and single hold", async () => {

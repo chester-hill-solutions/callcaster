@@ -18,7 +18,7 @@ export function intent(id = firstId, destination = phone, connection_state: Voic
 
 export function current(active: ReturnType<typeof intent> | null = null, pending: ReturnType<typeof intent> | null = null) {
   return { workspace_id: owner.workspaceId, user_id: owner.userId, active, pending, recovery_required: false, customer_pending: false,
-    predictive: { revision: "0", customer: null } };
+    predictive: { revision: "0", customer: null }, manual: null };
 }
 
 export function memoryStorage(): AgentAudioStorage {

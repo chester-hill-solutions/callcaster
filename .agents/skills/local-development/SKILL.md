@@ -291,6 +291,12 @@ retain known terminal intents so a later read cannot revive them.
 Admission fences block new operations. Keep an explicit Check for an already
 submitted Start on its captured request even when the server reports busy.
 
+For manual customer recovery, retire automatic discovery in the local command
+itself. Next can run while the FSM is already idle, so an effect that waits for
+a state change is not a command fence. Restore the exact editable outreach
+attempt as well as the visible contact; prove that new disposition and answer
+edits save to that attempt when the loader points at another contact.
+
 Customer controls also need their committed page lifetime. Reuse the canonical
 customer owner, and check it before a provider command or Voice Drop submit,
 after an awaited reply, and before a global failure toast or SDK cleanup. Retire

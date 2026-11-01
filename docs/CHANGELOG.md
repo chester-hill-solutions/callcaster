@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Reloading a manual campaign restores its saved customer, contact and answers for phone or browser audio. Recovery keeps the actual call status and confirms a matching lost request without placing another call ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
+
 - Fixed: Reconciled SIM personas receive working password accounts. Owner funding and member SMS keep separate browser sessions, which close when a task fails ([PR #3104](https://github.com/chester-hill-solutions/callcaster/pull/3104), [#2828](https://github.com/chester-hill-solutions/callcaster/issues/2828)).
 
 - Added: Operators can review and apply legacy workspace subaccount name backfills with exact ownership checks across dev, QA and production. Dry-run is the default; reviewed apply preserves custom labels, shared accounts and already-completed names ([#3102](https://github.com/chester-hill-solutions/callcaster/issues/3102), parent [#2168](https://github.com/chester-hill-solutions/callcaster/issues/2168)).

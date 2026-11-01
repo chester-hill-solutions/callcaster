@@ -201,6 +201,27 @@ describe("manual voice funding and ownership (#2879)", () => {
     }
     for (const job of stored) await sql`update public.job set status = 'completed' where id = ${job.id}`;
   }
+  test("reload recovers the browser manual child, never its agent parent, without sending again", async () => {
+    const intent = randomUUID();
+    expect((await send({ selected_device: "computer", dial_intent_id: intent })).status).toBe(200);
+    const parent = firstCall(), child = await connectRecipient(parent);
+    await status(child, "in-progress");
+    const [reservation] = await sql`select * from public.workspace_voice_reservation where provider_sid = ${child.sid}`;
+    await sql`update public.outreach_attempt set result = '{"q1":"browser saved answer"}'::jsonb where id = ${reservation.outreach_attempt_id}`;
+    const before = await state(); provider.fetch.mockClear(); provider.update.mockClear();
+    const { readCurrentOwnedVoiceAudio } = await import("@/server/voice-audio-current.server");
+    const response = await readCurrentOwnedVoiceAudio({ workspaceId, userId: actor });
+    expect(response).toMatchObject({ ok: true, current: { customer_pending: true, manual: {
+      call_sid: child.sid, agent_call_sid: parent.sid, dial_intent_id: intent, provider_status: "in-progress",
+      campaign_id: campaignId, contact_id: contactId, queue_id: queueId,
+      attempt: { id: Number(reservation.outreach_attempt_id), result: { q1: "browser saved answer" } },
+      request: { selected_device: "computer", audio_connection_id: null, audio_generation: null },
+    } } });
+    expect(await state()).toEqual(before); expect(provider.create).toHaveBeenCalledTimes(1);
+    expect(provider.fetch).not.toHaveBeenCalled(); expect(provider.update).not.toHaveBeenCalled();
+    expect(await readCurrentOwnedVoiceAudio({ workspaceId: foreignId, userId: actor })).toMatchObject({ ok: false });
+  });
+
   test("saves the manual parent continuation before the setup provider POST", async () => {
     const create = provider.create.getMockImplementation();
     if (!create) throw new Error("Owned setup provider implementation required");

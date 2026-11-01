@@ -62,7 +62,8 @@ describe("agent audio OpenAPI view boundaries", () => {
     const readResponses = path.get.responses["200"].content["application/json"].schema.oneOf;
     expect(readResponses).toHaveLength(3);
     const current = readResponses[2];
-    expect(current.required).toEqual(["workspace_id", "user_id", "active", "pending", "recovery_required", "customer_pending", "predictive"]);
+    expect(current.required).toEqual(["workspace_id", "user_id", "active", "pending", "recovery_required", "customer_pending", "predictive", "manual"]);
+    expect(current.properties.manual.required).toEqual(expect.arrayContaining(["call_sid", "agent_call_sid", "provider_status", "dial_intent_id", "attempt", "queue_id", "request"]));
     expect(current.properties.recovery_required.type).toBe("boolean");
     expect(current.properties.customer_pending.type).toBe("boolean");
     const recovery = current.properties.predictive;

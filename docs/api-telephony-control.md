@@ -171,7 +171,8 @@ query without a control intent retains the legacy explicit control behavior.
 Use `GET /api/connect-phone-device?workspaceId=…&current=1` to recover without
 a usable browser journal. Omit all connection and intent IDs. The response
 contains `workspace_id`, `user_id`, `active`, `pending`, `recovery_required`
-and `customer_pending`, plus `predictive: { revision, customer }`. The audio roles contain the current submitted intent
+and `customer_pending`, plus `predictive: { revision, customer }` and nullable
+`manual`. The audio roles contain the current submitted intent
 and its connection, or null. Discovery reads under the workspace/actor lock;
 it sends no provider command and does not change control ownership. It keeps
 old-account resources visible if credentials or phone verification change.
@@ -198,6 +199,15 @@ Keep that nonce for explicit Check or Cancel. A saved cancel belongs only to
 that submitted intent and cannot transfer to a newer discovered request.
 Busy state blocks new dispatches; explicit Check for an already submitted
 manual call or predictive Start retains its original complete request.
+The manual snapshot identifies the one unresolved funded customer for browser
+or phone audio. It includes the actual provider status, reservation and dial
+intent, agent leg, exact queue item and saved outreach answers. A terminal
+customer can remain visible while its reservation awaits settlement. Recovery
+does not claim a predictive human or advance the queue. The canonical call flow
+adopts this customer once; local commands retire older automatic reads. A saved
+POST request clears only when every saved request field matches this customer.
+That confirmation is read-only and retires a delayed POST reply. Missing or
+mismatched request ownership keeps the existing Check gate.
 `current` is GET-only; DELETE still needs a captured connection or intent.
 
 New clients send `X-Callcaster-Audio-Actor` on POST, GET and DELETE. It must

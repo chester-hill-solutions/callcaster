@@ -7,7 +7,7 @@ import type { Database } from "@/lib/db-types";
 
 export type CallStatusEnum = Database["public"]["Enums"]["call_status"];
 
-const VALID_CALL_STATUSES: CallStatusEnum[] = [
+export const VALID_CALL_STATUSES: readonly CallStatusEnum[] = [
   "queued",
   "ringing",
   "in-progress",

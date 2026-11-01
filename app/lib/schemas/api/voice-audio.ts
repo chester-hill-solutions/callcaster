@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { VALID_CALL_STATUSES } from "@/lib/call-status";
 
 const callSid = z.string().regex(/^CA[0-9a-f]{32}$/i);
 
@@ -82,11 +83,31 @@ function matchesRecoveredAttempt(customer: { outreach_attempt_id: number; worksp
   return attempt.id === customer.outreach_attempt_id && attempt.workspace === customer.workspace_id &&
     attempt.user_id === customer.user_id && attempt.campaign_id === customer.campaign_id && attempt.contact_id === customer.contact_id;
 }
-export const predictiveCustomerRecoverySchema = z.object({
-  revision: z.string().regex(/^(0|[1-9]\d*)$/).max(19),
-  customer: z.object({ workspace_id: z.uuid(), user_id: z.string().min(1), call_sid: callSid,
+const recoveredCustomerContextSchema = z.object({ workspace_id: z.uuid(), user_id: z.string().min(1), call_sid: callSid,
     campaign_id: z.number().int().positive(), contact_id: z.number().int().positive(), outreach_attempt_id: z.number().int().positive(),
     queue_id: z.number().int().positive(), attempt: recoveredAttemptSchema,
+    conference_id: z.string().min(1).nullable(),
+});
+export type RecoveredCallCustomer = z.infer<typeof recoveredCustomerContextSchema>;
+
+export const manualCustomerRecoverySchema = recoveredCustomerContextSchema.extend({
+  reservation_id: z.uuid(), dial_intent_id: z.uuid(), agent_call_sid: callSid,
+  provider_status: z.enum(VALID_CALL_STATUSES),
+  request: z.object({
+    to_number: z.string().regex(/^\+[1-9]\d{1,14}$/), caller_id: z.string().regex(/^\+[1-9]\d{1,14}$/),
+    selected_device: z.string().min(1), requested_outreach_attempt_id: z.number().int().positive().nullable(),
+    queue_generation: z.uuid(), audio_connection_id: z.uuid().nullable(), audio_generation: z.number().int().positive().nullable(),
+  }),
+}).superRefine((customer, ctx) => {
+  if (!matchesRecoveredAttempt(customer) || customer.call_sid === customer.agent_call_sid ||
+    (customer.request.audio_connection_id === null) !== (customer.request.audio_generation === null))
+    ctx.addIssue({ code: "custom", message: "Recovered manual customer does not match its saved owner" });
+});
+export type RecoveredManualCustomer = z.infer<typeof manualCustomerRecoverySchema>;
+
+export const predictiveCustomerRecoverySchema = z.object({
+  revision: z.string().regex(/^(0|[1-9]\d*)$/).max(19),
+  customer: recoveredCustomerContextSchema.extend({
     conference_id: z.string().min(1), conference_sid: z.string().regex(/^CF[0-9a-f]{32}$/i).nullable(),
     conference_sequence: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable(), human_state: z.enum(["pending", "joined"]),
   }).nullable(),
@@ -110,9 +131,14 @@ export const voiceAudioCurrentSnapshotSchema = z.object({
   active: voiceAudioIntentSnapshotSchema.nullable(), pending: voiceAudioIntentSnapshotSchema.nullable(),
   recovery_required: z.boolean(), customer_pending: z.boolean(),
   predictive: predictiveCustomerRecoverySchema,
+  // Older servers omit manual recovery. Keep their busy gate while they roll out.
+  manual: manualCustomerRecoverySchema.nullable().optional().default(null),
 }).superRefine((value, ctx) => {
   if (!matchesCurrentPredictiveOwner(value))
     ctx.addIssue({ code: "custom", message: "Recovered customer does not match this current actor", path: ["predictive"] });
+  if (value.manual && (value.manual.workspace_id !== value.workspace_id || value.manual.user_id !== value.user_id ||
+    !value.customer_pending || value.predictive.customer))
+    ctx.addIssue({ code: "custom", message: "Recovered manual customer does not match this current actor", path: ["manual"] });
   for (const name of ["active", "pending"] as const) {
     const intent = value[name];
     if (!intent) continue;

@@ -1,5 +1,6 @@
 import { errorResponse, rateLimitResponse } from "@/lib/openapi-platform-components";
 import { sessionCookieSecurity } from "@/lib/openapi-integrator";
+import { VALID_CALL_STATUSES } from "@/lib/call-status";
 
 const callSid = { type: "string", pattern: "^CA[0-9a-fA-F]{32}$" };
 const workspaceId = { type: "string", format: "uuid" };
@@ -67,12 +68,28 @@ const predictiveRecovery = { type: "object", required: ["revision", "customer"],
   revision: { type: "string", pattern: "^(0|[1-9][0-9]*)$", maxLength: 19, description: "Monotonic saved human-state version for this actor and workspace. Zero means no saved human state. An empty customer at a newer version ends the previous conversation view; it never ends agent audio. The saved queue ID and exact outreach attempt restore the current contact and answers, including after dequeue." },
   customer: { ...predictiveCustomer, nullable: true, description: "The one pending or joined funded predictive customer. This is never the phone or SDK agent leg. Pending does not prove that a human joined. Refused, ended, foreign and terminal Calls are excluded." },
 } };
-const currentSnapshot = { type: "object", required: ["workspace_id", "user_id", "active", "pending", "recovery_required", "customer_pending", "predictive"], properties: {
+const manualCustomer = { type: "object", nullable: true,
+  description: "The one unresolved funded manual customer, for browser or phone audio. Includes its actual provider status and exact saved contact and answers. Terminal Calls remain recoverable while settlement is pending. This read never places another call or admits a predictive human.",
+  required: ["workspace_id", "user_id", "call_sid", "campaign_id", "contact_id", "outreach_attempt_id", "queue_id", "attempt", "conference_id",
+    "reservation_id", "dial_intent_id", "agent_call_sid", "provider_status", "request"],
+  properties: { workspace_id: workspaceId, user_id: { type: "string", minLength: 1 }, call_sid: callSid,
+    campaign_id: { type: "integer", minimum: 1 }, contact_id: { type: "integer", minimum: 1 }, outreach_attempt_id: { type: "integer", minimum: 1 },
+    queue_id: { type: "integer", minimum: 1 }, attempt: recoveredAttempt, conference_id: { type: "string", nullable: true, minLength: 1 },
+    reservation_id: { type: "string", format: "uuid" }, dial_intent_id: { type: "string", format: "uuid" }, agent_call_sid: callSid,
+    provider_status: { type: "string", enum: VALID_CALL_STATUSES },
+    request: { type: "object", required: ["to_number", "caller_id", "selected_device", "requested_outreach_attempt_id", "queue_generation", "audio_connection_id", "audio_generation"],
+      properties: { to_number: phoneNumber, caller_id: phoneNumber, selected_device: { type: "string", minLength: 1 },
+        requested_outreach_attempt_id: { type: "integer", minimum: 1, nullable: true }, queue_generation: { type: "string", format: "uuid" },
+        audio_connection_id: { type: "string", format: "uuid", nullable: true }, audio_generation: { type: "integer", minimum: 1, nullable: true } } },
+  },
+};
+const currentSnapshot = { type: "object", required: ["workspace_id", "user_id", "active", "pending", "recovery_required", "customer_pending", "predictive", "manual"], properties: {
   workspace_id: workspaceId, user_id: { type: "string", minLength: 1 },
   active: { ...intentSnapshot, nullable: true }, pending: { ...intentSnapshot, nullable: true },
   recovery_required: { type: "boolean", description: "Unresolved physical cleanup, room stop or promotion blocks new audio work." },
   customer_pending: { type: "boolean", description: "An unresolved staffed customer reservation blocks another Start until its customer owner is confirmed. This does not prove that a human joined." },
   predictive: predictiveRecovery,
+  manual: manualCustomer,
 } };
 
 /** One owned audio operation covers session control and signed provider callbacks. */
