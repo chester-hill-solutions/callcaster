@@ -74,8 +74,6 @@ test/auth-instance.server.test.ts::@/lib/env.server#1
 test/auth-instance.server.test.ts::@/lib/send-reset-password-email.server#1
 test/auth-trusted-origins.server.test.ts::@/lib/env.server#1
 test/authz.test.ts::@/lib/env.server#1
-test/auto-dial-end.route.test.ts::@/lib/database/workspace.server#1
-test/auto-dial-end.route.test.ts::@/lib/telephony-db.server#1
 test/auto-dial-room.route.test.ts::@/lib/auth.server#1
 test/auto-dial-room.route.test.ts::@/lib/auto-dial.server#1
 test/auto-dial-room.route.test.ts::@/lib/campaign-ivr.server#1
