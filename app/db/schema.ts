@@ -438,7 +438,7 @@ export const outreach_attempt = pgTable("outreach_attempt", {
   campaign_id: bigint({ mode: "number" }).notNull(),
   callback_audit: boolean(),
   contact_id: bigint({ mode: "number" }).notNull(),
-  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`clock_timestamp()`),
   current_step: text(),
   disposition: text(),
   ended_at: timestamp({ withTimezone: true, mode: "string" }),

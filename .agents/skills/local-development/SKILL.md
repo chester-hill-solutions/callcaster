@@ -790,6 +790,10 @@ can produce skipped tests and startup failures. Require the full count and zero
 skips before treating the run as proof.
 
 JavaScript fake timers do not change Postgres `now()` or column defaults.
+Postgres `now()` is the transaction start time. An insertion-order ownership
+cutoff needs `clock_timestamp()` on both compared insert events. Test an older
+transaction that inserts a replacement later, and an older transaction that
+inserts the original outreach after its queue. Keep applied migrations intact.
 Keep real database I/O on real timers when testing a provider deadline. Signal
 that the provider read has started, await its bounded rejection, then release
 the late response. Faking all timers can stall the SQL client's socket work and

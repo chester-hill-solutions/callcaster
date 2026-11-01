@@ -97,12 +97,56 @@ describe("legacy voice terminal queue ownership", () => {
     await resultRows(f);
   });
 
+  test.each(['primary', 'household'])("a replacement %s inserted by an older transaction stays queued", async target => {
+    const url = process.env.INTEGRATION_DB_URL ?? process.env.DATABASE_URL;
+    if (!url) throw new Error('Owned fixture URL required');
+    const rebuild = postgres(url, { max: 1 }); let fixture: Fixture | undefined; let replacement: Record<string, unknown> | undefined;
+    try {
+      await rebuild.begin(async tx => {
+        await tx`select current_timestamp`;
+        const f = fixture = await legacyAttempt(target === 'household');
+        if (target === 'primary') await sql`update public.call set queue_id = null where sid = ${f.callSid}`;
+        const contactId = target === 'primary' ? f.contact : f.sibling?.contact;
+        if (!contactId) throw new Error('Owned replacement contact required');
+        await tx`delete from public.campaign_queue where campaign_id = ${f.campaign} and contact_id = ${contactId}`;
+        const [{ id }] = await tx`select public.handle_campaign_queue_entry(${contactId}, ${f.campaign}, null, false) id`;
+        [replacement] = await tx`select * from public.campaign_queue where id = ${id}`;
+      });
+      if (!fixture || !replacement) throw new Error('Owned replacement required');
+      await finish(fixture);
+      expect((await sql`select * from public.campaign_queue where id = ${replacement.id}`)[0]).toEqual(replacement);
+      if (target === 'household') expect((await sql`select queue_state from public.campaign_queue where id = ${fixture.queue.id}`)[0].queue_state).toBe('dequeued');
+      await resultRows(fixture);
+    } finally { await rebuild.end(); }
+  });
+
   test("an unchanged original outreach completes a legacy Call without a saved queue ID", async () => {
     const f = await legacyAttempt();
     await sql`update public.call set queue_id = null where sid = ${f.callSid}`;
     await finish(f);
     expect((await sql`select queue_state from public.campaign_queue where id = ${f.queue.id}`)[0].queue_state).toBe('dequeued');
     await resultRows(f);
+  });
+
+  test("outreach inserted by an older transaction still completes earlier queue work", async () => {
+    const url = process.env.INTEGRATION_DB_URL ?? process.env.DATABASE_URL;
+    if (!url) throw new Error('Owned fixture URL required');
+    const writer = postgres(url, { max: 1 }); let fixture: Fixture | undefined;
+    try {
+      await writer.begin(async tx => {
+        await tx`select current_timestamp`;
+        const f = fixture = await legacyAttempt();
+        const [{ id }] = await tx`insert into public.outreach_attempt (workspace, campaign_id, contact_id, user_id, disposition)
+          values (${workspaceId}::uuid, ${f.campaign}, ${f.contact}, ${actor}, 'in-progress') returning id`;
+        await tx`update public.call set queue_id = null, outreach_attempt_id = ${id} where sid = ${f.callSid}`;
+        await tx`delete from public.outreach_attempt where id = ${f.attempt}`;
+        f.attempt = Number(id);
+      });
+      if (!fixture) throw new Error('Owned outreach required');
+      await finish(fixture);
+      expect((await sql`select queue_state from public.campaign_queue where id = ${fixture.queue.id}`)[0].queue_state).toBe('dequeued');
+      await resultRows(fixture);
+    } finally { await writer.end(); }
   });
 
   test("an unchanged legacy household still advances its eligible sibling", async () => {

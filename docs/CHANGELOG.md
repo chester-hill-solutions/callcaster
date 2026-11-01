@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Late legacy call results preserve requeued, rebuilt and reassigned contacts and newer household work. Confirmed original calls still advance their queues, keep one billing entry and record their results. Legacy predictive callbacks use the durable result worker before continuing ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
+- Fixed: Late legacy call results preserve requeued, rebuilt and reassigned contacts and newer household work, including replacements inserted by an earlier transaction. Confirmed original calls, including older records without queue IDs, still advance their queues, keep one billing entry and record their results. Legacy predictive callbacks use the durable result worker before continuing ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
 
 - Fixed: Save and Next waits for a confirmed update to its captured queue entry. Failed replies keep the contact and answers visible. Household actions check each captured contact, including contacts outside the visible page; new or live work stays queued. An old completed call leaves newer queue work untouched ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
 

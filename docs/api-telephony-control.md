@@ -108,9 +108,12 @@ request with the same captured fields. GET adds a read-only `advance_snapshot` t
 Legacy completion callbacks use the saved Call and outreach attempt to identify
 the original queue work. A saved parent can supply a legacy child leg's queue
 identity. A saved queue ID must match. Older Calls without that ID require
-the original outreach, actor and full database time cutoffs to prove ownership; a later explicit requeue, reservation, outreach attempt or live customer
-keeps that row queued. Missing original outreach or unresolved parent ownership never borrows the
-current assignee. Eligible household members created before the original attempt still
+the original outreach, actor and full database time cutoffs to prove ownership.
+New queue rows and outreach attempts use database insertion time, so a transaction
+that starts earlier cannot backdate replacement work. A later explicit requeue,
+reservation, outreach attempt or live customer keeps that row queued. Missing
+original outreach or unresolved parent ownership never borrows the current
+assignee. Eligible household members created before the original attempt still
 advance; newer or live members stay queued. Call billing and the original
 outreach result continue through their canonical owners. Legacy Hang Up waits
 for a confirmed terminal Call before queue completion. Predictive continuation

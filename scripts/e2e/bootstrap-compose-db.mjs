@@ -113,6 +113,7 @@ const steps = [
   "client/migrations/20261031000001_workspace_number_release_history.sql",
   "client/migrations/20261101000002_predictive_customer_recovery.sql",
   "client/migrations/20261101000003_voice_dialer_intents.sql",
+  "client/migrations/20261101000004_voice_legacy_intent_timestamps.sql",
 ];
 
 /**

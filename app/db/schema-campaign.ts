@@ -132,7 +132,7 @@ export const campaign_queue = pgTable(
     campaign_id: bigint({ mode: "number" }).notNull(),
     claimed_at: timestamp({ withTimezone: true, mode: "date" }),
     contact_id: bigint({ mode: "number" }).notNull(),
-    created_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    created_at: timestamp({ withTimezone: true, mode: "date" }).notNull().default(sql`clock_timestamp()`),
     id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
     last_attempt_at: timestamp({ withTimezone: true, mode: "date" }),
     last_attempt_error: text(),
