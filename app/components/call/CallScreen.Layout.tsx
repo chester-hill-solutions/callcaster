@@ -429,6 +429,7 @@ export function CallScreenLayout({
         }
         call={
           <CallArea
+            isAdvancingQueue={callControls.isAdvancingQueue}
             conference={conference ? { parameters: { Sid: conference } } : null}
             isBusy={isBusy || deviceIsBusy}
             predictive={campaign.dial_type === "predictive"}
@@ -531,7 +532,7 @@ export function CallScreenLayout({
             update={update ?? {}}
             nextRecipient={questionContact}
             handleQuickSave={saveData}
-            disabled={!questionContact}
+            disabled={callControls.isAdvancingQueue || !questionContact}
           />
         }
         queue={queueList}

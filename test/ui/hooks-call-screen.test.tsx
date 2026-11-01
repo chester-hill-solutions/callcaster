@@ -106,7 +106,7 @@ let initialAttempt: {
 const navigate = vi.fn();
 const createOscillator = vi.fn();
 let fetcherCall = 0;
-const routeFetchers = [verifyFetcher, fetcher, queueFetcher, saveFetcher];
+const routeFetchers = [verifyFetcher, fetcher, saveFetcher];
 
 vi.mock("react-router", async () => {
   const actual = await vi.importActual<typeof import("react-router")>("react-router");

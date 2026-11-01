@@ -31,6 +31,7 @@ interface Conference {
 
 export interface CallAreaProps {
   isBusy: boolean;
+  isAdvancingQueue?: boolean;
   isStartingConference?: boolean;
   startDisabledReason?: string | null;
   awaitingCustomerReceipt?: boolean;
@@ -367,6 +368,7 @@ export function CallControls({
 type DispositionBarProps = Pick<
   CallAreaProps,
   | "isBusy"
+  | "isAdvancingQueue"
   | "questionContact"
   | "handleDequeueNext"
   | "disposition"
@@ -376,6 +378,7 @@ type DispositionBarProps = Pick<
 
 export function DispositionBar({
   isBusy,
+  isAdvancingQueue = false,
   questionContact,
   handleDequeueNext,
   disposition,
@@ -394,7 +397,7 @@ export function DispositionBar({
       <Select
         value={disposition}
         onValueChange={setDisposition}
-        disabled={!questionContact}
+        disabled={isAdvancingQueue || !questionContact}
       >
         <SelectTrigger
           data-testid="call-screen-disposition"
@@ -420,7 +423,7 @@ export function DispositionBar({
       </Select>
       <Button
         type="button"
-        disabled={isBusy || !hasValidDisposition}
+        disabled={isBusy || isAdvancingQueue || !hasValidDisposition}
         onClick={handleDequeueNext}
         className="flex-1 rounded-full text-xs"
       >
@@ -432,6 +435,7 @@ export function DispositionBar({
 
 export const CallArea: React.FC<CallAreaProps> = ({
   isBusy,
+  isAdvancingQueue,
   isStartingConference,
   startDisabledReason,
   awaitingCustomerReceipt,
@@ -486,6 +490,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
           onResetCall={onResetCall}
         />
         <DispositionBar
+          isAdvancingQueue={isAdvancingQueue}
           isBusy={isBusy || awaitingCustomerReceipt || displayState === "dialing" || displayState === "connected"}
           questionContact={questionContact}
           handleDequeueNext={handleDequeueNext}

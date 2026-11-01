@@ -119,39 +119,14 @@ export const handleContact = ({
 };
 
 export const handleQueue = ({
-  submit,
-  groupByHousehold,
   campaign,
   workspaceId,
   setQueue,
 }:{
-  submit: FetcherWithComponents<unknown>["submit"];  
-  groupByHousehold: boolean;
   campaign: Campaign;
   workspaceId: string;
   setQueue: Dispatch<SetStateAction<QueueItem[]>>;
 }) => {
-  const dequeue = ({ contact }:{contact:QueueItem }) => {
-    if (!contact || !contact.contact || !contact.contact.phone) return;
-    submit(
-      {
-        contact_id: contact.contact.id,
-        campaign_id: campaign.id,
-        household: groupByHousehold,
-      },
-      {
-        action: "/api/queues",
-        method: "POST",
-        encType: "application/json",
-      },
-    );
-    setQueue((prevQueue) => {
-      return prevQueue.filter(
-        (queueContact) => queueContact.contact.id !== contact.contact.id,
-      );
-    });
-  };
-
   const updateQueue = (newContacts: QueueItem[]) => {
     setQueue((prevQueue) => {
       const existingHouseholds = new Map<string, QueueItem[]>();
@@ -188,5 +163,5 @@ export const handleQueue = ({
       .then((json) => updateQueue(json))
       .catch((error) => logger.error("Unable to fetch queue: ", error));
   };
-  return { dequeue, fetchMore };
+  return { fetchMore };
 };

@@ -190,50 +190,6 @@ describe("callscreenActions", () => {
     );
   });
 
-  test("handleQueue.dequeue submits and filters queue", async () => {
-    const { handleQueue } = await import("@/lib/callscreenActions");
-    const submit = vi.fn();
-    const setQueue = vi.fn();
-    const { dequeue } = handleQueue({
-      submit,
-      groupByHousehold: true,
-      campaign: { id: 1 },
-      workspaceId: "w1",
-      setQueue,
-    } as any);
-
-    dequeue({ contact: { contact: { id: 1, phone: "+1555" } } } as any);
-    expect(submit).toHaveBeenCalledWith(
-      expect.objectContaining({ contact_id: 1, campaign_id: 1, household: true }),
-      expect.objectContaining({ action: "/api/queues" }),
-    );
-    expect(typeof setQueue.mock.calls[0][0]).toBe("function");
-    const updater = setQueue.mock.calls[0][0];
-    expect(
-      updater([
-        { contact: { id: 1 } },
-        { contact: { id: 2 } },
-      ]),
-    ).toEqual([{ contact: { id: 2 } }]);
-  });
-
-  test("handleQueue.dequeue returns early when contact phone is missing", async () => {
-    const { handleQueue } = await import("@/lib/callscreenActions");
-    const submit = vi.fn();
-    const setQueue = vi.fn();
-    const { dequeue } = handleQueue({
-      submit,
-      groupByHousehold: false,
-      campaign: { id: 1 },
-      workspaceId: "w1",
-      setQueue,
-    } as any);
-
-    dequeue({ contact: { contact: { id: 1, phone: null } } } as any);
-    expect(submit).not.toHaveBeenCalled();
-    expect(setQueue).not.toHaveBeenCalled();
-  });
-
   test("handleQueue.fetchMore updates queue and logs on failure", async () => {
     const { handleQueue } = await import("@/lib/callscreenActions");
     const submit = vi.fn();

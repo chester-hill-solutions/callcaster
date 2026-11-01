@@ -78,6 +78,29 @@ Conference/handset acceptance remain in development.
 
 `GET/POST/DELETE /api/queues` requires bearer or session auth plus workspace access (campaign must belong to the caller's workspace).
 
+`POST /api/queues` is the captured **Save and Next** control. Send
+`workspace_id`, `campaign_id`, `contact_id`, `queue_id`, `dispatch_generation`
+and boolean `household`. Include the captured customer `call_sid` when finishing
+a call; omit it for an idle manual skip. The required
+`X-Callcaster-Audio-Actor` header must match the signed-in actor. Workspace API
+keys cannot use this session-only operation.
+
+The server checks membership and the queue snapshot under the workspace lock.
+A customer must have ended and belong to this actor and contact. Funding and
+final billing keep their existing owners. HTTP 200 echoes the captured fields,
+`user_id`, `dequeued` and `advance_state`:
+
+- `dequeued`: this request removed its own queue row.
+- `already_dequeued`: that exact row was already removed; a retry is safe.
+- `superseded`: the completed customer can leave the screen, while newer queue
+  work stays queued. A completed legacy call with no saved funding owner also
+  gets this result; the action does not guess which queue generation it owned.
+
+Wait for a matching acknowledgement before clearing the form. Remove the local
+queue row only for `dequeued` or `already_dequeued`. HTTP 409, failed requests
+and unknown replies keep the contact and answers visible. Retry an unknown
+request with the same captured fields. GET and DELETE keep their existing contracts.
+
 ## Browser dialer / tokens
 
 | Method | Path | Purpose |

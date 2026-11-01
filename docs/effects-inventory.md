@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**149** documented / **149** total effects (0 grandfathered, ratcheting to 0).
+**151** documented / **151** total effects (0 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -71,6 +71,8 @@
 | `app/hooks/call/useCallStatusPolling.ts` | Poll the provider call status serially for one committed call/agent-leg identity; the Effect task aborts on exit or identity change. | enabled, callSid, workspaceId, agentLegSid, intervalMs (the committed polling identity) | Effect task + fetch; abort on unmount or identity replacement | Provider status is live server state that keeps changing after the call starts; a loader cannot poll. |
 | `app/hooks/call/useCampaignCallFlow.ts` | Restore the saved manual customer into the canonical customer owner. | manualRecovery, allowManualRecovery, workspaceId, isPredictive, fsmState, onServerCustomerOwned, send (committed recovery). | Logical customer state and SDK ownership bridge; no provider command. | Current discovery completes after the page has mounted. |
 | `app/hooks/call/useCampaignCallFlow.ts` | Bind the confirmed room customer and bridge legacy FSM transitions into the canonical lifecycle. | fsmState, callSid, resetCustomer, confirmedCustomerSid, predictiveState.status, send (committed customer and transition). | Update the logical customer owner and lifecycle state; remember the last committed source. | SDK and realtime transitions arrive after mount, outside loader requests. |
+| `app/hooks/call/useCampaignQueueFlow.ts` | Bind prefetched queue rows to their committed page. | pageOwner (actor, workspace and campaign). | Retire old page fetch replies; no network work starts here. | A user-requested batch can arrive after navigation. |
+| `app/hooks/call/useCampaignQueueFlow.ts` | Bind queue acknowledgements to the committed page and selected call attempt. | owner (actor, workspace, campaign, queue snapshot and customer). | Retire late queue replies on cleanup; no queue writes. | Pending browser commands can outlive their selected contact. |
 | `app/hooks/call/useCustomerCallControls.ts` | Bind customer controls to the committed actor, workspace and campaign. | owner (a new page scope creates a new lifetime). | Retire captured commands and replies on cleanup; no provider cleanup. | Controls can outlive a page through pending HTTP replies and retained callbacks. |
 | `app/hooks/call/useDialFailureRecovery.ts` | Dispatch FAIL to the call FSM when a settled dial fetcher | fetcherState, fetcherData, send, showError (fires once per settled fetcher response carrying a rejection) | none directly (FSM dispatch + toast) | Reacts to a mutation result to fix client FSM |
 | `app/hooks/call/useManualAudioDial.ts` | Recover the saved manual request and reject replies after disposal. | resource (actor, workspace and campaign owner). | browser storage read; no call is sent on mount. | The saved request is browser-owned and explicit |

@@ -78,6 +78,17 @@ function baseProps(overrides: Partial<any> = {}) {
 }
 
 describe("app/components/call/CallScreen.CallArea.tsx", () => {
+  test("pending Save and Next locks the disposition until the acknowledgement arrives", async () => {
+    const { CallArea } = await import("@/components/call/CallScreen.CallArea");
+    const props = baseProps({ isAdvancingQueue: true, disposition: "answered",
+      dispositionOptions: [{ value: "answered", label: "Answered" }] });
+    const { rerender } = render(<CallArea {...props} />);
+    expect(screen.getByRole("combobox")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save and Next" })).toBeDisabled();
+    rerender(<CallArea {...props} isAdvancingQueue={false} />);
+    expect(screen.getByRole("combobox")).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Save and Next" })).toBeEnabled();
+  });
   test.each([false, true])("audio prerequisites disable Start in predictive mode %s", async predictive => {
     const { CallArea } = await import("@/components/call/CallScreen.CallArea");
     const props = baseProps({ predictive, startDisabledReason: "Check audio connection" });

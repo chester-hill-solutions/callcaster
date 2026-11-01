@@ -15,12 +15,14 @@ import { handsetPathOverrides } from "@/lib/openapi-handset";
 import { voiceAudioPathOverrides } from "@/lib/openapi-voice-audio";
 import { manualDialPathOverrides } from "@/lib/openapi-manual-dial";
 import { dialerStopPathOverrides } from "@/lib/openapi-dialer-stop";
+import { queueAdvancePathOverrides } from "@/lib/openapi-queue-advance";
 
 export const platformPathOverrides = {
   ...handsetPathOverrides,
   ...voiceAudioPathOverrides,
   ...manualDialPathOverrides,
   ...dialerStopPathOverrides,
+  ...queueAdvancePathOverrides,
   "/api/workspaces/{workspaceId}/conversations": {
     get: {
       operationId: "getWorkspaces_workspaceId_conversations",

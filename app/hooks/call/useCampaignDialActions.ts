@@ -122,7 +122,8 @@ type UseCampaignDequeueActionsOptions = {
   setCallDuration: (duration: number) => void;
   handleDialButton: () => void;
   saveData: () => void;
-  dequeue: (args: { contact: QueueItem }) => void;
+  dequeue: (args: { contact: QueueItem }) => Promise<boolean>;
+  isCurrentQueue: () => boolean;
   fetchMore: (args: { householdMap: Record<string, QueueItem[]> }) => Promise<void>;
   householdMap: Record<string, QueueItem[]>;
   handleNextNumber: (skipHousehold?: boolean) => void;
@@ -138,13 +139,14 @@ export function useCampaignDequeueActions({
   handleDialButton,
   saveData,
   dequeue,
+  isCurrentQueue,
   fetchMore,
   householdMap,
   handleNextNumber,
   setRecentAttempt,
   setUpdate,
 }: UseCampaignDequeueActionsOptions) {
-  return useCallback(() => {
+  return useCallback(async () => {
     if (!campaign || !questionContact) return;
 
     if (campaign.dial_type === "predictive") {
@@ -154,7 +156,7 @@ export function useCampaignDequeueActions({
       saveData();
     } else if (campaign.dial_type === "call") {
       saveData();
-      dequeue({ contact: questionContact });
+      if (!await dequeue({ contact: questionContact }) || !isCurrentQueue()) return;
       fetchMore({ householdMap });
       handleNextNumber(campaign?.group_household_queue || false);
       // NEXT resets a finished call to idle; HANG_UP here parked the FSM in
@@ -172,6 +174,7 @@ export function useCampaignDequeueActions({
     handleDialButton,
     saveData,
     dequeue,
+    isCurrentQueue,
     fetchMore,
     householdMap,
     handleNextNumber,

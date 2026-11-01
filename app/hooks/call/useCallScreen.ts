@@ -425,6 +425,10 @@ export function useCallScreen() {
   const queueFlow = useCampaignQueueFlow({
     campaign: campaign ?? null,
     workspaceId,
+    userId: user.id,
+    questionContact,
+    customerCallSid,
+    isCurrentCustomer,
     groupByHousehold,
     queue,
     householdMap,
@@ -469,7 +473,7 @@ export function useCallScreen() {
 
   const handleDialButton = useCampaignDialActions({
     campaign,
-    deviceIsBusy: hasHeldCalls || (deviceIsBusy && !(agentAudio.state.active?.transport === "computer" && agentAudio.state.active.callSid === agentLegSid)),
+    deviceIsBusy: queueFlow.pending || hasHeldCalls || (deviceIsBusy && !(agentAudio.state.active?.transport === "computer" && agentAudio.state.active.callSid === agentLegSid)),
     incomingCall,
     deviceStatus,
     callState: displayState,
@@ -495,6 +499,7 @@ export function useCallScreen() {
     handleDialButton,
     saveData,
     dequeue: queueFlow.dequeue,
+    isCurrentQueue: queueFlow.isCurrentQueue,
     fetchMore: queueFlow.fetchMore,
     householdMap,
     handleNextNumber: queueFlow.handleNextNumber,
@@ -612,6 +617,7 @@ export function useCallScreen() {
   }, [hangUp, send, reconnectDevice]);
 
   const callControls = {
+    isAdvancingQueue: queueFlow.pending,
     awaitingCustomerReceipt: (manualAudioDial.state.pending && !callSid) || Boolean(pendingStartIntentId) || customerRecoveryPending,
     manualDialError: manualAudioDial.state.error ?? (dialerStopPending ? dialerError ?? "Stop is pending. Stay on this screen until it is confirmed."
       : dialerError ?? (awaitingStartReceipt ? "The dialer request is not confirmed. Check this request before starting another session."
@@ -632,7 +638,7 @@ export function useCallScreen() {
     activeCall,
     callState: displayState,
     callDuration: logicalDuration.callDuration,
-    deviceIsBusy,
+    deviceIsBusy: deviceIsBusy || queueFlow.pending,
     isStartingConference,
     startDisabledReason: startDisabledReason ?? audioStartDisabledReason,
     handleDialButton,

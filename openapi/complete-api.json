@@ -9607,8 +9607,8 @@
     "/api/queues": {
       "post": {
         "operationId": "postQueues",
-        "summary": "POST /api/queues",
-        "description": "Campaign queue dequeue and reset; requires session auth and workspace access.",
+        "summary": "Advance one captured call-screen queue entry",
+        "description": "Session or bearer session only. Capture workspace, campaign, contact, queue ID and dispatch generation before sending Save and Next. X-Callcaster-Audio-Actor must match the authenticated user; it grants no authority. A customer Call SID must belong to that actor and contact and be terminal. A current funded attempt can dequeue only its own queue generation and reservation. An old terminal customer can finish its view with advance_state=superseded while newer queue work remains unchanged. A legacy completed customer without a saved funding owner also returns superseded; this command does not infer its queue ownership. Idle stale skips return 409. All HTTP 200 variants echo the captured request and actor. Remove a local queue row only for dequeued or already_dequeued, never for superseded. Unknown replies keep the current form; retry the same request. This control does not settle customer billing or start another call.",
         "tags": [
           "User API",
           "queues"
@@ -9631,20 +9631,317 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "additionalProperties": true
+                "additionalProperties": false,
+                "required": [
+                  "workspace_id",
+                  "campaign_id",
+                  "contact_id",
+                  "queue_id",
+                  "dispatch_generation",
+                  "household"
+                ],
+                "properties": {
+                  "workspace_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "campaign_id": {
+                    "oneOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$"
+                      }
+                    ]
+                  },
+                  "contact_id": {
+                    "oneOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$"
+                      }
+                    ]
+                  },
+                  "queue_id": {
+                    "oneOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$"
+                      }
+                    ]
+                  },
+                  "dispatch_generation": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "household": {
+                    "type": "boolean"
+                  },
+                  "call_sid": {
+                    "type": "string",
+                    "pattern": "^CA[0-9a-fA-F]{32}$",
+                    "description": "The captured customer Call SID when completing a call. Omit it for an idle manual skip."
+                  }
+                }
               },
-              "description": "Request body; see human docs for field details."
+              "example": {
+                "workspace_id": "10000000-0000-4000-8000-000000000001",
+                "campaign_id": 42,
+                "contact_id": 7,
+                "queue_id": 27,
+                "dispatch_generation": "10000000-0000-4000-8000-000000000099",
+                "household": false,
+                "call_sid": "CA33333333333333333333333333333333"
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "The captured action is acknowledged. Only dequeued changes the queue; already_dequeued is an idempotent replay and superseded leaves newer work queued.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "workspace_id",
+                        "campaign_id",
+                        "contact_id",
+                        "queue_id",
+                        "dispatch_generation",
+                        "household",
+                        "success",
+                        "user_id",
+                        "dequeued",
+                        "advance_state"
+                      ],
+                      "properties": {
+                        "workspace_id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "campaign_id": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "contact_id": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "queue_id": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "dispatch_generation": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "household": {
+                          "type": "boolean"
+                        },
+                        "call_sid": {
+                          "type": "string",
+                          "pattern": "^CA[0-9a-fA-F]{32}$",
+                          "description": "The captured customer Call SID when completing a call. Omit it for an idle manual skip."
+                        },
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "user_id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "dequeued": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "advance_state": {
+                          "type": "string",
+                          "enum": [
+                            "dequeued"
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "workspace_id",
+                        "campaign_id",
+                        "contact_id",
+                        "queue_id",
+                        "dispatch_generation",
+                        "household",
+                        "success",
+                        "user_id",
+                        "dequeued",
+                        "advance_state"
+                      ],
+                      "properties": {
+                        "workspace_id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "campaign_id": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "contact_id": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "queue_id": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "dispatch_generation": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "household": {
+                          "type": "boolean"
+                        },
+                        "call_sid": {
+                          "type": "string",
+                          "pattern": "^CA[0-9a-fA-F]{32}$",
+                          "description": "The captured customer Call SID when completing a call. Omit it for an idle manual skip."
+                        },
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "user_id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "dequeued": {
+                          "type": "boolean",
+                          "enum": [
+                            false
+                          ]
+                        },
+                        "advance_state": {
+                          "type": "string",
+                          "enum": [
+                            "already_dequeued"
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "workspace_id",
+                        "campaign_id",
+                        "contact_id",
+                        "queue_id",
+                        "dispatch_generation",
+                        "household",
+                        "success",
+                        "user_id",
+                        "dequeued",
+                        "advance_state",
+                        "call_sid"
+                      ],
+                      "properties": {
+                        "workspace_id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "campaign_id": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "contact_id": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "queue_id": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "dispatch_generation": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "household": {
+                          "type": "boolean"
+                        },
+                        "call_sid": {
+                          "type": "string",
+                          "pattern": "^CA[0-9a-fA-F]{32}$",
+                          "description": "The captured customer Call SID when completing a call. Omit it for an idle manual skip."
+                        },
+                        "success": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "user_id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "dequeued": {
+                          "type": "boolean",
+                          "enum": [
+                            false
+                          ]
+                        },
+                        "advance_state": {
+                          "type": "string",
+                          "enum": [
+                            "superseded"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid captured queue identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -9654,22 +9951,73 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Workspace role is not permitted",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workspace or contact is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The actor, queue snapshot or live customer does not match",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Queue transaction failed; retain the captured request for retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "X-Callcaster-Audio-Actor",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
       },
       "delete": {
         "operationId": "deleteQueues",

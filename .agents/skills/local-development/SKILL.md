@@ -1123,6 +1123,12 @@ proof. Parse whole statements and retain valid called-service/auth controls.
 
 ## Generated API files
 
+Before changing a session-only API, check both exported specifications.
+Session-only queue controls can still appear in public and complete views.
+Update their hand-authored override and matching contract tests before codegen.
+If a referenced `.cursor` skill is missing in a worktree, also check the
+verified main checkout. Current ADRs and scripts govern stale bootstrap examples.
+
 For API surface changes, generate with `npm run tools:api:codegen` and
 `npm run tools:api:surface:report` before full CI. **Declaring or changing a
 capability is an API surface change**: an entry in

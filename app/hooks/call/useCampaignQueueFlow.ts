@@ -1,13 +1,17 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import { useFetcher } from "react-router";
 import { handleContact, handleQueue } from "@/lib/callscreenActions";
-import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
+import { advanceQueueEntry } from "@/lib/queue-advance-client";
+import { toast } from "sonner";
 import type { Call, Campaign, OutreachAttempt, QueueItem } from "@/lib/types";
 
 type UseCampaignQueueFlowOptions = {
   campaign: Campaign | null | undefined;
   workspaceId: string;
+  userId: string;
+  questionContact: QueueItem | null;
+  customerCallSid: string | null;
+  isCurrentCustomer: () => boolean;
   groupByHousehold: boolean;
   queue: QueueItem[];
   householdMap: Record<string, QueueItem[]>;
@@ -26,6 +30,10 @@ type UseCampaignQueueFlowOptions = {
 export function useCampaignQueueFlow({
   campaign,
   workspaceId,
+  userId,
+  questionContact,
+  customerCallSid,
+  isCurrentCustomer,
   groupByHousehold,
   queue,
   householdMap,
@@ -40,22 +48,48 @@ export function useCampaignQueueFlow({
   setNextRecipient,
   setQueue,
 }: UseCampaignQueueFlowOptions) {
-  const queueFetcher = useFetcher<{
-    queueError?: boolean;
-    error?: string;
-    code?: string;
-  }>();
+  const pageScope = JSON.stringify([workspaceId, userId, campaign?.id]);
+  const pageOwner = useMemo(() => ({ scope: pageScope, active: false, epoch: 0 }), [pageScope]);
+  const scope = JSON.stringify([workspaceId, userId, campaign?.id, questionContact?.id, questionContact?.dispatch_generation, customerCallSid]);
+  const owner = useMemo(() => ({ scope, active: false, posting: false, epoch: 0 }), [scope]);
+  const [postingOwner, setPostingOwner] = useState<typeof owner | null>(null);
+  /**
+   * @effect Bind prefetched queue rows to their committed page.
+   * @effect-deps pageOwner (actor, workspace and campaign).
+   * @effect-side-effects Retire old page fetch replies; no network work starts here.
+   * @effect-why-not-loader A user-requested batch can arrive after navigation.
+   */
+  useEffect(() => {
+    pageOwner.active = true; pageOwner.epoch++;
+    return () => { pageOwner.active = false; pageOwner.epoch++; };
+  }, [pageOwner]);
+  /**
+   * @effect Bind queue acknowledgements to the committed page and selected call attempt.
+   * @effect-deps owner (actor, workspace, campaign, queue snapshot and customer).
+   * @effect-side-effects Retire late queue replies on cleanup; no queue writes.
+   * @effect-why-not-loader Pending browser commands can outlive their selected contact.
+   */
+  useEffect(() => {
+    owner.active = true; owner.epoch++;
+    return () => { owner.active = false; owner.posting = false; owner.epoch++; };
+  }, [owner]);
+  const isCurrentQueue = useCallback(() => owner.active && isCurrentCustomer(), [owner, isCurrentCustomer]);
 
-  // POST /api/queues answers a manual dequeue with 409 + `{ error, code }`
-  // when the row was NOT dequeued — it is `assigned` to another agent, so the
-  // guarded RPC left it alone (#1278). Without this the agent saw the contact
-  // vanish from their list and nothing else: the fetcher result was read by no
-  // one. Success carries no message on purpose (the row disappearing is the
-  // feedback), and an already-dequeued contact answers 200, so the routine
-  // "next contact" dequeue after a hangup stays silent.
-  useActionFeedback(queueFetcher.data, {
-    enabled: queueFetcher.state === "idle",
-  });
+  const dequeue = useCallback(async ({ contact }: { contact: QueueItem }) => {
+    if (!campaign || owner.posting || !isCurrentQueue() || contact.id !== questionContact?.id ||
+      contact.dispatch_generation !== questionContact.dispatch_generation) return false;
+    const epoch = owner.epoch;
+    owner.posting = true; setPostingOwner(owner);
+    const result = await advanceQueueEntry({ workspace_id: workspaceId, campaign_id: campaign.id,
+      contact_id: contact.contact.id, queue_id: contact.id, dispatch_generation: contact.dispatch_generation,
+      household: groupByHousehold, ...(customerCallSid ? { call_sid: customerCallSid } : {}) }, userId);
+    if (!isCurrentQueue() || owner.epoch !== epoch) return false;
+    owner.posting = false; setPostingOwner(null);
+    if (!result.ok) { toast.error(result.error); return false; }
+    if (result.advanceState !== "superseded")
+      setQueue(current => current.filter(row => row.id !== contact.id || row.dispatch_generation !== contact.dispatch_generation));
+    return true;
+  }, [campaign, owner, isCurrentQueue, questionContact, workspaceId, groupByHousehold, customerCallSid, userId, setQueue]);
 
   const { switchQuestionContact, nextNumber } = handleContact({
     setQuestionContact,
@@ -66,13 +100,14 @@ export function useCampaignQueueFlow({
     calls: callsList,
   });
 
-  const { dequeue, fetchMore } = handleQueue({
-    submit: queueFetcher.submit,
-    groupByHousehold,
-    campaign: campaign as Campaign,
-    workspaceId,
-    setQueue,
-  });
+  const fetchMore = useCallback(async (args: { householdMap: Record<string, QueueItem[]> }) => {
+    if (!campaign || !pageOwner.active) return;
+    const epoch = pageOwner.epoch;
+    const batch = handleQueue({ campaign, workspaceId,
+      setQueue: update => setQueue(current => pageOwner.active && pageOwner.epoch === epoch
+        ? typeof update === "function" ? update(current) : update : current) });
+    await batch.fetchMore(args);
+  }, [campaign, workspaceId, pageOwner, setQueue]);
 
   const handleNextNumber = useCallback(
     (skipHousehold = false) => {
@@ -105,6 +140,7 @@ export function useCampaignQueueFlow({
     handleNextNumber,
     dequeue,
     fetchMore,
-    queueFetcher,
+    pending: postingOwner === owner,
+    isCurrentQueue,
   };
 }
