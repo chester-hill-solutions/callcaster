@@ -6,6 +6,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 - Fixed: Released phone numbers stay in dated, read-only workspace and support history. Live sender lists, routing, rental billing and reports exclude them; repeat release is refused ([PR #3097](https://github.com/chester-hill-solutions/callcaster/pull/3097), [#2995](https://github.com/chester-hill-solutions/callcaster/issues/2995)).
 
+- Fixed: Archiving a workspace permanently revokes its API keys and blocks its API sessions. Restoring the workspace requires new keys, including for workspaces archived under the old rule ([PR #3096](https://github.com/chester-hill-solutions/callcaster/pull/3096), [#2994](https://github.com/chester-hill-solutions/callcaster/issues/2994)).
+
+- Added: Platform admins can find archived workspaces and restore them while keeping their saved data and previous enabled or disabled state ([PR #3094](https://github.com/chester-hill-solutions/callcaster/pull/3094), [#2992](https://github.com/chester-hill-solutions/callcaster/issues/2992), [#2993](https://github.com/chester-hill-solutions/callcaster/issues/2993)).
+
 - Fixed: Members can review and merge confirmed duplicate-person records while keeping history, call lists and the most restrictive opt-out. SMS errors link to Contacts for review ([PR #3093](https://github.com/chester-hill-solutions/callcaster/pull/3093), [#3091](https://github.com/chester-hill-solutions/callcaster/issues/3091)).
 
 - Fixed: Campaign SMS respects an opt-out saved on any matching workspace contact, including copies outside the selected audience ([PR #3090](https://github.com/chester-hill-solutions/callcaster/pull/3090), [#3088](https://github.com/chester-hill-solutions/callcaster/issues/3088)).

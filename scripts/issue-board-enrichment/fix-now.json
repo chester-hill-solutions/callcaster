@@ -1,68 +1,5 @@
 [
   {
-    "issueNumber": 2995,
-    "verdict": "fix-now",
-    "summary": "Retain released numbers as dated, read-only history while all live paths exclude them. The active candidate is draft PR #3097; final CI, merge and acceptance remain.",
-    "currentBehavior": "At dev@05195e1e, release deletes the original workspace_number row. The candidate marks it released and retains its release date, keeps legacy receipt history, and filters live lists, routing, billing and reports.",
-    "rootCause": "Number consumers assume every row is live. Retaining rows requires the lifecycle filter and read-only protection to land with the release write.",
-    "resolution": "Complete #2995 as one change: retain the row after confirmed provider release, show workspace and support history, exclude released rows from live reads and writes, refuse repeat release, and keep the existing recovery and release-first archive order. A later explicit purchase creates a new rental row.",
-    "lookIn": [
-      "app/server/number-release-intent.server.ts",
-      "app/lib/workspace-number-history.server.ts",
-      "app/components/phone-numbers/NumberHistory.tsx",
-      "client/migrations/20261031000001_workspace_number_release_history.sql",
-      "test/integration-db/number-history-live-paths.test.ts"
-    ],
-    "existingTests": [
-      "Original runtime fails 15 of 56 initial cases. The candidate passes the full owned PostgreSQL tier (1,358 cases), 23 UI cases and 48 admin-response/API contract checks. Final exact-head checks and GitHub CI remain."
-    ],
-    "missingTests": [
-      "Require final exact-head local checks and full GitHub CI before merge; then verify dev deployment and operator/release acceptance. Provider boundaries use an isolated fake; no live number was released."
-    ],
-    "acceptanceCriteria": [
-      "Release retains the original row with released status and a date.",
-      "Live lists, routing, senders, billing and reports exclude released rows.",
-      "Workspace and support history show the release date without mutation controls.",
-      "Repeat release and attempts to reactivate the same row are refused without repeated provider work or charges.",
-      "Archive keeps release-first ordering and failure recovery; script/queue cleanup preserves valid history references."
-    ],
-    "blockedBy": [],
-    "size": "L",
-    "risk": "high",
-    "trackerRecommendation": "Native Project Status is In progress, read in the authenticated board on 2026-10-31. Assigned to @wra-sol, child of High-priority #2732. Its own Priority, Effort and Enviornment fields are unset. Keep open for release acceptance."
-  },
-  {
-    "issueNumber": 2994,
-    "verdict": "fix-now",
-    "summary": "The owner chose permanent API-key revocation on archive on 2026-10-31. The active branch implements the rule; CI, merge, deployed and release acceptance remain.",
-    "currentBehavior": "At dev@86e4d3a, archive retains API keys and shared member access does not check archived_at. Old keys can still authenticate. Restore can revive their access.",
-    "rootCause": "The final archive write does not revoke keys. API-key creation and archive do not share a lock. The shared membership check accepts archived workspaces.",
-    "resolution": "Commit archive and key deletion in one transaction. Use the same workspace row lock for key creation, require an active workspace in shared membership checks, remove legacy keys before restore and return the revoked-key count. Keep release-first behavior and owner-only archive.",
-    "lookIn": [
-      "app/server/workspace-credentials.server.ts",
-      "app/lib/workspace-membership.server.ts",
-      "app/server/workspace-restore.server.ts",
-      "test/integration-db/workspace-archive-credentials.test.ts"
-    ],
-    "existingTests": [
-      "The original implementation fails seven of nine initial database cases; two controls pass. The candidate passes 23 real-session database tests, 149 affected Node tests and 10 UI tests. Coverage includes archived sessions and keys, legacy restore, exact counts, foreign isolation, provider failure, rollback and concurrent key creation."
-    ],
-    "missingTests": [
-      "Full exact-head GitHub CI, merge, deployed acceptance and release acceptance remain. Provider tests use an isolated fake; no deployed keys or provider resources were changed."
-    ],
-    "acceptanceCriteria": [
-      "Archive permanently revokes the workspace keys and reports the exact count.",
-      "Archived workspaces refuse key and session access.",
-      "Restore requires new keys, including for workspaces archived under the old rule.",
-      "Concurrent key creation cannot leave a valid key after archive.",
-      "Failed number release keeps the workspace and its keys active; database failures roll back key deletion."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Native Project Status is In progress. The task is assigned to @wra-sol and is a child of High-priority #2732; its own Priority, Effort and Enviornment fields are unset. Decision: https://github.com/chester-hill-solutions/callcaster/issues/2994#issuecomment-6549744222 . Keep open for dev and release acceptance."
-  },
-  {
     "issueNumber": 2638,
     "verdict": "fix-now",
     "summary": "PR #3023 names the Call list selection controls and reuses one named Rows per page control. Review, merge and deployed acceptance remain.",
@@ -162,21 +99,6 @@
     ],
     "acceptanceCriteria": [],
     "rootCause": "Two commits are in origin/master: 642f4ee7 'feat(ivr): improve speech capture with hints, valid model, and numDigits (#1875) (#1876)' (slice A) and 9dcab08b 'feat(ivr): store structured speech answers (#2160)' (slice B items 4-5). The brief's candidate list only names the slice A commit, which by itself would not satisfy the slice B title; the slice B shape landed later under PR #2160 and is what the master tree contains. The remaining slice B item 6 is knowingly deferred: the repo's own triage record for #1880 ('Decide: adopt Jev (TypeSafe) or hand-roll IVR speech intent', scripts/issue-board-enrichment/needs-decision.json:311-328) says its decision 'decides #1862 and the deferred confidence slice of #1875', and the board still lists #1880 in the 'Needs decision' lane. Because the issue's own acceptance criteria (hints + valid model/timeout pairing, numDigits, and a confidence value on each recorded speech answer) are all met but the slice-B scope named in the title is not complete, the verdict is PARTIAL rather than VERIFIED. manual: false \u2014 everything that is implemented is machine-checkable."
-  },
-  {
-    "issueNumber": 1981,
-    "verdict": "fix-now",
-    "summary": "Nothing in origin/master changes the Stripe receipt to say how many credits were bought: the Checkout Session still creates ONE line item with `quantity: 1` and the whole package price in `unit_amount`, with the credit count folded into the product name \u2014 so the receipt still reads '500 workspace credits x 1', not 'Workspace credits x 500'.",
-    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
-    "resolution": "Implement the missing mechanism named in the root cause.",
-    "lookIn": [
-      "app/lib/platform-billing.server.ts"
-    ],
-    "existingTests": [
-      "None that proves the receipt text. test/platform-billing-checkout.test.ts asserts the Checkout request SHAPE (`quantity === 1`, name contains the formatted count) rather than the rendered receipt, so it passes while the reported symptom remains. There is no Stripe test-mode session, no receipt assertion and no screenshot of a real receipt in the repo."
-    ],
-    "acceptanceCriteria": [],
-    "rootCause": "The claimed fix (070f04f4 'fix(billing): receipts state credit count + contact@callcaster.ca ... (#1997)', PR #1997) IS an ancestor of origin/master (merged by 61594cdf on 2026-09-24) \u2014 but it does not implement the requested behaviour, it implements the rejected alternative. What is missing from origin/master: a Checkout Session whose line item is `name: 'Workspace credits'` with `quantity: <credits bought>` and a per-credit `unit_amount`, so the receipt states the count. The fix for that lives only on `origin/change-request/1981-credit-receipt-quantity` (8225f5ce) and has not been promoted. manual: true \u2014 the symptom is a real Stripe receipt (or a real credit balance on the account) that a person has to read; the unit test only inspects the request payload."
   },
   {
     "issueNumber": 2860,

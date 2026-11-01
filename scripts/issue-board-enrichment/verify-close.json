@@ -1,5 +1,71 @@
 [
   {
+    "issueNumber": 2994,
+    "verdict": "verify-close",
+    "summary": "Permanent API-key revocation is merged and deployed to dev in PR #3096. Restore needs new keys. Operator and release acceptance remain.",
+    "currentBehavior": "At dev@05195e1e and later, archive deletes the workspace keys in its final transaction. Archived keys and sessions cannot use workspace APIs; restore also removes legacy keys before reopening access.",
+    "rootCause": "The old archive write retained keys, and key creation did not share its workspace lock. PR #3096 adds the shared lock and active-workspace checks.",
+    "resolution": "Verify the merged archive and restore flow, then follow the release process. Do not implement another revocation patch.",
+    "lookIn": [
+      "app/server/workspace-credentials.server.ts",
+      "app/lib/workspace-membership.server.ts",
+      "app/server/workspace-restore.server.ts",
+      "test/integration-db/workspace-archive-credentials.test.ts"
+    ],
+    "existingTests": [
+      "The original runtime failed seven of nine initial database cases. The merged fix passed 23 real-session database tests, 149 affected Node tests and 10 UI tests, plus full local and exact-head GitHub CI.",
+      "The dev app and worker were healthy at merge 05195e1e; /readyz returned 200."
+    ],
+    "missingTests": [
+      "Operator acceptance and promotion to master remain. Provider tests used an isolated fake; they did not revoke deployed keys or release live numbers."
+    ],
+    "acceptanceCriteria": [
+      "Archive permanently revokes the workspace keys and reports the exact count.",
+      "Archived workspaces refuse key and session access.",
+      "Restore requires new keys, including for workspaces archived under the old rule.",
+      "Concurrent key creation cannot leave a valid key after archive.",
+      "Failed number release keeps the workspace and its keys active; database failures roll back key deletion."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Native Project Status is on-dev, read in the authenticated board on 2026-11-01. Assigned to @wra-sol, child of High-priority #2732; own Priority, Effort and Enviornment fields are unset. The owner decision is recorded at https://github.com/chester-hill-solutions/callcaster/issues/2994#issuecomment-6549744222 . Keep open for operator and release acceptance."
+  },
+  {
+    "issueNumber": 2995,
+    "verdict": "verify-close",
+    "summary": "Released-number history is merged and deployed to dev in PR #3097. Operator and release acceptance remain.",
+    "currentBehavior": "At dev@0b73c943, release retains the original workspace_number row with released status and a date. Workspace and support views show read-only history; live lists, routing, senders, rental billing and reports exclude it.",
+    "rootCause": "The old release path deleted the original row, and number consumers assumed every stored row was live. PR #3097 adds the lifecycle filter and database protection with the release write.",
+    "resolution": "Verify the merged history and live-use exclusions, then follow the release process. A later explicit purchase creates a new rental row; do not reactivate the retained row.",
+    "lookIn": [
+      "app/server/number-release-intent.server.ts",
+      "app/lib/workspace-number-history.server.ts",
+      "app/components/phone-numbers/NumberHistory.tsx",
+      "client/migrations/20261031000001_workspace_number_release_history.sql",
+      "test/integration-db/number-history-live-paths.test.ts"
+    ],
+    "existingTests": [
+      "The original runtime failed 15 of 56 initial cases. The final source passed 37 local gates, 3,523 affected Node tests, 125 focused database tests, 23 UI tests and 48 response/API contract checks.",
+      "Full PostgreSQL 18 CI passed 1,358 cases, including 40 new live-path cases. All 19 applicable exact-head checks and both post-merge drift checks passed.",
+      "Dev app and worker were healthy at merge 0b73c943; /readyz returned 200."
+    ],
+    "missingTests": [
+      "Operator acceptance and promotion to master remain. Provider tests used an isolated fake; no live number was released."
+    ],
+    "acceptanceCriteria": [
+      "Release retains the original row with released status and a date.",
+      "Live lists, routing, senders, billing and reports exclude released rows.",
+      "Workspace and support history show the release date without mutation controls.",
+      "Repeat release and attempts to reactivate the same row are refused without repeated provider work or charges.",
+      "Archive keeps release-first ordering and failure recovery; script/queue cleanup preserves valid history references."
+    ],
+    "blockedBy": [],
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Native Project Status is on-dev, confirmed in the authenticated board on 2026-11-01. Assigned to @wra-sol, child of High-priority #2732; own Priority, Effort and Enviornment fields are unset. Keep open for operator and release acceptance."
+  },
+  {
     "issueNumber": 2992,
     "verdict": "verify-close",
     "summary": "Admin restore is merged into dev in PR #3094. Operators can identify archived workspaces and confirm a restore that preserves released-number state.",

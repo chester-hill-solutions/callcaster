@@ -370,25 +370,6 @@
     "trackerRecommendation": "needs-decision/roadmap spike. Keep vx-any as-is until answered; its outcome decides #1862."
   },
   {
-    "issueNumber": 1983,
-    "verdict": "needs-decision",
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "",
-    "recommendedTitle": "Receipts and charges should include tax",
-    "summary": "Product/legal decision: receipts currently show untaxed charges. Adding tax display (and taxing charges) needs a jurisdiction/tax-configuration decision (rates, exemptions, remittance) before implementation.",
-    "currentBehavior": "Billing shows amounts without tax; receipts have no tax line; ledgers store pretax totals.",
-    "resolution": "Decide: (1) tax on CallCaster charges scope (which products, jurisdictions, rate config), (2) display-only receipts vs taxed ledger amounts. Then implement in the receipt builder + pricing path.",
-    "lookIn": [
-      "app/routes/api+/workspaces+/$workspaceId/billing/receipt.route.tsx",
-      "shared/pricing.ts"
-    ],
-    "acceptanceCriteria": [
-      "No implementation until the tax decision is recorded"
-    ]
-  },
-  {
     "issueNumber": 1996,
     "verdict": "needs-decision",
     "recommendedTitle": "Decide whether a daily full PII snapshot ships, into which bucket, with what retention and who can restore it",
