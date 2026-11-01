@@ -113,9 +113,10 @@ New queue rows and outreach attempts use database insertion time, so a transacti
 that starts earlier cannot backdate replacement work. A later explicit requeue,
 reservation, outreach attempt or live customer keeps that row queued. Missing
 original outreach or unresolved parent ownership never borrows the current
-assignee. A historical row without the intent timestamp needs its exact saved
+assignee. A historical row without a trusted insertion or redial timestamp needs its exact saved
 primary queue ID; unbound primary rows and household siblings stay queued for
-operator review. New rows receive the existing intent timestamp on insertion.
+operator review. New rows receive `inserted_at`; normal campaign phone
+deduplication still uses only an explicit `redial_requested_at` cutoff.
 Eligible household members created before the original attempt still
 advance; newer or live members stay queued. Call billing and the original
 outreach result continue through their canonical owners. Legacy Hang Up waits

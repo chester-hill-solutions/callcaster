@@ -797,6 +797,8 @@ inserts the original outreach after its queue. Keep applied migrations intact.
 A new default does not repair historical values. Preserve unknown intent
 timestamps and require saved ownership before old rows can advance. Test a
 delayed callback across a real upgrade after the replacement was already made.
+Keep insertion proof separate from explicit-redial timestamps used by phone
+deduplication. Test a new duplicate contact added after the first call ends.
 Keep real database I/O on real timers when testing a provider deadline. Signal
 that the provider read has started, await its bounded rejection, then release
 the late response. Faking all timers can stall the SQL client's socket work and

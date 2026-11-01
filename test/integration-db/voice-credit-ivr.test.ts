@@ -555,6 +555,24 @@ describe("IVR dispatch funding and recovery (#2879)", () => {
     const [row] = await sql`select contact_id from public.call where workspace = ${workspaceId}::uuid and sid <> ${first.sid}`;
     expect(Number(row.contact_id)).toBe(Number(other.contact_id));
   });
+
+  test("a new contact added after a completed campaign call keeps normal phone deduplication", async () => {
+    await send("worker"); await completeCall(firstProviderCall());
+    const [other] = await sql`insert into public.contact (workspace, firstname, phone)
+      values (${workspaceId}::uuid, 'Later duplicate', ${to}) returning id`;
+    try {
+      const { enqueueContactsForCampaign } = await import("@/lib/queue.server");
+      await enqueueContactsForCampaign(campaignId, [Number(other.id)], { requeue: false });
+      await sql`update public.campaign set status = 'running' where id = ${campaignId}`;
+      await send("worker");
+      expect(provider.create).toHaveBeenCalledTimes(1);
+      expect(await state()).toEqual({ credits: 98, holds: 0, attempts: 1, calls: 1, ledger: 1 });
+      expect((await sql`select queue_state from public.campaign_queue where campaign_id = ${campaignId} and contact_id = ${other.id}`)[0].queue_state).toBe('dequeued');
+    } finally {
+      await sql`delete from public.campaign_queue where campaign_id = ${campaignId} and contact_id = ${other.id}`;
+      await sql`delete from public.contact where id = ${other.id}`;
+    }
+  });
   test("a late call row does not round an earlier admission into the new redial window", async () => {
     await send("worker"); const first = firstProviderCall(); await completeCall(first); await readdContact();
     await sql`update public.workspace_voice_reservation r set created_at = q.redial_requested_at - interval '1 microsecond'

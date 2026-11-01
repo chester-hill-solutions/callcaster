@@ -86,7 +86,7 @@ suite("campaign results units and ended-call retries (#2034)", () => {
       await sql`insert into public.outreach_attempt (workspace,campaign_id,contact_id,user_id,disposition,created_at,answered_at)
       values (${workspace},${campaign},${contact},${actor},'completed','2026-10-07T12:00:00Z','2026-10-07T12:00:05Z') returning id`;
     attempt = Number(row.id);
-    await sql`insert into public.campaign_queue (workspace,campaign_id,contact_id,queue_state,queue_order,assigned_to_user_id,created_at,redial_requested_at)
+    await sql`insert into public.campaign_queue (workspace,campaign_id,contact_id,queue_state,queue_order,assigned_to_user_id,created_at,inserted_at)
       values (${workspace},${campaign},${contact},'assigned',1,${actor},'2026-10-07T11:59:59Z','2026-10-07T11:59:59Z')`;
     await sql`insert into public.call (sid,workspace,campaign_id,contact_id,outreach_attempt_id,status,duration)
       values (${parentSid},${workspace},${campaign},${contact},${attempt},'completed','20')`;
