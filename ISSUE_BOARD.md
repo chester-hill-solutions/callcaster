@@ -2,7 +2,7 @@
 
 Base snapshots: complete native Issue metadata and Project export from 2026-10-29 UTC (401 issues; 398 Project rows). The full open-issue inventory was checked again on 2026-11-01 UTC: 403 issues, exactly matching this board. This is not a new full Project export. Unselected entries retain their dated evidence. Refresh the full board with npm run tools:issues:board.
 
-Selected refresh, 2026-11-01 UTC: all 27 current Urgent/High issues plus #2533 and #2776. Native Type, Priority, Effort, Enviornment, owners, relationships and full timelines were read. Actual Project Status was read separately in the authenticated issue sidebar; no Status is inferred from a PR or label. The earlier full Project view omitted #100, #2902 and #2906; their Project Status stays unknown.
+Selected priority snapshot, 2026-11-01 UTC: 27 Urgent/High issues plus #2533 and #2776. The later selected refresh adds Urgent child #3102 and updates parent #2168. Native Type, Priority, Effort, Enviornment, owners, relationships and full timelines were read. Actual Project Status was read separately in the authenticated issue sidebar; no Status is inferred from a PR or label. The earlier full Project view omitted #100, #2902 and #2906; their Project Status stays unknown.
 
 PR #3100 is merged and healthy on dev: #2533 now shows both elapsed session time and accumulated connected talk time. PR #3099 for #2776 is also merged and healthy; script errors use block names. Those tasks and the merged redirect repair #3073 move to Verify and close. Operator and release acceptance remain.
 
@@ -11,6 +11,8 @@ Take existing urgent and high-priority app requirements first. The approved batc
 The user made #2700 human-only: skip agent setup and acceptance. Keep receipt quantity #1981 and the stated 13% Ontario tax #1983 blocked. See [the account audit](docs/stripe-environments.md). The retention/repeat decision #2029 remains open despite Status on-dev. In #2168, the keep-list is delivered; name backfill and repeat policy remain, and workspace-row cleanup stays deferred. PR #2537 changed planning evidence only. No provider cleanup was run for this refresh.
 
 Earlier selected updates remain: #1724 is answered and closed as completed; #2992–#2995 are on-dev; #2943 keeps its postal address by owner decision. Dev delivery and source tests do not replace operator, provider or release acceptance.
+
+Name backfill, 2026-11-01 UTC: #3102 is the separate Urgent child of #2168 and is In progress. The source provides reviewed plan/apply tooling, with 83 focused Node and 5 PostgreSQL cases passing. The live GET-only plan has 7 eligible dev names, 1 already correct and 30 protected records. Operational apply and release acceptance remain separate; #2029 still owns retention/repeat decisions. The inventory below includes the new child (404 open issues); this selected change is not a full Project export.
 
 ## How to use this board
 
@@ -302,7 +304,19 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 64
+## Verify and close — 65
+
+### [#3102](https://github.com/chester-hill-solutions/callcaster/issues/3102) Backfill legacy dev subaccount names from a reviewed ownership plan
+- **IN PROGRESS** · Verdict: **Verify and close** · Type: Task · Priority: Urgent · Effort: Medium · Environment: dev · Size: M · Risk: medium · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-11-01
+- The source provides a reviewed, idempotent name-backfill command for the Urgent requirement in #2168. Live apply and release acceptance remain separate from dry-run verification.
+- Current behavior: The command defaults to a JSON plan. It reads all provider pages and cross-checks dev, QA and production ownership. It protects shared accounts, duplicate owners, archived or unknown-state targets and custom labels. Apply changes only approved FriendlyName values and skips completed names.
+- Root cause: The naming helper changed new resources, but no command backfilled legacy UUID labels. Shared provider accounts require exact database ownership and cross-environment checks.
+- Resolution: Require the final exact-head local gate and GitHub CI, execute the reviewed eligible dev-only set, retain receipts and verify the result with GETs. Keep protected conflicts explicit and follow release acceptance. Parent #2168 retains the separate policy work.
+- Look in: `scripts/backfill-twilio-subaccount-names.mjs`, `scripts/lib/twilio-subaccount-name-backfill.mjs`, `app/lib/twilio-resource-name.ts`, `test/twilio-subaccount-name-backfill.test.ts`, `test/integration-db/twilio-subaccount-name-backfill.test.ts`, `docs/twilio-subaccount-name-backfill.md`
+- Existing tests: 83 focused Node tests pass, including 30 new SDK/CLI cases and the existing naming, keep-list and prune-policy controls.; 5 PostgreSQL tests cover stored object/JSON-text credentials, legacy reference schemas, archived owners and database URL aliases.; Disabling cross-environment protection fails four cases with 26 controls passing; a capped inventory or wrong name limit fails its own case with 29 controls passing.; A live GET-only plan found 7 eligible dev names, 1 already correct and 30 protected records; all three app/database bindings were verified.; The three hidden/conflicting SID cases fail before the review fix while 27 controls pass. The fixed reader preserves every recognized SID in both stored JSON forms and refuses conflicting target IDs.
+- Missing tests: Final exact-head local and GitHub checks, operational receipt and release acceptance.
+- Done when: Dry-run makes no provider or database writes.; Only exact, active, unshared target owners with consistent SID fields and legacy UUID labels can be renamed; every recognized cross-environment reference is protected.; Reviewed apply rechecks ownership, preserves custom names and account status, and is idempotent.; Names retain their ID suffix within the Account API limit.; Save the approved dev-only operation receipts and GET-only verification; do not override protected conflicts.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status In progress, read in the authenticated issue sidebar. Native Type Task, Priority Urgent, Effort Medium, Enviornment dev; assigned @wra-sol. Parent #2168; no children or native open blockers. Code behavior is verified; CI, the separate operator step and release acceptance remain.
 
 ### [#2533](https://github.com/chester-hill-solutions/callcaster/issues/2533) show caller how long theyve been calling for somewhere (agent request)
 - Verdict: **Verify and close** · Type: Feature · Priority: Medium · Effort: Low · Environment: unset · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-11-01
@@ -1642,16 +1656,16 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status In progress. Native Type Feature, Priority Urgent, Effort Medium, Enviornment unset; assignee @wra-sol. Parent #1158 (closed). Children: #2029 (open), #2757 (open). Native open blockers: #2029, #2757. Native open blockers #2757 and #2029 remain; #2757 code is on dev but broader cleanup is not accepted.
 
 ### [#2168](https://github.com/chester-hill-solutions/callcaster/issues/2168) Cull old dev numbers and workspaces: backfill subaccount names and record the keep-list in the repo
-- Verdict: **Blocked / split first** · Type: unset · Priority: Urgent · Effort: Medium · Environment: unset · Size: S-M · Risk: low · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-10-17
-- The keep-list now lives in the repo and is enforced by PR #2536 on dev. Name backfill and the repeat-policy decision remain; workspace-row cleanup stays deferred.
-- Current behavior: The confirmed keep-list is enforced by PR #2536 (7f2c2f9a). The issue records the historical 19-number cull. PR #2537 (41a1308d) only updated board evidence; it did not implement name backfill. Current scripts provide read-only reports and closed-preview App cleanup, but no legacy subaccount rename command.
+- Verdict: **Blocked / split first** · Type: Task · Priority: Urgent · Effort: Medium · Environment: unset · Size: S-M · Risk: low · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-11-01
+- The keep-list is delivered. Urgent child #3102 provides the separate reviewed name-backfill tool. Retention and repeat-policy decisions remain; workspace-row cleanup stays deferred.
+- Current behavior: The source includes a dry-run and reviewed apply command. The GET-only live audit on 2026-11-01 found 7 eligible dev names, 1 already correct and 30 protected rows (27 cross-environment references and 3 without a valid match). That audit made no provider or database writes.
 - Root cause: No tooling existed to decide what could be culled, and no recorded rule to make the decision repeatable. The name-fragment junk exclusion is deliberately a --exclude flag rather than hardcoded, because it is a judgement call rather than a rule.
-- Resolution: Implement a separate idempotent name-backfill plan from the existing naming helper and ownership evidence. Default to dry-run, require an explicit environment and owner match, and review the exact rename list before provider writes. Record the one-off versus recurring policy before scheduling cleanup. Workspace-row cleanup remains deferred.
-- Look in: `scripts/cull-keep-list.mjs (the confirmed keep-list, shipped)`, `scripts/cull-report-policy.mjs:8-24 (the keep-list wins first)`, `app/lib/database/workspace-twilio-subaccount.server.ts:39-62 (workspaceResourceName, create path only)`, `scripts/twilio-resource-prune-report.mjs (resolves legacy names to their owner workspace)`
-- Existing tests: cull-report.mjs handles 555-number test credentials, the E911 VERIFY line, cross-workspace-only blockers, and compares dates rather than strings; test/cull-report-policy.test.ts confirms the three recorded workspace IDs and proves 2608141501 survives the phone-name cull rule
-- Missing tests: Name backfill must be idempotent.
+- Resolution: Complete the #3102 operator receipt and release acceptance, then record the retention/repeat decision in #2029. Keep shared and unknown accounts protected. Do not schedule cleanup or remove workspace rows as part of naming.
+- Look in: `scripts/backfill-twilio-subaccount-names.mjs`, `scripts/lib/twilio-subaccount-name-backfill.mjs`, `scripts/cull-keep-list.mjs`, `docs/twilio-subaccount-name-backfill.md`
+- Existing tests: cull-report.mjs handles 555-number test credentials, the E911 VERIFY line, cross-workspace-only blockers, and compares dates rather than strings; test/cull-report-policy.test.ts confirms the three recorded workspace IDs and proves 2608141501 survives the phone-name cull rule; 83 focused Node cases and 5 real-PostgreSQL cases pass. Isolated disabled ownership, pagination and name-limit guards fail their relevant tests while controls pass.
+- Missing tests: Reviewed operational apply, receipt verification and release acceptance remain for child #3102. The parent retention/repeat policy is still unrecorded.
 - Done when: Subaccount display names are backfilled to the #2167 format; The keep-list lives in the repository, not a shell argument; 2608141501 survives, since it is on both the keep-list and the phone-number-named rule; The cull report remains read-only with no delete path
-- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type unset, Priority Urgent, Effort Medium, Enviornment unset; assignee @wra-sol. Parent #2029 (open). Children: #2931 (open). Native open blockers: none. Native Type is unset. Backfill needs implementation and reviewed provider-write acceptance; keep-list is delivered. No cleanup was run in this refresh.
+- Tracker: Selected snapshot, 2026-11-01 UTC: actual Project Status on-dev. Native Type Task, Priority Urgent, Effort Medium, Enviornment unset; assigned @wra-sol. Parent #2029; open children #2931 and #3102; no native open blockers. The name-backfill work is split into #3102 as requested. Keep the parent open for its complete policy and operational scope.
 
 ### [#1157](https://github.com/chester-hill-solutions/callcaster/issues/1157) epic(testing): controlled synthetic campaign audiences
 - **IN PROGRESS** · Verdict: **Blocked / split first** · Type: Feature · Priority: High · Effort: High · Environment: unset · Size: L-XL · Risk: high · Labels: devops/admin · Assignee: @sai-sy · Updated: 2026-10-17

@@ -56,6 +56,12 @@ do not invent a v2010 path. For complete SDK inventories, set `pageSize` and
 leave `limit` unset: `limit` caps the total count. An unreadable list must fail
 the audit rather than become an empty result. See [subaccount authentication](https://www.twilio.com/docs/iam/api/subaccounts#authentication).
 
+For direct SQL ownership checks, normalize `workspace.twilio_data` in both stored
+forms: a JSON object or JSON text inside the JSON column. Match the exact account
+SID as well as the workspace ID. Preserve all recognized SID fields for
+reference checks; conflicting fields must block a target rename. Return only ownership fields; never print the
+stored Auth Token or full provider account response.
+
 ---
 
 ## Phone Numbers

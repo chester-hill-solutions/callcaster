@@ -9,12 +9,17 @@ const WS = "6aff2ab3-8a7a-48b2-92e6-f86ec7441ca0";
 
 describe("workspaceResourceName", () => {
   test("uses the workspace name with a short id suffix", () => {
-    expect(workspaceResourceName("Civic Action", WS)).toBe("Civic Action · 6aff2ab3");
+    expect(workspaceResourceName("Civic Action", WS)).toBe(
+      "Civic Action · 6aff2ab3",
+    );
   });
 
   test("two workspaces sharing a name stay distinguishable", () => {
     const a = workspaceResourceName("Civic Action", WS);
-    const b = workspaceResourceName("Civic Action", "aaaaaaa1-0000-4000-8000-000000000000");
+    const b = workspaceResourceName(
+      "Civic Action",
+      "aaaaaaa1-0000-4000-8000-000000000000",
+    );
     expect(a).not.toBe(b);
   });
 
@@ -37,8 +42,12 @@ describe("workspaceResourceName", () => {
   });
 
   test("collapses whitespace so a pasted name is not doubled up", () => {
-    expect(workspaceResourceName("Civic   Action", WS)).toBe("Civic Action · 6aff2ab3");
-    expect(workspaceResourceName("  Civic Action  ", WS)).toBe("Civic Action · 6aff2ab3");
+    expect(workspaceResourceName("Civic   Action", WS)).toBe(
+      "Civic Action · 6aff2ab3",
+    );
+    expect(workspaceResourceName("  Civic Action  ", WS)).toBe(
+      "Civic Action · 6aff2ab3",
+    );
   });
 
   test("strips control characters, which Twilio rejects", () => {
@@ -47,7 +56,7 @@ describe("workspaceResourceName", () => {
   });
 
   /**
-   * 160 is Twilio's documented friendly-name limit, stated here as a literal
+   * 160 is the existing default label budget, stated here as a literal
    * rather than read back from the module. `MAX_TWILIO_FRIENDLY_NAME_LENGTH`
    * is separately asserted below, so a changed constant still fails a test —
    * it just fails a different one.
@@ -62,7 +71,7 @@ describe("workspaceResourceName", () => {
     expect(result.endsWith(" · 6aff2ab3")).toBe(true);
   });
 
-  test("the module's exported limit is Twilio's documented 160", () => {
+  test("the exported default label budget remains 160", () => {
     expect(MAX_TWILIO_FRIENDLY_NAME_LENGTH).toBe(TWILIO_LIMIT);
   });
 
