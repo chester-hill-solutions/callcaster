@@ -190,6 +190,7 @@ const serviceOverlaySchema = z
     bucket: z.string().min(1).optional(),
     region: z.string().min(1).optional(),
     trafficPolicy: z.enum(simTrafficPolicies).optional(),
+    checkoutProvider: z.enum(["stripe", "mock"]).optional(),
     secrets: z.array(SecretReferenceSchema).optional(),
   })
   .strict()
