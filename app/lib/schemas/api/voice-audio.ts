@@ -125,6 +125,12 @@ function matchesCurrentPredictiveOwner(value: { workspace_id: string; user_id: s
   const customer = value.predictive.customer;
   return !customer || customer.workspace_id === value.workspace_id && customer.user_id === value.user_id && value.customer_pending;
 }
+function matchesCurrentManualOwner(value: { workspace_id: string; user_id: string; customer_pending: boolean;
+  manual: RecoveredManualCustomer | null; predictive: PredictiveCustomerRecovery }) {
+  const customer = value.manual;
+  return !customer || customer.workspace_id === value.workspace_id && customer.user_id === value.user_id &&
+    value.customer_pending && !value.predictive.customer;
+}
 
 export const voiceAudioCurrentSnapshotSchema = z.object({
   workspace_id: z.uuid(), user_id: z.string().min(1),
@@ -136,8 +142,7 @@ export const voiceAudioCurrentSnapshotSchema = z.object({
 }).superRefine((value, ctx) => {
   if (!matchesCurrentPredictiveOwner(value))
     ctx.addIssue({ code: "custom", message: "Recovered customer does not match this current actor", path: ["predictive"] });
-  if (value.manual && (value.manual.workspace_id !== value.workspace_id || value.manual.user_id !== value.user_id ||
-    !value.customer_pending || value.predictive.customer))
+  if (!matchesCurrentManualOwner(value))
     ctx.addIssue({ code: "custom", message: "Recovered manual customer does not match this current actor", path: ["manual"] });
   for (const name of ["active", "pending"] as const) {
     const intent = value[name];
