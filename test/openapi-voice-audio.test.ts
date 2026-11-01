@@ -62,7 +62,10 @@ describe("agent audio OpenAPI view boundaries", () => {
     const readResponses = path.get.responses["200"].content["application/json"].schema.oneOf;
     expect(readResponses).toHaveLength(3);
     const current = readResponses[2];
-    expect(current.required).toEqual(["workspace_id", "user_id", "active", "pending", "recovery_required", "customer_pending", "predictive", "manual"]);
+    expect(current.required).toEqual(["workspace_id", "user_id", "active", "pending", "recovery_required", "customer_pending", "predictive", "manual", "dialer"]);
+    expect(current.properties.dialer.nullable).toBe(true);
+    expect(current.properties.dialer.required).toEqual(["workspace_id", "user_id", "campaign_id", "intent_id", "conference_id", "dialer_state"]);
+    expect(current.properties.dialer.properties.dialer_state.enum).toEqual(["active", "stopping"]);
     expect(current.properties.manual.required).toEqual(expect.arrayContaining(["call_sid", "agent_call_sid", "provider_status", "dial_intent_id", "attempt", "queue_id", "request"]));
     expect(current.properties.recovery_required.type).toBe("boolean");
     expect(current.properties.customer_pending.type).toBe("boolean");
@@ -97,6 +100,15 @@ describe("agent audio OpenAPI view boundaries", () => {
     }
     for (const status of ["409", "502"]) expect(path.post.responses[status].content["application/json"].schema.anyOf[1].required)
       .toEqual(expect.arrayContaining(["error", "connection_id", "connection_intent_id"]));
+  });
+  test.each([["public", openApiSpec], ["complete", completeOpenApiSpec]])("%s documents captured Stop acknowledgement and pending cleanup separately", (_name, spec) => {
+    const stop = spec.paths["/api/auto-dial/end"].post;
+    expect(stop).toMatchObject({ operationId: "stopCapturedDialerSession", "x-callcaster-auth-class": "session", "x-callcaster-exposure": "sessionOnly" });
+    expect(stop.requestBody.content["application/json"].schema.required).toEqual(["workspaceId", "campaignId", "dial_intent_id"]);
+    expect(stop.requestBody.content["application/json"].schema.additionalProperties).toBe(false);
+    expect(stop.parameters).toContainEqual(expect.objectContaining({ name: "X-Callcaster-Audio-Actor", in: "header" }));
+    expect(stop.responses["200"].content["application/json"].schema.properties.stop_state.enum).toEqual(["stopped"]);
+    expect(stop.responses["202"].content["application/json"].schema.properties.stop_state.enum).toEqual(["pending"]);
   });
   test("cannot inject a path absent from the selected API view", () => {
     expect(() => buildOpenApiSpec({ entries: [], title: "Selected fixture", description: "Owned fixture", tagStrategy: "owner",

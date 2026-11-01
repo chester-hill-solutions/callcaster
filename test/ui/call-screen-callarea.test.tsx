@@ -151,7 +151,7 @@ describe("app/components/call/CallScreen.CallArea.tsx", () => {
     }
   });
 
-  test("predictive idle shows a single Start Dialing action when no conference, Start with one", async () => {
+  test("predictive idle offers Start without a session and Stop for its existing room", async () => {
     const { CallArea } = await import("@/components/call/CallScreen.CallArea");
 
     const handleDialNext = vi.fn();
@@ -182,10 +182,9 @@ describe("app/components/call/CallScreen.CallArea.tsx", () => {
       />,
     );
 
-    const start = screen.getByTestId("call-screen-dial");
-    expect(start).toHaveTextContent("Start");
-    fireEvent.click(start);
-    expect(handleDialNext).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId("call-screen-dial")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stop Dialing" })).toBeEnabled();
+    expect(handleDialNext).toHaveBeenCalledTimes(1);
   });
 
   test("renders recipient info including trimmed address segments", async () => {
@@ -349,7 +348,7 @@ describe("app/components/call/CallScreen.CallArea.tsx", () => {
     expect(handleDialNext).toHaveBeenCalledTimes(1);
   });
 
-  test("predictive Start Dialing does NOT require confirmation after a call ends (only replacing-the-hangup manual dial does)", async () => {
+  test("a confirmed predictive Stop permits a fresh Start without manual dial confirmation", async () => {
     const { CallArea } = await import("@/components/call/CallScreen.CallArea");
     const handleDialNext = vi.fn();
 
@@ -364,7 +363,7 @@ describe("app/components/call/CallScreen.CallArea.tsx", () => {
         })}
       />,
     );
-    expect(screen.getByRole("button", { name: "Hang Up" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stop Dialing" })).toBeInTheDocument();
 
     rerender(
       <CallArea

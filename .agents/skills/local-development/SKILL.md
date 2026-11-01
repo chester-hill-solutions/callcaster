@@ -356,6 +356,9 @@ from that schema. Do not broaden route authentication to fit an old example.
 Run the matching OpenAPI contract tests with focused route/client checks when
 parameters or response variants change. Check each HTTP method separately;
 a new GET discovery mode must not broaden DELETE controls or its documentation.
+For call-control changes, include the shared CallArea tests with hook tests.
+For a new recovery stage, include the worker scheduling adapter tests and stub
+each service boundary so the test cannot enter real database I/O.
 
 Quote literal route paths containing `$` or shell glob characters; otherwise
 the shell can remove a route segment before the command runs. Read script names
