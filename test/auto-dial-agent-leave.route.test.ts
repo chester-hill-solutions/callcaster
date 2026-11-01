@@ -6,7 +6,7 @@ const boundary = vi.hoisted(() => ({
   findCall: vi.fn(), updateCall: vi.fn(), findAttempt: vi.fn(),
   claimStatus: vi.fn(), processStatus: vi.fn(), broadcast: vi.fn(),
   listConferences: vi.fn(), fetchConference: vi.fn(), completeConference: vi.fn(),
-  signature: vi.fn(), createTwilio: vi.fn(),
+  signature: vi.fn(), createTwilio: vi.fn(), enqueueOutcome: vi.fn(), runOutcome: vi.fn(), legacyQueue: vi.fn(),
 }));
 vi.mock("@/lib/telephony-db.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/telephony-db.server")>()),
@@ -31,6 +31,19 @@ vi.mock("@/lib/workspace-events.server", async (importOriginal) => ({
 vi.mock("@/lib/twilio-call-status.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/twilio-call-status.server")>()),
   processCallStatusWebhook: boundary.processStatus,
+}));
+
+vi.mock("@/lib/worker/enqueue-call-status.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/worker/enqueue-call-status.server")>(),
+  enqueueCallStatusSideEffects: boundary.enqueueOutcome,
+}));
+vi.mock("@/lib/worker/webhook-side-effects.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/worker/webhook-side-effects.server")>(),
+  runCallStatusSideEffects: boundary.runOutcome,
+}));
+vi.mock("@/server/legacy-voice-queue.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/server/legacy-voice-queue.server")>(),
+  dequeueLegacyVoiceAttempt: boundary.legacyQueue,
 }));
 
 const conferenceName = "u1~conference";
@@ -64,6 +77,12 @@ describe("agent participant hangup (#2094)", () => {
     boundary.processStatus.mockResolvedValue({ call: { ...agent }, billingResult: {} });
     boundary.broadcast.mockResolvedValue(null);
     boundary.signature.mockResolvedValue(null);
+    boundary.enqueueOutcome.mockImplementation(async (_call: unknown, params: Record<string, string>) => {
+      const { parseTwilioVoiceCallback } = await import("@/lib/twilio/voice-callback");
+      return parseTwilioVoiceCallback(params);
+    });
+    boundary.runOutcome.mockResolvedValue({ ok: true });
+    boundary.legacyQueue.mockResolvedValue({ ownedPrimary: false, removedCount: 0 });
     boundary.listConferences.mockResolvedValue([{ sid: "CF_AGENT" }]);
     boundary.fetchConference.mockResolvedValue({ friendlyName: conferenceName, status: "in-progress" });
     boundary.completeConference.mockResolvedValue({ status: "completed" });
@@ -120,11 +139,18 @@ describe("agent participant hangup (#2094)", () => {
     expect((await post()).status).toBe(200);
     expect(boundary.updateCall.mock.calls[0]?.[2]).not.toHaveProperty("status");
     expect(boundary.claimStatus).not.toHaveBeenCalled();
+    expect(boundary.enqueueOutcome).not.toHaveBeenCalled();
+    expect(boundary.runOutcome).not.toHaveBeenCalled();
     boundary.processStatus.mockResolvedValue({ call: { ...agent, status: "completed", contact_id: 7, outreach_attempt_id: 21 } });
-    expect((await post({ StatusCallbackEvent: null, ReasonParticipantLeft: null, CallStatus: "completed", CallDuration: "42" })).status).toBe(200);
+    const terminal = await post({ StatusCallbackEvent: null, ReasonParticipantLeft: null, CallStatus: "completed", CallDuration: "42" });
+    expect(terminal.status, JSON.stringify(await terminal.json())).toBe(200);
     expect(boundary.claimStatus).toHaveBeenCalledWith("w1", "CA_AGENT", "completed");
     expect(boundary.processStatus).toHaveBeenCalledWith(expect.objectContaining({ status: "completed", duration: "42" }),
-      expect.objectContaining({ outreachAttemptId: 21, contactId: 7 }));
+      expect.objectContaining({ outreachAttemptId: 21, contactId: 7, skipBilling: true }));
+    expect(boundary.enqueueOutcome).toHaveBeenCalledWith(expect.objectContaining({ sid: "CA_AGENT", contact_id: 7, outreach_attempt_id: 21 }),
+      expect.objectContaining({ CallSid: "CA_AGENT", CallStatus: "completed", CallDuration: "42" }));
+    expect(boundary.runOutcome).toHaveBeenCalledExactlyOnceWith({ callSid: "CA_AGENT", event: expect.objectContaining({ callStatus: "completed" }) });
+    expect(boundary.legacyQueue).toHaveBeenCalledWith("w1", "CA_AGENT");
     expect(boundary.broadcast.mock.calls).toEqual([
       ["w1", { contact_id: 7, status: "completed", conference_id: conferenceName, conference_ended: true }],
       ["w1", { contact_id: 7, status: "completed", conference_id: conferenceName,

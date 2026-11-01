@@ -713,6 +713,12 @@ Drizzle can remap the inner columns to the outer table alias. Use transaction-
 bound select subqueries or separate tenant-scoped reads, and verify the query
 against an owned database with both positive and refusal cases.
 
+When a terminal route moves inline work into the result worker, find all route
+adapter tests for that path, including participant-leave tests. Mock the new
+outbox/result boundaries there and retain the participant-versus-terminal claim
+assertions. Keep billing, queue ownership and retry proof on the real worker
+and owned database.
+
 For queue generation tests, use explicit requeue through
 `enqueueContactsForCampaign(..., { requeue: true })`. Assignment release keeps
 the current intent. Inspect foreign-key delete actions before rebuilding a
