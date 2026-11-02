@@ -28,82 +28,6 @@ describe("callscreenActions", () => {
     vi.restoreAllMocks();
   });
 
-  test("handleConference start/end", async () => {
-    const { handleConference } = await import("@/lib/callscreenActions");
-    const begin = vi.fn();
-    const setConference = vi.fn();
-
-    const { handleConferenceStart, handleConferenceEnd } = handleConference({ begin });
-    handleConferenceStart();
-    expect(begin).toHaveBeenCalledTimes(1);
-
-    await handleConferenceEnd({
-      activeCall: { parameters: { CallSid: "CA1" } },
-      setConference,
-      workspaceId: "w1",
-    } as any);
-
-    expect(fetch).toHaveBeenCalledWith(
-      "/api/auto-dial/end",
-      expect.objectContaining({ method: "POST", body: JSON.stringify({ workspaceId: "w1" }) }),
-    );
-    expect(fetch).toHaveBeenCalledWith(
-      "/api/hangup",
-      expect.objectContaining({ method: "POST" }),
-    );
-    expect(setConference).toHaveBeenCalledWith();
-  });
-
-  test("handleConferenceEnd does not hang up when CallSid missing", async () => {
-    const { handleConference } = await import("@/lib/callscreenActions");
-    const begin = vi.fn();
-    const setConference = vi.fn();
-
-    const { handleConferenceEnd } = handleConference({ begin });
-    await handleConferenceEnd({
-      activeCall: { parameters: {} },
-      setConference,
-      workspaceId: "w1",
-    } as any);
-
-    expect(fetch).not.toHaveBeenCalledWith("/api/hangup", expect.anything());
-    expect(setConference).toHaveBeenCalledWith();
-  });
-
-  test("does not hang up the agent or clear its conference before the server confirms completion", async () => {
-    const { handleConference } = await import("@/lib/callscreenActions");
-    let resolve!: (response: Response) => void;
-    const pending = new Promise<Response>((done) => { resolve = done; });
-    const fetchMock = vi.mocked(fetch);
-    fetchMock.mockReturnValueOnce(pending);
-    const setConference = vi.fn();
-    const end = handleConference({ begin: vi.fn() }).handleConferenceEnd({
-      activeCall: { parameters: { CallSid: "CA_AGENT" } },
-      workspaceId: "w1",
-      conferenceName: "u1~current",
-      setConference,
-    });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(setConference).not.toHaveBeenCalled();
-    resolve(Response.json({ success: true }));
-    await end;
-    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auto-dial/end", "/api/hangup"]);
-    expect(setConference).toHaveBeenCalledTimes(1);
-  });
-
-  test("a rejected conference stop leaves the agent leg and conference state available", async () => {
-    const { handleConference } = await import("@/lib/callscreenActions");
-    vi.mocked(fetch).mockResolvedValueOnce(Response.json({ error: "unavailable" }, { status: 502 }));
-    const setConference = vi.fn();
-    await expect(handleConference({ begin: vi.fn() }).handleConferenceEnd({
-      activeCall: { parameters: { CallSid: "CA_AGENT" } },
-      workspaceId: "w1",
-      setConference,
-    })).rejects.toThrow("Could not stop");
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(setConference).not.toHaveBeenCalled();
-  });
-
   test("handleCall.startCall submits only when contact has phone", async () => {
     const { handleCall } = await import("@/lib/callscreenActions");
     const submit = vi.fn();
@@ -264,50 +188,6 @@ describe("callscreenActions", () => {
     expect(setRecentAttempt).toHaveBeenLastCalledWith(
       expect.objectContaining({ id: 99, call: calls[0] }),
     );
-  });
-
-  test("handleQueue.dequeue submits and filters queue", async () => {
-    const { handleQueue } = await import("@/lib/callscreenActions");
-    const submit = vi.fn();
-    const setQueue = vi.fn();
-    const { dequeue } = handleQueue({
-      submit,
-      groupByHousehold: true,
-      campaign: { id: 1 },
-      workspaceId: "w1",
-      setQueue,
-    } as any);
-
-    dequeue({ contact: { contact: { id: 1, phone: "+1555" } } } as any);
-    expect(submit).toHaveBeenCalledWith(
-      expect.objectContaining({ contact_id: 1, campaign_id: 1, household: true }),
-      expect.objectContaining({ action: "/api/queues" }),
-    );
-    expect(typeof setQueue.mock.calls[0][0]).toBe("function");
-    const updater = setQueue.mock.calls[0][0];
-    expect(
-      updater([
-        { contact: { id: 1 } },
-        { contact: { id: 2 } },
-      ]),
-    ).toEqual([{ contact: { id: 2 } }]);
-  });
-
-  test("handleQueue.dequeue returns early when contact phone is missing", async () => {
-    const { handleQueue } = await import("@/lib/callscreenActions");
-    const submit = vi.fn();
-    const setQueue = vi.fn();
-    const { dequeue } = handleQueue({
-      submit,
-      groupByHousehold: false,
-      campaign: { id: 1 },
-      workspaceId: "w1",
-      setQueue,
-    } as any);
-
-    dequeue({ contact: { contact: { id: 1, phone: null } } } as any);
-    expect(submit).not.toHaveBeenCalled();
-    expect(setQueue).not.toHaveBeenCalled();
   });
 
   test("handleQueue.fetchMore updates queue and logs on failure", async () => {

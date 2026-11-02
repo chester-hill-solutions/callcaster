@@ -1,91 +1,69 @@
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { appendLiveTranscriptionStreamTwiml } from "@/lib/media-stream-twiml.server";
-import { findCallBySid } from "@/lib/telephony-db.server";
-import {
-    requireTwilioSignature,
-    twilioWebhookForbiddenHangup,
-} from "@/lib/twilio-webhook.server";
+import { requireTwilioSignature, twilioWebhookForbiddenHangup } from "@/lib/twilio-webhook.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import { defineAction } from "@/lib/handler.server";
 import { createVoiceResponse, sayHangupTwiml } from "@/lib/twilio-twiml.server";
+import { bindVerifiedVoiceSetupRequest, voiceBridgeCallbackArgs } from "@/lib/voice-bridge-webhook.server";
+import { claimVoiceBridgeRecipient } from "@/server/voice-bridge-reservation.server";
+import { voiceWebhookDeliveryUrl } from "@/lib/twilio-webhook-delivery";
+import { prepareVoiceDialRecording } from "@/server/voice-recording-operation.server";
+import { findVoicePhoneCustomerOwner } from "@/server/voice-phone-customer.server";
+import { voicePhoneCustomerInstruction } from "@/lib/voice-phone-customer.server";
 
-/** Fallback TwiML returned when the handler throws unexpectedly, so Twilio
- * hears a graceful message instead of an HTML error page. */
-function dialUnavailableTwiml(): Response {
-    return new Response(
-        sayHangupTwiml("We're unable to take your call right now. Please try again later."),
-        {
-            status: 200,
-            headers: { "Content-Type": "text/xml" },
-        },
-    );
+function unavailable() {
+  return new Response(sayHangupTwiml("We're unable to take your call right now. Please try again later."),
+    { headers: { "Content-Type": "text/xml" } });
 }
 
 export const action = defineAction({
-    auth: async ({ request }) => {
-        const formData = await request.clone().formData();
-        const callSid = String(formData.get("CallSid") ?? "");
-        // Twilio always supplies CallSid when fetching a call's TwiML action
-        // URL. Omitting the option here (rather than requiring it) would
-        // silently downgrade validation to the main-account token instead of
-        // this call's workspace token — fail closed instead.
-        if (!callSid) return twilioWebhookForbiddenHangup();
-        const forbidden = await requireTwilioSignature(request, { callSid });
-        return forbidden ?? null;
-    },
-    sideEffects: ["twilio"],
-    handler: async ({ request, params }) => {
-        try {
-            const formData = await request.clone().formData();
-            const twiml = createVoiceResponse();
-            const number = params.number;
-            const callSid = String(formData.get("CallSid") ?? "");
-
-            if (callSid) {
-                const call = await findCallBySid(callSid);
-                const workspaceId = call?.workspace;
-                if (call && workspaceId && call.user_id) {
-                    const workspace = await getWorkspaceById(workspaceId);
-                    appendLiveTranscriptionStreamTwiml({
-                        twiml,
-                        featureFlags: workspace?.feature_flags as Record<string, unknown> | undefined,
-                        params: {
-                            workspaceId,
-                            userId: call.user_id,
-                            direction: "outbound",
-                            contactId: call.contact_id,
-                            campaignId: call.campaign_id,
-                            callSid,
-                            streamName: `call-${callSid}`,
-                        },
-                    });
-                }
-            }
-
-            const dial = twiml.dial({
-                callerId: formData.get('From') as string,
-                record: 'record-from-answer',
-                recordingStatusCallback: `${env.BASE_URL()}/api/recording`,
-                recordingStatusCallbackEvent: ['completed']
-            })
-
-            // No machineDetection on a manual dial: the agent is on the
-            // line, so the AMD verdict only adds latency. Predictive dialing
-            // keeps it (app/lib/auto-dial.server.ts).
-            dial.number({
-                statusCallback: `${env.BASE_URL()}/api/call-status/`,
-                statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
-            }, number!);
-
-            return new Response(twiml.toString(), {
-                headers: {
-                    'Content-Type': 'text/xml'
-                }
-            });
-        } catch (e) {
-            logger.error("Error in dial route:", e);
-            return dialUnavailableTwiml();
-        }
-    },
+  auth: async ({ request }) => {
+    const formData = await request.clone().formData();
+    const params = Object.fromEntries(formData.entries()) as Record<string, string>;
+    if (!params.CallSid) return twilioWebhookForbiddenHangup();
+    const query = new URL(request.url).searchParams;
+    const phoneCustomer = query.get("credit_leg") === "recipient"
+      ? await findVoicePhoneCustomerOwner(query.get("credit_reservation") ?? "") : null;
+    if (query.get("credit_leg") === "recipient" && !phoneCustomer?.audio_connection_id) return twilioWebhookForbiddenHangup();
+    const forbidden = await requireTwilioSignature(request, { callSid: params.CallSid, params,
+      ...(phoneCustomer ? { workspaceId: phoneCustomer.workspace, expectedAccountSid: phoneCustomer.account_sid } : {}),
+    });
+    if (forbidden) return forbidden;
+    if (phoneCustomer) return { phoneCustomer, bridge: null, params };
+    const bridge = await bindVerifiedVoiceSetupRequest(request, params);
+    return bridge instanceof Response ? bridge : { bridge, params, phoneCustomer: null };
+  },
+  sideEffects: ["db-read", "db-write", "twilio"],
+  handler: async ({ request, auth }) => {
+    try {
+      const { bridge, params } = auth;
+      if (auth.phoneCustomer) return await voicePhoneCustomerInstruction(request, auth.phoneCustomer, params) ?? unavailable();
+      if (!bridge) return unavailable();
+      if (!bridge.status_callback || !bridge.user_id) return unavailable();
+      const recording = await prepareVoiceDialRecording(bridge, { sid: params.CallSid ?? "", accountSid: params.AccountSid ?? "",
+        to: params.To ?? "", from: params.From ?? "", direction: params.Direction ?? "", parentCallSid: params.ParentCallSid || null }, env.BASE_URL());
+      if (!recording) return unavailable();
+      const twiml = createVoiceResponse();
+      const workspace = await getWorkspaceById(bridge.workspace);
+      appendLiveTranscriptionStreamTwiml({ twiml,
+        featureFlags: workspace?.feature_flags as Record<string, unknown> | undefined,
+        params: { workspaceId: bridge.workspace, userId: bridge.user_id, direction: "outbound",
+          contactId: bridge.contact_id, campaignId: bridge.campaign_id, callSid: params.CallSid,
+          streamName: `call-${params.CallSid}` },
+      });
+      const dial = twiml.dial({ callerId: bridge.caller_id, record: "record-from-answer",
+        ...(bridge.setup_continuation_url ? { action: voiceWebhookDeliveryUrl(bridge.setup_continuation_url), method: "POST" } : {}),
+        recordingStatusCallback: voiceWebhookDeliveryUrl(recording.callback_url), recordingStatusCallbackMethod: "POST",
+        recordingStatusCallbackEvent: ["in-progress", "completed", "absent"] });
+      dial.number({ statusCallback: bridge.status_callback,
+        statusCallbackEvent: ["initiated", "ringing", "answered", "completed"] }, bridge.recipient);
+      const xml = twiml.toString();
+      const claimed = await claimVoiceBridgeRecipient(voiceBridgeCallbackArgs(request, params, "voice"), recording.id);
+      return claimed.issued ? new Response(xml, { headers: { "Content-Type": "text/xml" } }) : unavailable();
+    } catch (error) {
+      logger.error("Error in dial route:", error);
+      return unavailable();
+    }
+  },
 });

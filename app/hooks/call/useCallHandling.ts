@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Call, Device } from "@twilio/voice-sdk";
 import { hangupCall } from "@/lib/services/hooks-api";
 import { logger } from "@/lib/logger.client";
@@ -44,8 +44,9 @@ interface UseCallHandlingReturn {
   isMicMuted: boolean;
   /** Active call is locally suspended via SDK mute (not conference hold). */
   isActiveCallOnLocalHold: boolean;
-  makeCall: (params: CallConnectParams) => void;
+  makeCall: (params: CallConnectParams) => Promise<Call | undefined> | undefined;
   hangUp: (call?: Call) => Promise<void>;
+  cancelPendingDial: () => void;
   answer: () => void;
   holdAndAnswer: () => void;
   switchTo: (call: Call) => void;
@@ -66,6 +67,20 @@ function applyAgentLegMute(call: Call, muted: boolean): void {
 
 function suspendHeldCall(call: Call): void {
   applyAgentLegMute(call, true);
+}
+
+/** Resource teardown has no page-state or customer-lifecycle continuation. */
+export async function stopOwnedSdkCall(call: Call, workspaceId: string) {
+  const callSid = getCallSid(call);
+  if (!callSid) return;
+  try { await hangupCall({ callSid, workspaceId }); }
+  catch (error) { logger.error("Error ending an owned SDK call:", error); }
+}
+
+async function endStaleOutgoingCall(call: Call, workspaceId: string) {
+  try { call.disconnect(); }
+  catch (error) { logger.error("Error disconnecting a stale outgoing call:", error); }
+  await stopOwnedSdkCall(call, workspaceId);
 }
 
 /**
@@ -102,6 +117,10 @@ export function useCallHandling({
   const isOnLocalHoldRef = useRef(false);
   const incomingListenerCleanupsRef = useRef<Map<Call, () => void>>(new Map());
   const callGenerationRef = useRef(0);
+  const scopeOwner = useMemo(() => ({ workspaceId, active: false }), [workspaceId]);
+  const cancelPendingDial = useCallback(() => {
+    if (scopeOwner.active) callGenerationRef.current += 1;
+  }, [scopeOwner]);
 
   /**
    * @effect Mirror `heldCalls` state into a ref so callbacks/other effects
@@ -376,6 +395,7 @@ export function useCallHandling({
 
   const makeCall = useCallback(
     (params: CallConnectParams) => {
+      if (!scopeOwner.active) return;
       if (!device) {
         logger.error("Device is not ready");
         onError?.(new Error("Device is not ready"));
@@ -386,47 +406,91 @@ export function useCallHandling({
       const myGeneration = callGenerationRef.current;
 
       const connection = device.connect({ params });
-      connection
-        .then((call: Call) => {
-          if (callGenerationRef.current !== myGeneration) return;
+      return connection
+        .then(async (call: Call) => {
+          if (callGenerationRef.current !== myGeneration) {
+            await endStaleOutgoingCall(call, workspaceId);
+            return;
+          }
           updateActiveCall(call);
           updateCallState("dialing");
+          return call;
         })
         .catch((err: unknown) => {
           if (callGenerationRef.current !== myGeneration) return;
           logger.error("Error making call:", err);
           onError?.(err instanceof Error ? err : new Error("Failed to make call"));
+          return undefined;
         });
     },
-    [device, updateActiveCall, updateCallState, onError],
+    [device, workspaceId, updateActiveCall, updateCallState, onError, scopeOwner],
   );
+
+  const finishHangUp = useCallback((target: Call, isActive: boolean) => {
+    const held = heldCallsRef.current;
+    // A provider acknowledgement can precede SDK transport cleanup failure.
+    try { target.disconnect(); }
+    catch (error) { logger.debug("Call disconnect failed during hangup cleanup", error); }
+    if (isActive && held.length === 0 && !incomingCallRef.current && device &&
+      (device.calls ?? []).every(call => call === target || call.status?.() === "closed")) {
+      try { device.disconnectAll(); }
+      catch (error) { logger.debug("Device disconnect failed during hangup cleanup", error); }
+    }
+    if (!isActive) {
+      setHeldCalls(previous => previous.filter(call => call !== target));
+      return;
+    }
+    setActiveCallState(null);
+    resetAgentAudioState();
+    const nextHeld = held[0];
+    if (nextHeld) {
+      setHeldCalls(previous => previous.slice(1));
+      setIsMicMuted(false);
+      setIsActiveCallOnLocalHold(false);
+      isMicMutedRef.current = false;
+      isOnLocalHoldRef.current = false;
+      applyAgentLegMute(nextHeld, false);
+      setActiveCallState(nextHeld);
+      onStatusChange?.("connected");
+      updateCallState("connected");
+    } else {
+      onStatusChange?.("Registered");
+      updateCallState("completed");
+      onDeviceBusyChange?.(Boolean(incomingCallRef.current));
+    }
+  }, [device, resetAgentAudioState, onStatusChange, updateCallState, onDeviceBusyChange]);
+
+  const clearMissingActiveCall = useCallback(() => {
+    // A missed SDK disconnect can leave connected state with no physical call (#1292).
+    if (callStateRef.current === "connected" || callStateRef.current === "dialing") {
+      logger.debug("No call to hang up; clearing stale in-call state");
+      onStatusChange?.("Registered");
+      updateCallState("completed");
+      onDeviceBusyChange?.(false);
+    } else {
+      logger.error("No call to hang up");
+      onError?.(new Error("No call to hang up"));
+    }
+  }, [onStatusChange, updateCallState, onDeviceBusyChange, onError]);
 
   const hangUp = useCallback(
     async (call?: Call) => {
-      callGenerationRef.current += 1;
+      if (!scopeOwner.active) return;
+      if (call === undefined && activeCall !== activeCallRef.current) return;
       const target = call ?? activeCallRef.current;
       if (!target) {
-        // The SDK can drop the agent leg without this hook hearing about
-        // it (#1292): `callState` still reads connected, the Hang Up
-        // button stays, and every click lands here. Nothing is left to
-        // disconnect, so converge the state instead of only reporting.
-        const stale =
-          callStateRef.current === "connected" ||
-          callStateRef.current === "dialing";
-        if (stale) {
-          logger.debug("No call to hang up; clearing stale in-call state");
-          onStatusChange?.("Registered");
-          updateCallState("completed");
-          onDeviceBusyChange?.(false);
-          return;
-        }
-        logger.error("No call to hang up");
-        onError?.(new Error("No call to hang up"));
+        callGenerationRef.current += 1;
+        clearMissingActiveCall();
         return;
       }
 
       const isActive = target === activeCallRef.current;
-      const held = heldCallsRef.current;
+      if (!isActive && !heldCallsRef.current.includes(target)) return;
+      callGenerationRef.current += 1;
+      const generation = callGenerationRef.current;
+      const isCurrent = () => scopeOwner.active && callGenerationRef.current === generation &&
+        (isActive ? activeCallRef.current === target :
+          activeCallRef.current === target || heldCallsRef.current.includes(target));
 
       try {
         const callSid = getCallSid(target);
@@ -435,6 +499,7 @@ export function useCallHandling({
         }
         await hangupCall({ callSid, workspaceId });
       } catch (err) {
+        if (!isCurrent()) return;
         if (
           err instanceof Error &&
           err.message === "Call is not in-progress. Cannot redirect."
@@ -446,52 +511,16 @@ export function useCallHandling({
         }
       }
 
-      // SDK teardown can throw after the provider has already ended the call.
-      // Each cleanup must still run so the controls do not retain a dead leg.
-      try {
-        target.disconnect();
-      } catch (err) {
-        logger.debug("Call disconnect failed during hangup cleanup", err);
-      }
-      if (isActive && held.length === 0 && device) {
-        try {
-          device.disconnectAll();
-        } catch (err) {
-          logger.debug("Device disconnect failed during hangup cleanup", err);
-        }
-      }
-
-      if (isActive) {
-        setActiveCallState(null);
-        resetAgentAudioState();
-        const nextHeld = held[0];
-        if (held.length > 0 && nextHeld) {
-          setHeldCalls((prev) => prev.slice(1));
-          setIsMicMuted(false);
-          setIsActiveCallOnLocalHold(false);
-          isMicMutedRef.current = false;
-          isOnLocalHoldRef.current = false;
-          applyAgentLegMute(nextHeld, false);
-          setActiveCallState(nextHeld);
-          onStatusChange?.("connected");
-          updateCallState("connected");
-        } else {
-          onStatusChange?.("Registered");
-          updateCallState("completed");
-          onDeviceBusyChange?.(false);
-        }
-      } else {
-        setHeldCalls((prev) => prev.filter((c) => c !== target));
-      }
+      if (!isCurrent()) return;
+      finishHangUp(target, activeCallRef.current === target);
     },
     [
-      device,
+      finishHangUp,
+      clearMissingActiveCall,
+      activeCall,
+      scopeOwner,
       workspaceId,
-      updateCallState,
-      onStatusChange,
       onError,
-      onDeviceBusyChange,
-      resetAgentAudioState,
     ],
   );
 
@@ -656,24 +685,27 @@ export function useCallHandling({
   }, [heldCalls]);
 
   /**
-   * @effect On unmount, run any incoming-call SDK listener cleanups still
+   * @effect On workspace change or unmount, invalidate pending commands and outgoing connections and run incoming-call SDK listener cleanups still
    * pending in `incomingListenerCleanupsRef` so no Twilio Call listeners leak
    * past the hook's lifetime.
-   * @effect-deps [] — intentionally mount-once, cleanup-only; the ref's Map
+   * @effect-deps scopeOwner (the committed workspace lifetime); the ref's Map
    * object identity never changes (created once via useRef), so capturing it
    * once here and reading it in the cleanup is safe.
    * @effect-side-effects subscription cleanup (invokes stored SDK
-   * listener-removal functions); runs only on unmount.
-   * @effect-why-not-loader Teardown of imperative SDK listeners on unmount;
+   * listener-removal functions); runs on workspace change or unmount.
+   * @effect-why-not-loader Teardown of imperative SDK listeners on scope exit;
    * not request/response data.
    */
   useEffect(() => {
+    scopeOwner.active = true;
     const incomingListenerCleanups = incomingListenerCleanupsRef.current;
     return () => {
+      scopeOwner.active = false;
+      callGenerationRef.current += 1;
       incomingListenerCleanups.forEach((cleanup) => cleanup());
       incomingListenerCleanups.clear();
     };
-  }, []);
+  }, [scopeOwner]);
 
   const sessionPhase = deriveCallSessionPhase(
     activeCall,
@@ -692,6 +724,7 @@ export function useCallHandling({
     isActiveCallOnLocalHold,
     makeCall,
     hangUp,
+    cancelPendingDial,
     answer,
     holdAndAnswer,
     switchTo,

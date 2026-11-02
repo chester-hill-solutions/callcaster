@@ -28,7 +28,7 @@ const BASELINE_ALLOWLIST = {
   // available for the remaining domains.
   // Inbound-queue tables moved to db/schema-inbound-queue.ts on 2026-09-06
   // (713 lines after the move); the pin leaves room for a handful of columns.
-  "db/schema.ts": 720,
+  "db/schema.ts": 706,
   // Lowered from 1080 on 2026-08-04: authForContact/Script/Survey/OutreachAttempt
   // collapsed into authForResource, so the file genuinely shrank.
   "lib/platform-data.server.ts": 1005,

@@ -158,50 +158,35 @@ export async function claimNextQueueContact(
   tdb: TenantDb,
   campaignId: number,
   userId: string,
+  options?: { deferEmit?: DeferredEmit },
 ): Promise<ClaimedQueueContact | null> {
+  const publish = async (workspaceId: string, oldRows: CampaignQueueRow[], newRows: CampaignQueueRow[]) => {
+    const emit = () => emitQueueRowUpdates(workspaceId, oldRows, newRows);
+    if (options?.deferEmit) options.deferEmit(emit);
+    else await emit();
+  };
   for (let attempt = 0; attempt < MAX_OPT_OUT_CLAIM_SKIPS; attempt++) {
     const rows = await tdb.execute(
       sql`select * from claim_next_queue_contact(${campaignId}, ${userId}::uuid)`,
     );
     const row = rows[0] as ClaimedQueueContact | undefined;
     if (!row || !row.queue_id) return null;
+    const queueRow = await tdb.campaign_queue.findFirst({ where: eq(campaignQueueTable.id, row.queue_id) });
+    if (!queueRow) return null;
+    await publish(queueRow.workspace, [], [queueRow]);
 
-    const [queueRow] = await db
-      .select()
-      .from(campaignQueueTable)
-      .where(eq(campaignQueueTable.id, row.queue_id))
-      .limit(1);
-    if (queueRow) {
-      await emitQueueEvent(
-        queueRow.workspace,
-        "UPDATE",
-        queueRow as Record<string, unknown>,
-        null,
-      );
-    }
-
-    // Belt-and-suspenders opt-out guard: `claim_next_queue_contact` does not
-    // filter on `contact.opt_out`, so a contact opted out by a writer that did
-    // not also dequeue their rows could still be claimed. Dequeue such claims
-    // and try again (bounded so a queue full of opted-out rows can't loop
-    // forever).
-    const [contactRow] = await db
-      .select({ opt_out: contactTable.opt_out })
-      .from(contactTable)
-      .where(eq(contactTable.id, row.contact_id))
-      .limit(1);
+    // Reads and opt-out writes use the same tenant transaction as the claim.
+    // A later explicit re-add must survive this older claim's cleanup.
+    const contactRow = await tdb.contact.findFirst({ where: eq(contactTable.id, row.contact_id), columns: { opt_out: true } });
     if (contactRow?.opt_out) {
-      // Nothing to dequeue if the row can no longer be read.
-      if (!queueRow) continue;
-      await dequeueCampaignQueueById({
-        queueId: row.queue_id,
-        userId,
-        reason: "Contact opted out",
-        workspaceId: queueRow.workspace,
-      });
+      const updated = await tdb.campaign_queue.update({ set: buildDequeuedQueueUpdate(userId, "Contact opted out"), where: and(
+        eq(campaignQueueTable.id, row.queue_id), eq(campaignQueueTable.dispatch_generation, queueRow.dispatch_generation),
+        eq(campaignQueueTable.queue_state, QUEUE_LIFECYCLE_ASSIGNED), eq(campaignQueueTable.assigned_to_user_id, userId),
+        isNull(campaignQueueTable.dequeued_at),
+      ) });
+      await publish(queueRow.workspace, [queueRow], updated);
       continue;
     }
-
     return row;
   }
   return null;
@@ -228,13 +213,18 @@ export async function updateCampaignQueueStatusByIds(
   if (ids.length === 0) {
     return;
   }
+  const set: QueueColumnWrite = buildQueueStatusUpdatePayload(status);
+  if (status === QUEUE_STATUS_QUEUED) {
+    set.dispatch_generation = sql`gen_random_uuid()`;
+    set.redial_requested_at = sql`clock_timestamp()`;
+  }
 
   await updateCampaignQueueAndEmit({
     conditions: [
       inArray(campaignQueueTable.id, ids),
       eq(campaignQueueTable.workspace, workspaceId),
     ],
-    set: buildQueueStatusUpdatePayload(status),
+    set,
     workspaceId,
   });
 }
@@ -397,9 +387,10 @@ export async function getQueuedContactIdsForCampaign(args: {
  */
 async function dequeueCampaignQueueById(args: {
   queueId: number;
-  userId: string;
+  userId: string | null;
   reason: string;
   workspaceId: string;
+  expectedGeneration?: string | null;
   exec?: QueueWriteExecutor;
   deferEmit?: DeferredEmit;
 }) {
@@ -409,6 +400,7 @@ async function dequeueCampaignQueueById(args: {
     eq(campaignQueueTable.id, args.queueId),
     eq(campaignQueueTable.workspace, args.workspaceId),
   ];
+  conditions.push(matchesQueueGeneration(args.expectedGeneration));
 
   return updateCampaignQueueAndEmit({
     conditions,
@@ -417,6 +409,11 @@ async function dequeueCampaignQueueById(args: {
     exec: args.exec,
     deferEmit: args.deferEmit,
   });
+}
+
+function matchesQueueGeneration(expected: string | null | undefined): SQL {
+  if (expected === undefined) return sql`true`;
+  return expected === null ? sql`false` : eq(campaignQueueTable.dispatch_generation, expected);
 }
 
 
@@ -538,9 +535,11 @@ async function dequeueCampaignQueueByContact(args: {
  */
 type DequeueQueueEntryByIdArgs = {
   by: { id: number };
-  userId: string;
+  userId: string | null;
   reason: string;
   workspaceId: string;
+  /** A funded dispatch may finish only its own queue intent. Null refuses the write. */
+  expectedGeneration?: string | null;
   household?: undefined;
   /** Run in the caller's transaction, and hold the publish until it commits. */
   exec?: QueueWriteExecutor;
@@ -605,12 +604,14 @@ export async function recordQueueAttemptFailure(args: {
   queueId: number;
   error: string;
   workspaceId: string;
+  expectedGeneration?: string | null;
 }): Promise<void> {
   await updateCampaignQueueAndEmit({
     conditions: [
       eq(campaignQueueTable.id, args.queueId),
       eq(campaignQueueTable.workspace, args.workspaceId),
       isNull(campaignQueueTable.dequeued_at),
+      matchesQueueGeneration(args.expectedGeneration),
     ],
     set: {
       attempt_count: sql`${campaignQueueTable.attempt_count} + 1`,
@@ -638,6 +639,7 @@ export async function dequeueQueueEntry(
       userId: args.userId,
       reason: args.reason,
       workspaceId: args.workspaceId,
+      expectedGeneration: args.expectedGeneration,
       exec: args.exec,
       deferEmit: args.deferEmit,
     });
@@ -702,65 +704,7 @@ export async function dequeueQueueEntry(
 }
 
 
-/**
- * Why a dequeue reported `dequeuedPrimary: false`.
- *
- * A plain read, run only on the no-op path, so the API can say something true
- * instead of "assigned to another agent" for every zero-row dequeue — the
- * manual-dial "next contact" flow dequeues a contact the hangup route has
- * usually already dequeued, and calling that a conflict would be a new lie in
- * place of the old one.
- *
- * Best-effort by construction: the row can change again between the RPC and
- * this read. It decides a message, never a write.
- */
-export type DequeueNoOpReason =
-  | "already_dequeued"
-  | "assigned_elsewhere"
-  | "not_found"
-  | "unknown";
-
-export async function explainDequeueNoOp(args: {
-  contactId: number;
-  campaignId: number;
-  workspaceId: string;
-  userId: string | null;
-}): Promise<DequeueNoOpReason> {
-  const rows = await db
-    .select({
-      queue_state: campaignQueueTable.queue_state,
-      assigned_to_user_id: campaignQueueTable.assigned_to_user_id,
-      dequeued_at: campaignQueueTable.dequeued_at,
-    })
-    .from(campaignQueueTable)
-    .where(
-      and(
-        eq(campaignQueueTable.contact_id, args.contactId),
-        eq(campaignQueueTable.campaign_id, args.campaignId),
-        eq(campaignQueueTable.workspace, args.workspaceId),
-      ),
-    );
-
-  if (rows.length === 0) {
-    return "not_found";
-  }
-
-  const heldByAnotherAgent = rows.some(
-    (row) =>
-      row.dequeued_at == null &&
-      row.assigned_to_user_id != null &&
-      row.assigned_to_user_id !== args.userId,
-  );
-  if (heldByAnotherAgent) {
-    return "assigned_elsewhere";
-  }
-
-  if (rows.every((row) => row.dequeued_at != null)) {
-    return "already_dequeued";
-  }
-
-  return "unknown";
-}
+export { explainDequeueNoOp, type DequeueNoOpReason } from "@/lib/campaign-queue-dequeue-result.server";
 
 export async function releaseAssignedQueueForUser(
   userId: string,

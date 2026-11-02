@@ -16,9 +16,9 @@ import { recheckCampaignCompletion } from "@/lib/campaign-completion.server";
 import { MMS_CREDITS, SMS_SEGMENT_CREDITS, debitAmountFromCredits } from "@/lib/pricing";
 import { smsKey } from "@/lib/billing-keys";
 import type { TwilioSmsStatusWebhook, TwilioSmsStatus, OutreachDisposition } from "@/lib/twilio.types";
-import { campaign as campaignTable, campaign_queue as campaignQueueTable } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
-import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
+import { campaign as campaignTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { dequeueLegacyVoiceAttempt } from "@/server/legacy-voice-queue.server";
 import { findMessageBySid, updateMessageBySid, type MessageRow } from "@/lib/message-db.server";
 import { parseSmsProviderCount, smsProviderQuantityFields } from "@/lib/sms-provider-quantities";
 import {
@@ -31,6 +31,7 @@ import {
 import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "@/lib/logger.server";
 import { emitPredictiveBroadcast } from "@/lib/workspace-events.server";
+import { predictiveCustomerBroadcast } from "@/lib/predictive-customer-broadcast.server";
 import {
   billTerminalCallStatus,
   resolveCallOutreachContext,
@@ -38,11 +39,15 @@ import {
 import type { TwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 import { persistCallRecordingToStorage } from "@/lib/call-recording-storage.server";
 import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
-import {
-  ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE,
-  WEBHOOK_DELIVERY_JOB_TYPE,
-} from "@/lib/worker/job-types.server";
-import { isBatchTranscriptionEnabled } from "@/lib/worker/handlers/elevenlabs-batch-transcribe.server";
+import { WEBHOOK_DELIVERY_JOB_TYPE } from "@/lib/worker/job-types.server";
+import { enqueueCallRecordingTranscription } from "@/lib/call-recording-transcription.server";
+import { isTerminalStatus, normalizeProviderStatus } from "@/lib/call-status";
+import { findVoiceReservationForCall } from "@/server/voice-bridge-reservation.server";
+import { dequeueFundedVoiceAttempt } from "@/server/voice-attempt-queue.server";
+import { queueFundedPredictiveContinuation } from "@/server/predictive-machine-operation.server";
+import { enqueueFundedVoiceTerminalOutcome } from "@/server/voice-terminal-outcome.server";
+import { ensureFundedPredictiveReceipt } from "@/server/predictive-voice-receipt.server";
+import { isVoiceAudioLeg } from "@/server/voice-audio-classification.server";
 
 /** Terminal Twilio call statuses and the outreach disposition they imply. */
 const CALL_STATUS_TO_DISPOSITION: Record<string, string> = {
@@ -67,10 +72,24 @@ export async function runCallStatusSideEffects(args: {
   if (!callRow) {
     throw new Error(`Call ${args.callSid} not found for side effects`);
   }
+  if (callRow.workspace && await isVoiceAudioLeg(callRow.workspace, args.callSid)) return { ok: true };
+  let reservation = callRow.workspace ? await findVoiceReservationForCall(callRow.workspace, args.callSid) : null;
+  if (reservation?.setup_sid === args.callSid) return { ok: true };
+  // An older progress job can observe a newer terminal row. Keep its hold
+  // recoverable until a terminal job exists to carry all recipient outcomes.
+  if (reservation && isTerminalStatus(normalizeProviderStatus(callRow.status)) && !CALL_STATUS_TO_DISPOSITION[args.event.callStatus.toLowerCase()]) return { ok: true };
 
-  await billTerminalCallStatus(callRow);
+  if (reservation && CALL_STATUS_TO_DISPOSITION[args.event.callStatus.toLowerCase()] && !reservation.terminal_status) {
+    await enqueueFundedVoiceTerminalOutcome(reservation.workspace, args.callSid, args.event.raw);
+    reservation = await findVoiceReservationForCall(reservation.workspace, args.callSid);
+  }
+  const finalStatus = normalizeProviderStatus(reservation?.terminal_status);
+  const effectiveCall = finalStatus && reservation?.terminal_duration != null
+    ? { ...callRow, status: finalStatus, duration: reservation.terminal_duration } : callRow;
+  if (reservation) await ensureFundedPredictiveReceipt(reservation);
+  await billTerminalCallStatus(effectiveCall);
 
-  const callStatus = args.event.callStatus;
+  const callStatus = finalStatus ?? args.event.callStatus;
   const { outreachAttemptId, workspaceId } = await resolveCallOutreachContext(callRow);
 
   const currentAttempt =
@@ -80,10 +99,8 @@ export async function runCallStatusSideEffects(args: {
 
   const billingWorkspace = currentAttempt?.workspace ?? workspaceId;
   if (currentAttempt && billingWorkspace && outreachAttemptId != null) {
-    await emitPredictiveBroadcast(billingWorkspace, {
-      contact_id: currentAttempt.contact_id,
-      status: callStatus,
-    });
+    const broadcast = callRow.workspace === billingWorkspace ? predictiveCustomerBroadcast(callRow, callStatus) : null;
+    if (broadcast) await emitPredictiveBroadcast(billingWorkspace, broadcast);
 
     // Provider-terminal statuses stamp a disposition so every call yields a
     // results row even when the browser never reaches /api/hangup (callee
@@ -106,55 +123,14 @@ export async function runCallStatusSideEffects(args: {
     }
   }
 
-  // A provider-terminal status must collapse the contact's queue entry exactly
-  // like /api/hangup does; otherwise a callee hang-up leaves the agent's
-  // nextRecipient (and the whole queue view) pointing at a finished contact
-  // while an agent hang-up clears it. Idempotent: if the agent already
-  // hung up, the guarded dequeue_contact RPC no-ops on dequeued rows. The
-  // assignee id is required for the RPC to cover assigned rows, so take it
-  // from the queue row itself — a webhook has no acting user. Test calls can
-  // name a campaign and contact, but they deliberately have no outreach
-  // attempt and must leave the matching queue row untouched.
-  if (
-    outreachAttemptId != null &&
-    CALL_STATUS_TO_DISPOSITION[callStatus.toLowerCase()] &&
-    callRow.contact_id != null &&
-    callRow.campaign_id != null
-  ) {
-    const dequeueWorkspace = workspaceId ?? callRow.workspace;
-    if (!dequeueWorkspace) {
-      logger.warn("call_status.dequeue_skipped", {
-        callSid: args.callSid,
-        reason: "no workspace",
-      });
-      return { ok: true };
-    }
-    const tdb = createTenantDb(dequeueWorkspace);
-    const [queueRow, campaign] = await Promise.all([
-      callRow.campaign_id
-        ? tdb.campaign_queue.findFirst({
-            where: and(
-              eq(campaignQueueTable.contact_id, callRow.contact_id),
-              eq(campaignQueueTable.campaign_id, callRow.campaign_id),
-            ),
-            columns: { assigned_to_user_id: true },
-          })
-        : Promise.resolve(null),
-      callRow.campaign_id
-        ? tdb.campaign.findFirst({
-            where: eq(campaignTable.id, callRow.campaign_id),
-            columns: { group_household_queue: true },
-          })
-        : Promise.resolve(null),
-    ]);
-    await dequeueQueueEntry({
-      by: { contactId: callRow.contact_id, campaignId: callRow.campaign_id },
-      workspaceId: dequeueWorkspace,
-      household: campaign?.group_household_queue ?? false,
-      userId: queueRow?.assigned_to_user_id ?? null,
-      reason: "Call completed",
-      exec: tdb,
-    });
+  if (reservation && CALL_STATUS_TO_DISPOSITION[callStatus.toLowerCase()]) {
+    await dequeueFundedVoiceAttempt(reservation);
+    await queueFundedPredictiveContinuation(reservation);
+    return { ok: true };
+  }
+
+  if (outreachAttemptId != null && workspaceId && CALL_STATUS_TO_DISPOSITION[callStatus.toLowerCase()]) {
+    await dequeueLegacyVoiceAttempt(workspaceId, args.callSid);
   }
 
   return { ok: true };
@@ -413,22 +389,7 @@ export async function runRecordingSideEffects(args: {
       // Batch transcription is default-off pending an undecided product policy
       // (see `batchTranscription` in @/lib/coaching-schemas). Suppress the
       // enqueue entirely rather than queueing work nothing will bill for.
-      if (await isBatchTranscriptionEnabled(callRow.workspace)) {
-        try {
-          await enqueueRegisteredJob({
-            type: ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE,
-            workspaceId: callRow.workspace,
-            params: { callSid: args.callSid },
-            dedupe: { kind: "idempotency", key: `elevenlabs_batch:${args.callSid}` },
-          });
-        } catch (error) {
-          logger.warn("elevenlabs_batch_transcribe.enqueue_failed", {
-            callSid: args.callSid,
-            workspaceId: callRow.workspace,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
+      await enqueueCallRecordingTranscription(callRow.workspace, args.callSid, persistResult.audioUrl);
     }
   } else if (recordingSid && !accountSid) {
     logger.warn("call_recording.missing_account_sid", {

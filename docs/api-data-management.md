@@ -33,6 +33,10 @@ Spec: [`/api/docs/openapi`](/api/docs/openapi) · UI: [`/docs`](/docs)
 | POST/DELETE | `/api/campaign_queue` | Queue row operations |
 | POST | `/api/reset_campaign` | Reset campaign via RPC |
 
+Campaign reset pauses the campaign and creates new queue attempts. Funded call
+and outreach records stay available for billing, late callbacks and recovery.
+Previously started calls keep their saved funding until settlement.
+
 POST `/api/campaign_queue` reserves queue order on the server. Omitted or supplied
 `startOrder` values cannot change the reserved range. Concurrent requests reserve
 separate ranges. Existing campaign/contact uniqueness and explicit `requeue`

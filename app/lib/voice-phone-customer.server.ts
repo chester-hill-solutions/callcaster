@@ -1,0 +1,39 @@
+import { createHash, randomUUID } from "node:crypto";
+import { createVoiceResponse } from "@/lib/twilio-twiml.server";
+import { voiceBridgeCallbackArgs } from "@/lib/voice-bridge-webhook.server";
+import { normalizeVerifiedVoiceParams } from "@/lib/twilio/verified-voice-params";
+import { twilioWebhookForbiddenHangup } from "@/lib/twilio-webhook.server";
+import { voiceWebhookDeliveryUrl } from "@/lib/twilio-webhook-delivery";
+import { voiceCustomerPhaseLabel } from "@/lib/voice-customer-phase";
+import { verifyVoiceAudioCustomerSource } from "@/lib/voice-audio-customer-source.server";
+import { appendLiveTranscriptionStreamTwiml } from "@/lib/media-stream-twiml.server";
+import { getWorkspaceById } from "@/lib/workspace-members-db.server";
+import { isObject } from "@/lib/type-safety-utils";
+import { bindVoiceReservationCallback, VoiceReservationBindingError } from "@/server/voice-reservation-callback.server";
+import { claimVoicePhoneCustomerInstruction, findVoicePhoneCustomerOwner } from "@/server/voice-phone-customer.server";
+import type { VoiceReservation } from "@/server/voice-credit-reservation.server";
+
+/** Only the already-funded customer root joins; Connect never reaches this path. */
+export async function voicePhoneCustomerInstruction(request: Request, owner: VoiceReservation, params: Record<string, string>, mode: "manual" | "predictive" = "manual") {
+  if (!normalizeVerifiedVoiceParams(params)) return twilioWebhookForbiddenHangup();
+  try { await bindVoiceReservationCallback(voiceBridgeCallbackArgs(request, params, "voice")); }
+  catch (error) { if (error instanceof VoiceReservationBindingError) return twilioWebhookForbiddenHangup(); throw error; }
+  const row = await findVoicePhoneCustomerOwner(owner.id);
+  if (!row?.audio_connection_id || row.audio_generation == null || !row.audio_destination || !row.audio_conference_callback ||
+    !row.user_id || row.campaign_id == null || !row.conference_id || row.audio_mode !== mode) return twilioWebhookForbiddenHangup();
+  const source = await verifyVoiceAudioCustomerSource({ workspaceId: row.workspace, userId: row.user_id, campaignId: row.campaign_id,
+    connectionId: row.audio_connection_id, generation: row.audio_generation, phoneNumber: row.audio_destination });
+  if (!source.ok) return null;
+  const phaseId = randomUUID();
+  const twiml = createVoiceResponse(), workspace = await getWorkspaceById(row.workspace);
+  appendLiveTranscriptionStreamTwiml({ twiml, featureFlags: isObject(workspace?.feature_flags) ? workspace.feature_flags : undefined,
+    params: { workspaceId: row.workspace, userId: row.user_id, direction: mode === "predictive" ? "predictive" : "outbound", contactId: row.contact_id,
+      campaignId: row.campaign_id, callSid: params.CallSid, streamName: `call-${params.CallSid}` } });
+  twiml.dial().conference({ beep: "false", startConferenceOnEnter: true, endConferenceOnExit: false, waitUrl: "",
+    participantLabel: voiceCustomerPhaseLabel(row.id, phaseId), statusCallback: voiceWebhookDeliveryUrl(row.audio_conference_callback),
+    statusCallbackMethod: "POST", statusCallbackEvent: ["join", "leave", "end"],
+  }, row.conference_id);
+  const xml = twiml.toString();
+  return await claimVoicePhoneCustomerInstruction(row, source.proof, { id: phaseId, digest: createHash("sha256").update(xml).digest("hex") })
+    ? new Response(xml, { headers: { "Content-Type": "text/xml" } }) : null;
+}

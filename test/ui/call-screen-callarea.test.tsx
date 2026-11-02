@@ -78,6 +78,48 @@ function baseProps(overrides: Partial<any> = {}) {
 }
 
 describe("app/components/call/CallScreen.CallArea.tsx", () => {
+  test("pending Save and Next locks the disposition until the acknowledgement arrives", async () => {
+    const { CallArea } = await import("@/components/call/CallScreen.CallArea");
+    const props = baseProps({ isAdvancingQueue: true, disposition: "answered",
+      dispositionOptions: [{ value: "answered", label: "Answered" }] });
+    const { rerender } = render(<CallArea {...props} />);
+    expect(screen.getByRole("combobox")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save and Next" })).toBeDisabled();
+    rerender(<CallArea {...props} isAdvancingQueue={false} />);
+    expect(screen.getByRole("combobox")).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Save and Next" })).toBeEnabled();
+  });
+  test.each([false, true])("audio prerequisites disable Start in predictive mode %s", async predictive => {
+    const { CallArea } = await import("@/components/call/CallScreen.CallArea");
+    const props = baseProps({ predictive, startDisabledReason: "Check audio connection" });
+    render(<CallArea {...props} />);
+    const start = screen.getByRole("button", { name: "Check audio connection" });
+    expect(start).toBeDisabled(); fireEvent.click(start);
+    expect(props.handleDialNext).not.toHaveBeenCalled();
+  });
+
+  test("an uncertain customer receipt cannot expose a working Hang Up or Reset control", async () => {
+    const { CallArea } = await import("@/components/call/CallScreen.CallArea");
+    const props = baseProps({ callState: "dialing", displayState: "dialing", awaitingCustomerReceipt: true, onResetCall: vi.fn() });
+    render(<CallArea {...props} />);
+    const pending = screen.getByRole("button", { name: "Confirming call…" });
+    expect(pending).toBeDisabled(); fireEvent.click(pending);
+    expect(props.hangUp).not.toHaveBeenCalled();
+    expect(screen.queryByText("Reset call")).toBeNull();
+  });
+
+  test.each(["dialing", "connected"])("Save and Next waits for the customer to end from %s", async phase => {
+    const { CallArea } = await import("@/components/call/CallScreen.CallArea");
+    const props = baseProps({ callState: phase, displayState: phase, disposition: "answered", dispositionOptions: [{ value: "answered", label: "Answered" }] });
+    const { rerender } = render(<CallArea {...props} />);
+    const next = screen.getByRole("button", { name: "Save and Next" });
+    expect(next).toBeDisabled(); fireEvent.click(next);
+    expect(props.handleDequeueNext).not.toHaveBeenCalled();
+    rerender(<CallArea {...props} callState="completed" displayState="completed" />);
+    expect(next).toBeEnabled(); fireEvent.click(next);
+    expect(props.handleDequeueNext).toHaveBeenCalledTimes(1);
+  });
+
   test("uses default predictive/conference/voiceDrop values when omitted", async () => {
     const { CallArea } = await import("@/components/call/CallScreen.CallArea");
 
@@ -120,7 +162,7 @@ describe("app/components/call/CallScreen.CallArea.tsx", () => {
     }
   });
 
-  test("predictive idle shows a single Start Dialing action when no conference, Start with one", async () => {
+  test("predictive idle offers Start without a session and Stop for its existing room", async () => {
     const { CallArea } = await import("@/components/call/CallScreen.CallArea");
 
     const handleDialNext = vi.fn();
@@ -151,10 +193,9 @@ describe("app/components/call/CallScreen.CallArea.tsx", () => {
       />,
     );
 
-    const start = screen.getByTestId("call-screen-dial");
-    expect(start).toHaveTextContent("Start");
-    fireEvent.click(start);
-    expect(handleDialNext).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId("call-screen-dial")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stop Dialing" })).toBeEnabled();
+    expect(handleDialNext).toHaveBeenCalledTimes(1);
   });
 
   test("renders recipient info including trimmed address segments", async () => {
@@ -318,7 +359,7 @@ describe("app/components/call/CallScreen.CallArea.tsx", () => {
     expect(handleDialNext).toHaveBeenCalledTimes(1);
   });
 
-  test("predictive Start Dialing does NOT require confirmation after a call ends (only replacing-the-hangup manual dial does)", async () => {
+  test("a confirmed predictive Stop permits a fresh Start without manual dial confirmation", async () => {
     const { CallArea } = await import("@/components/call/CallScreen.CallArea");
     const handleDialNext = vi.fn();
 
@@ -333,7 +374,7 @@ describe("app/components/call/CallScreen.CallArea.tsx", () => {
         })}
       />,
     );
-    expect(screen.getByRole("button", { name: "Hang Up" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stop Dialing" })).toBeInTheDocument();
 
     rerender(
       <CallArea

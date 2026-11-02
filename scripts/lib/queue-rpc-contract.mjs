@@ -104,6 +104,16 @@ export const DROPPED_QUEUE_COLUMNS = new Map([
  */
 export const BOOKKEEPING_COLUMNS = new Map([
   [
+    "dispatch_generation",
+    "identity of an explicit queue intent. handle_campaign_queue_entry rotates " +
+      "it when re-adding a row; claims, assignment releases and provider retries retain it.",
+  ],
+  [
+    "redial_requested_at",
+    "database timestamp of an explicit re-add. Initial queue rows retain " +
+      "campaign-wide phone deduplication; a re-add ignores only earlier admissions.",
+  ],
+  [
     "attempts",
     "legacy dial-attempt counter (bigint, on the table since the Supabase era). " +
       "Still written by the dial paths and read by the queue UI.",

@@ -36,27 +36,9 @@ describe("phone verification lifecycle", () => {
     vi.clearAllMocks();
   });
 
-  test("falls back to computer when the selected verified number is removed", () => {
-    const { result, rerender } = renderHook(
-      ({ verifiedNumbers }) => usePhoneVerification({ verifiedNumbers }),
-      { initialProps: { verifiedNumbers: ["+15551234567"] } },
-    );
-
-    act(() => {
-      void result.current.handlePhoneDeviceSelection("+15551234567", vi.fn());
-    });
-    expect(result.current.selectedDevice).toBe("+15551234567");
-    expect(result.current.phoneConnectionStatus).toBe("disconnected");
-
-    rerender({ verifiedNumbers: [] });
-
-    expect(result.current.selectedDevice).toBe("computer");
-    expect(result.current.phoneConnectionStatus).toBe("disconnected");
-  });
-
   test("uses call-in verification and reports failures without success toast", () => {
     const { result, rerender } = renderHook(() =>
-      usePhoneVerification({ verifiedNumbers: [] }),
+      usePhoneVerification(),
     );
 
     act(() => result.current.setNewPhoneNumber("+15551234567"));

@@ -120,6 +120,15 @@ Do not infer Project Status from labels or PRs. Preserve cached progress markers
 only with a visible notice that names their source revision and says they were
 not refreshed. This fallback does not verify or change Project Status.
 
+For a selected local board refresh, pass the normalized records returned by
+`validateEnrichmentFiles` or `loadEnrichment` to `buildBoard`. Raw JSON can omit
+default arrays such as `blockedBy` and fail during rendering. Build and validate
+the replacement before writing the board or enrichment; preserve other entries.
+Validate the full enrichment set before selecting one issue. Require all other
+record values and issue sections to remain unchanged. Keep the complete snapshot
+header and count; add the selected issue's source and observation time separately.
+An issue-body readback does not refresh its native fields or Project Status.
+
 ## Common Commands
 
 - View: `gh project view NUMBER --owner OWNER`
@@ -138,3 +147,7 @@ formatting. When removing a JSON array record, handle its adjacent comma,
 including the last record. Parse the edited JSON before saving it, then run
 `loadEnrichment` and `git diff --check`. Keep base snapshot dates distinct from
 selected live Issue and Project checks; do not imply a complete board refresh.
+
+Render changed field lines from the validated record. When updating commit IDs,
+replace full IDs before short forms and compare the exact rendered values with
+the record before saving.

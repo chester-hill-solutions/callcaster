@@ -17,6 +17,8 @@ import { callKey } from "@/lib/billing-keys";
 import { debitAmountFromCredits } from "@/lib/pricing";
 import { logger } from "@/lib/logger.server";
 import { emitPostgresChangeEvent } from "@/lib/workspace-events.server";
+import { settleVoiceReservation } from "@/server/voice-credit-settlement.server";
+import { isVoiceAudioLeg } from "@/server/voice-audio-classification.server";
 
 export {
   voiceBillingKindFromCampaignType,
@@ -75,12 +77,8 @@ export function buildCallUpsertFromTwilioParams(
       getString(underCaseData.status)) as Database["public"]["Enums"]["call_status"] | null,
     start_time: startTime ? new Date(startTime) : undefined,
     end_time: endTime ? new Date(endTime) : undefined,
-    duration: String(
-      Math.max(
-        getNumber(underCaseData.duration) ?? 0,
-        getNumber(underCaseData.call_duration) ?? 0,
-      ),
-    ),
+    // CallDuration is seconds; Duration is the provider's minute field.
+    duration: String(getNumber(underCaseData.call_duration) ?? getNumber(underCaseData.duration) ?? 0),
     direction: getString(underCaseData.direction),
     api_version: getString(underCaseData.api_version),
     forwarded_from: getString(underCaseData.forwarded_from),
@@ -150,6 +148,11 @@ export type CallStatusBillingResult = {
   existingId?: number;
 } | null;
 
+async function settleTerminalVoiceCall(workspaceId: string, callSid: string, status: string, duration: number, note: string) {
+  if (await isVoiceAudioLeg(workspaceId, callSid)) return { handled: true, billingResult: null };
+  return settleVoiceReservation({ workspaceId, callSid, status, duration, note });
+}
+
 /** Debit credits for a terminal call with non-zero duration (idempotent). */
 export async function billTerminalCallStatus(
   call: Tables<"call">,
@@ -166,6 +169,11 @@ export async function billTerminalCallStatus(
   const isTerminal = TERMINAL_BILLABLE_CALL_STATUSES.includes(
     status as (typeof TERMINAL_BILLABLE_CALL_STATUSES)[number],
   );
+
+  if (call.workspace && (isTerminal || status === "canceled")) {
+    const settlement = await settleTerminalVoiceCall(call.workspace, call.sid, status, duration, options.note ?? `Call ${call.sid}`);
+    if (settlement.handled) return settlement.billingResult;
+  }
 
   if (!call.workspace || !isTerminal || duration <= 0) {
     return null;

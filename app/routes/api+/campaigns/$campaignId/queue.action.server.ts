@@ -11,6 +11,7 @@ import {
   patchCampaignQueueApi,
 } from "@/lib/platform-data.server";
 import { patchCampaignQueueBodySchema } from "@/lib/schemas/api/platform-data";
+import { withQueueAdvanceSnapshots } from "@/server/queue-advance-snapshot.server";
 
 export const loader = defineLoader({
   auth: dataPlaneCapabilityAuthForResource("campaigns.read", "campaign", "campaignId"),
@@ -29,8 +30,10 @@ export const loader = defineLoader({
           campaignId: Number(campaignId),
           queueId,
         });
+        const mapped = item ? mapCampaignQueueItemForUi(item) : null;
+        const [snapshot] = mapped ? await withQueueAdvanceSnapshots([mapped], auth.workspaceId) : [];
         return jsonResponse(
-          { item: item ? mapCampaignQueueItemForUi(item) : null },
+          { item: snapshot ?? null },
           200,
         );
       } catch (error) {

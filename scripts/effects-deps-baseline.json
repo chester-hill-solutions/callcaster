@@ -4,8 +4,6 @@
   "app/components/sms-ui/ChatAddContactDialog.tsx::ChatAddContactDialog::undocumented dependency: createFetcher.state": 1,
   "app/components/sms-ui/ChatInput.tsx::ChatInput::undocumented dependency: selectedFrom": 1,
   "app/components/sms-ui/ChatInput.tsx::ChatInput::undocumented dependency: messagingServiceReady": 1,
-  "app/hooks/call/useAudioDeviceTest.ts::useAudioDeviceTest::undocumented dependency: stopMicMonitor": 1,
-  "app/hooks/call/useAudioDeviceTest.ts::useAudioDeviceTest::undocumented dependency: stopSpeakerTest": 1,
   "app/hooks/useIntersectionObserver.ts::useInfiniteScroll::undocumented dependency: onLoadMore": 1,
   "app/hooks/useIntersectionObserver.ts::useLazyImage::undocumented dependency: onLoad": 1,
   "app/hooks/useIntersectionObserver.ts::useLazyImage::undocumented dependency: onError": 1,

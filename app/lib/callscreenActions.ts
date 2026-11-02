@@ -5,6 +5,7 @@ import { Campaign, Contact, QueueItem, OutreachAttempt, Call   } from "./types";
 import { isRecent } from "./utils";
 import { isObject } from "./type-safety-utils";
 import { logger } from "@/lib/logger.client";
+import { manualDialFields, type StartCallArgs } from "@/lib/manual-dial-client";
 
 const getRecentAttempt = ({
   attempts,
@@ -30,88 +31,12 @@ export async function releaseCallSession(campaignId: number): Promise<void> {
   }
 }
 
-export const handleConference = ({ begin }:{begin:() => void}) => {
-  const handleConferenceStart = () => {
-    begin();
-  };
-
-  const handleConferenceEnd = async ({ activeCall, setConference, workspaceId, conferenceName }:{activeCall:{ parameters: Record<string, unknown> } | null, setConference:() => void, workspaceId:string, conferenceName?: string | null}) => {
-    const response = await fetch("/api/auto-dial/end", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspaceId, ...(conferenceName ? { conferenceName } : {}) }),
-    });
-    if (!response.ok) {
-      throw new Error("Could not stop the predictive conference");
-    }
-    const result: unknown = await response.json();
-    if (!isObject(result) || result.success !== true) {
-      throw new Error("Could not confirm that the predictive conference stopped");
-    }
-    const callSid = activeCall?.parameters?.CallSid;
-    if (typeof callSid === "string" && callSid) {
-      try {
-        const response = await fetch(`/api/hangup`, {
-          method: "POST",
-          body: JSON.stringify({
-            callSid: callSid,
-            workspaceId,
-          }),
-          headers: { "Content-Type": "application/json" },
-        });
-
-        if (!response.ok) {
-          logger.error("Failed to hang up conference call", {
-            callSid: callSid,
-            status: response.status,
-          });
-        }
-      } catch (error) {
-        logger.error("Failed to hang up conference call", error);
-      }
-    }
-    setConference();
-  };
-  return { handleConferenceStart, handleConferenceEnd };
-};
-
 export const handleCall = ({ submit }:{submit:FetcherWithComponents<unknown>["submit"]}) => {
-  const startCall = ({
-    contact,
-    campaign,
-    user,
-    workspaceId,
-    nextRecipient,
-    recentAttempt,
-    selectedDevice,
-  }: {
-    contact: Contact;
-    campaign: Campaign;
-    user: { id: string };
-    workspaceId: string;
-    nextRecipient: QueueItem | null;
-    recentAttempt: OutreachAttempt | null;
-    selectedDevice: string | null;
-  }) => {
-    if (contact.phone) {
+  const startCall = (args: StartCallArgs) => {
+    const fields = manualDialFields(args);
+    if (fields) {
       const data = new FormData();
-      data.append("to_number", contact.phone);
-      data.append("campaign_id", campaign.id.toString());
-      data.append("user_id", user.id);
-      data.append("contact_id", contact.id.toString());
-      data.append("workspace_id", workspaceId);
-      if (recentAttempt?.id != null) {
-        data.append("outreach_id", recentAttempt.id.toString());
-      }
-      if (nextRecipient?.id != null) {
-        data.append("queue_id", nextRecipient.id.toString());
-      }
-      if (campaign.caller_id) {
-        data.append("caller_id", campaign.caller_id);
-      }
-      if (selectedDevice) {
-        data.append("selected_device", selectedDevice);
-      }
+      for (const [key, value] of Object.entries(fields)) data.append(key, value);
 
       submit(data, {
         action: "/api/dial",
@@ -194,39 +119,14 @@ export const handleContact = ({
 };
 
 export const handleQueue = ({
-  submit,
-  groupByHousehold,
   campaign,
   workspaceId,
   setQueue,
 }:{
-  submit: FetcherWithComponents<unknown>["submit"];  
-  groupByHousehold: boolean;
   campaign: Campaign;
   workspaceId: string;
   setQueue: Dispatch<SetStateAction<QueueItem[]>>;
 }) => {
-  const dequeue = ({ contact }:{contact:QueueItem }) => {
-    if (!contact || !contact.contact || !contact.contact.phone) return;
-    submit(
-      {
-        contact_id: contact.contact.id,
-        campaign_id: campaign.id,
-        household: groupByHousehold,
-      },
-      {
-        action: "/api/queues",
-        method: "POST",
-        encType: "application/json",
-      },
-    );
-    setQueue((prevQueue) => {
-      return prevQueue.filter(
-        (queueContact) => queueContact.contact.id !== contact.contact.id,
-      );
-    });
-  };
-
   const updateQueue = (newContacts: QueueItem[]) => {
     setQueue((prevQueue) => {
       const existingHouseholds = new Map<string, QueueItem[]>();
@@ -263,5 +163,5 @@ export const handleQueue = ({
       .then((json) => updateQueue(json))
       .catch((error) => logger.error("Unable to fetch queue: ", error));
   };
-  return { dequeue, fetchMore };
+  return { fetchMore };
 };

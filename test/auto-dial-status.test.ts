@@ -1,7 +1,14 @@
+import "./helpers/legacy-voice-reservation-mock";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.mock("@/server/voice-credit-settlement.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/voice-credit-settlement.server")>(),
+  settleVoiceReservation: async () => ({ handled: false, billingResult: null }),
+}));
+
 import { asRouteResponse } from "./helpers/route-result";
+import type { Tables } from "@/lib/db-types";
 import {
   makeTransactionHistoryTableStub,
   type TransactionRow,
@@ -30,9 +37,22 @@ const campaignQueueDbMocks = vi.hoisted(() => ({
 vi.mock("@/lib/logger.server", () => ({
   logger: loggerMocks,
 }));
-const dequeueQueueEntryMock = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/campaign-queue-db.server", () => ({
-  dequeueQueueEntry: (...args: unknown[]) => dequeueQueueEntryMock(...args),
+const legacyQueueMock = vi.hoisted(() => vi.fn());
+vi.mock("@/server/legacy-voice-queue.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/server/legacy-voice-queue.server")>(),
+  dequeueLegacyVoiceAttempt: (...args: unknown[]) => legacyQueueMock(...args),
+}));
+const legacyOutcomeMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/worker/webhook-side-effects.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/worker/webhook-side-effects.server")>(),
+  runCallStatusSideEffects: (...args: unknown[]) => legacyOutcomeMock(...args),
+}));
+vi.mock("@/lib/worker/enqueue-call-status.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/worker/enqueue-call-status.server")>(),
+  enqueueCallStatusSideEffects: async (_call: unknown, params: Record<string, string>) => {
+    const { parseTwilioVoiceCallback } = await import("@/lib/twilio/voice-callback");
+    return parseTwilioVoiceCallback(params);
+  },
 }));
 // Spreads the real module, for the same reason: only the keyed write is
 // asserted on, and this file's graph is deep enough that a frozen factory hides
@@ -122,7 +142,7 @@ vi.mock("../app/lib/database/workspace.server", async () => {
   };
 });
 
-function makeDbClientStub(args?: { outreachDisposition?: string }) {
+function makeDbClientStub(args?: { outreachDisposition?: string; dbCall?: Partial<Tables<"call">> }) {
   const transactionRows: TransactionRow[] = [];
   const ledgerCalls: {
     workspace: string;
@@ -359,8 +379,10 @@ describe("api.auto-dial.status", () => {
     campaignQueueDbMocks.updateError = null;
     campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign.mockReset();
     loggerMocks.info.mockReset();
-    dequeueQueueEntryMock.mockReset();
-    dequeueQueueEntryMock.mockImplementation(async () => {});
+    legacyQueueMock.mockReset();
+    legacyQueueMock.mockResolvedValue({ ownedPrimary: true, removedCount: 1 });
+    legacyOutcomeMock.mockReset();
+    legacyOutcomeMock.mockResolvedValue({ ok: true });
     machineOperationMock.mockReset();
     machineOperationMock.mockResolvedValue(null);
     runAutoDialerTurnMock.mockReset();
@@ -391,11 +413,10 @@ describe("api.auto-dial.status", () => {
     expect(res.status).toBe(403);
   }, 60000);
 
-  // Whether a replayed key actually dedupes is the database's job and is
-  // asserted against a real Postgres in test/integration-db/ledger.test.ts.
-  // The route's job — the only part this suite can see — is to derive the same
-  // deterministic key from the same CallSid every time.
-  test("bills completed calls under one deterministic key per CallSid", async () => {
+  // Real legacy completion, ledger keys and retries are covered together in
+  // test/integration-db/legacy-voice-terminal-queue.test.ts. This adapter
+  // must delegate the accepted Call instead of doing a second inline debit.
+  test("delegates each accepted terminal callback to the result worker", async () => {
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const makeReq = () => {
       const fd = new FormData();
@@ -417,15 +438,12 @@ describe("api.auto-dial.status", () => {
     const r2 = await asRouteResponse(mod.action({ request: makeReq() } as any));
     expect(r2.status).toBe(200);
 
-    // Both deliveries billed, and both used the identical key — so the DB's
-    // unique index is what collapses them, not luck about ordering.
-    expect(postgresStub._ledgerCalls).toHaveLength(2);
-    expect(
-      postgresStub._ledgerCalls.every((c) => c.idempotencyKey === "call:CA_DUP"),
-    ).toBe(true);
+    expect(legacyOutcomeMock).toHaveBeenCalledTimes(2);
+    expect(legacyOutcomeMock).toHaveBeenCalledWith(expect.objectContaining({ callSid: "CA_DUP" }));
+    expect(postgresStub._ledgerCalls).toHaveLength(0);
   });
 
-  test("billing kind is derived from campaign type", async () => {
+  test("delegates completed IVR results to the canonical billing worker", async () => {
     postgresStub = await usePostgresStub({ campaignType: "robocall" } as any);
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
@@ -443,14 +461,11 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(200);
-    expect(postgresStub._ledgerCalls).toHaveLength(1);
-    expect(postgresStub._ledgerCalls[0]).toMatchObject({
-      type: "DEBIT",
-      idempotencyKey: "call:CA_IVR_KIND",
-    });
+    expect(legacyOutcomeMock).toHaveBeenCalledWith(expect.objectContaining({ callSid: "CA_IVR_KIND" }));
+    expect(postgresStub._ledgerCalls).toHaveLength(0);
   });
 
-  test("dequeues by fetched attempt without writing provider status to disposition", async () => {
+  test("delegates completion to the saved Call owner and result worker", async () => {
     postgresStub = await usePostgresStub({ outreachDisposition: "completed" });
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
@@ -470,9 +485,7 @@ describe("api.auto-dial.status", () => {
 
     expect(res.status).toBe(200);
     expect(telephonyStubState.outreachUpdateCalls.length).toBe(0);
-    expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
-      expect.objectContaining({ by: { contactId: 1, campaignId: 1 }, household: true }),
-    );
+    expect(legacyQueueMock).toHaveBeenCalledWith("w1", "CA1");
   });
 
   /**
@@ -481,7 +494,7 @@ describe("api.auto-dial.status", () => {
    * terminal call, so the contact was never dequeued and the dialer stopped
    * after a single call with the campaign stuck on "Running".
    */
-  test("dequeues with the user id from the conference name, not the name itself", async () => {
+  test("uses the saved Call identity rather than the conference display name", async () => {
     const userId = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
     postgresStub = await usePostgresStub({
       dbCall: {
@@ -510,9 +523,7 @@ describe("api.auto-dial.status", () => {
     } as any));
 
     expect(res.status).toBe(200);
-    expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
-      expect.objectContaining({ userId }),
-    );
+    expect(legacyQueueMock).toHaveBeenCalledWith("w1", "CA1");
   });
 
   test("returns 500 when call lookup fails", async () => {
@@ -563,7 +574,7 @@ describe("api.auto-dial.status", () => {
     expect(res.status).toBe(200);
   });
 
-  test("participant-join updates call, queue, and answered_at without provider disposition", async () => {
+  test("an unfunded participant join saves call and answer facts without changing queue ownership", async () => {
     postgresStub = await usePostgresStub({
       dbCall: {
         sid: "CA1",
@@ -596,9 +607,7 @@ describe("api.auto-dial.status", () => {
       expect.objectContaining({ answered_at: expect.any(String) }),
     ]);
     expect(telephonyStubState.outreachUpdateCalls[0]).not.toHaveProperty("disposition");
-    expect(campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign).toHaveBeenCalledWith(
-      expect.objectContaining({ contactId: 1, campaignId: 1 }),
-    );
+    expect(campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign).not.toHaveBeenCalled();
   });
 
   test("participant-leave completes conferences and sets completed status", async () => {
@@ -709,7 +718,34 @@ describe("api.auto-dial.status", () => {
     );
   });
 
-  test.each(["issued", "uncertain", "continued"])("%s machine operation keeps billing but suppresses a second next turn", async state => {
+  test("a superseded legacy completion cannot request another predictive turn", async () => {
+    legacyQueueMock.mockResolvedValueOnce({ ownedPrimary: false, removedCount: 0 });
+    twilioClientMock.conferences.list.mockResolvedValueOnce([{ sid: "CONF1" }]);
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA_OLD"); fd.set("CallStatus", "busy"); fd.set("CallDuration", "0");
+    const response = await asRouteResponse(mod.action({ request: new Request("http://localhost/api/auto-dial/status", {
+      method: "POST", headers: { "x-twilio-signature": "good" }, body: fd,
+    }) } as Parameters<typeof mod.action>[0]));
+    expect(response.status).toBe(200);
+    expect(legacyOutcomeMock).toHaveBeenCalledWith(expect.objectContaining({ callSid: "CA_OLD" }));
+    expect(twilioClientMock.conferences.list).not.toHaveBeenCalled();
+    expect(runAutoDialerTurnMock).not.toHaveBeenCalled();
+  });
+
+  test("a failed legacy result remains retryable before queue advance or continuation", async () => {
+    legacyOutcomeMock.mockRejectedValueOnce(new Error("Owned result worker fault"));
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData(); fd.set("CallSid", "CA_OLD"); fd.set("CallStatus", "busy"); fd.set("CallDuration", "0");
+    const response = await asRouteResponse(mod.action({ request: new Request("http://localhost/api/auto-dial/status", {
+      method: "POST", headers: { "x-twilio-signature": "good" }, body: fd,
+    }) } as Parameters<typeof mod.action>[0]));
+    expect(response.status).toBe(500);
+    expect(legacyQueueMock).not.toHaveBeenCalled();
+    expect(runAutoDialerTurnMock).not.toHaveBeenCalled();
+  });
+
+  test.each(["issued", "uncertain", "continued"])("%s machine operation delegates its result but suppresses a second next turn", async state => {
     twilioClientMock.conferences.list.mockResolvedValueOnce([{sid:"CONF1"}]);
     machineOperationMock.mockResolvedValueOnce({state});
     const mod=await import("../app/routes/api+/auto-dial/status.route");
@@ -720,9 +756,9 @@ describe("api.auto-dial.status", () => {
     expect(response.status).toBe(200);
     expect(runAutoDialerTurnMock).not.toHaveBeenCalled();
     expect(machineOperationMock).toHaveBeenCalledWith(expect.objectContaining({workspaceId:"w1",callSid:"CA_MACHINE"}));
-    expect(postgresStub._ledgerCalls).toHaveLength(1);
-    expect(postgresStub._ledgerCalls[0].idempotencyKey).toBe("call:CA_MACHINE");
-    expect(dequeueQueueEntryMock).toHaveBeenCalledTimes(1);
+    expect(legacyOutcomeMock).toHaveBeenCalledWith(expect.objectContaining({ callSid: "CA_MACHINE" }));
+    expect(postgresStub._ledgerCalls).toHaveLength(0);
+    expect(legacyQueueMock).toHaveBeenCalledTimes(1);
   });
 
   test("triggerAutoDialer error bubbles to 500 when the in-process dialer turn fails", async () => {
@@ -812,7 +848,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("rpc dequeue_contact error returns 500", async () => {
-    dequeueQueueEntryMock.mockRejectedValue(new Error("dq"));
+    legacyQueueMock.mockRejectedValue(new Error("dq"));
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -829,9 +865,7 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(500);
-    expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
-      expect.objectContaining({ by: { contactId: 1, campaignId: 1 }, household: true }),
-    );
+    expect(legacyQueueMock).toHaveBeenCalledWith("w1", "CA1");
     expect(loggerMocks.error).toHaveBeenCalledWith("Error in handleCallStatus:", expect.any(Error));
   });
 
@@ -880,10 +914,6 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(500);
-    expect(loggerMocks.error).toHaveBeenCalledWith(
-      "Error in handleParticipantLeave:",
-      expect.any(Error),
-    );
   });
 
   test("participant-join does nothing when conference_id exists and no outreach_attempt_id", async () => {
@@ -948,7 +978,7 @@ describe("api.auto-dial.status", () => {
     await expect(res.json()).resolves.toMatchObject({ success: true, replay: true });
     // The dangerous side effects must not run again: no re-dequeue, no new
     // outbound call, no billing.
-    expect(dequeueQueueEntryMock).not.toHaveBeenCalled();
+    expect(legacyQueueMock).not.toHaveBeenCalled();
     expect(runAutoDialerTurnMock).not.toHaveBeenCalled();
     expect(postgresStub._ledgerCalls).toHaveLength(0);
   });
@@ -981,7 +1011,7 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(200);
-    expect(dequeueQueueEntryMock).toHaveBeenCalled();
+    expect(legacyQueueMock).toHaveBeenCalled();
   });
 
   test("replayed participant-join does not restamp answered_at", async () => {
@@ -1020,6 +1050,8 @@ describe("api.auto-dial.status", () => {
   // predictive_broadcast events the agent call screen subscribes to — the
   // generic /api/call-status side-effects job never runs for these calls.
   test("emits predictive_broadcast for contact-leg progress statuses", async () => {
+    await usePostgresStub({ dbCall: { sid: "CA1", workspace: "w1", user_id: "u1", campaign_id: 1,
+      contact_id: 1, outreach_attempt_id: 1, conference_id: "conf1" } });
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -1038,10 +1070,13 @@ describe("api.auto-dial.status", () => {
       contact_id: 1,
       status: "ringing",
       conference_id: "conf1",
+      call_sid: "CA1", user_id: "u1", campaign_id: 1, outreach_attempt_id: 1,
     });
   });
 
   test("emits predictive_broadcast for terminal statuses before dequeue handling", async () => {
+    await usePostgresStub({ dbCall: { sid: "CA1", workspace: "w1", user_id: "u1", campaign_id: 1,
+      contact_id: 1, outreach_attempt_id: 1, conference_id: "conf1" } });
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -1062,6 +1097,7 @@ describe("api.auto-dial.status", () => {
       contact_id: 1,
       status: "completed",
       conference_id: "conf1",
+      call_sid: "CA1", user_id: "u1", campaign_id: 1, outreach_attempt_id: 1,
     });
   });
 
@@ -1149,7 +1185,7 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(200);
-    expect(dequeueQueueEntryMock).not.toHaveBeenCalled();
+    expect(legacyQueueMock).not.toHaveBeenCalled();
     expect(campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign).not.toHaveBeenCalled();
   });
 
@@ -1220,7 +1256,7 @@ describe("api.auto-dial.status", () => {
     await expect(res.json()).resolves.toMatchObject({ error: expect.stringContaining("Unknown error") });
   });
 
-  test("participant-join campaign_queue update error hits updateCampaignQueue + join catch branches", async () => {
+  test("an unfunded participant join cannot reach a failing queue writer", async () => {
     postgresStub = await usePostgresStub({ campaignQueueUpdateError: new Error("cq") } as any);
 
     const mod = await import("../app/routes/api+/auto-dial/status.route");
@@ -1238,12 +1274,9 @@ describe("api.auto-dial.status", () => {
         body: fd,
       }),
     } as any));
-    expect(res.status).toBe(500);
-    expect(loggerMocks.error).toHaveBeenCalledWith(
-      "Error updating campaign queue:",
-      expect.any(Error),
-    );
-    expect(loggerMocks.error).toHaveBeenCalledWith(
+    expect(res.status).toBe(200);
+    expect(campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign).not.toHaveBeenCalled();
+    expect(loggerMocks.error).not.toHaveBeenCalledWith(
       "Error in handleParticipantJoin:",
       expect.any(Error),
     );

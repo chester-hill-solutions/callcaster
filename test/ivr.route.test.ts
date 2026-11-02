@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { acceptVoiceDispatch } from "./helpers/voice-dispatch-stub";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -8,7 +9,7 @@ const mocks = vi.hoisted(() => {
     requireWorkspaceAccess: vi.fn(),
     requireJsonAuth: vi.fn(),
     rpcCreateOutreachAttempt: vi.fn(),
-    insertCallForWorkspace: vi.fn(),
+    dispatchReservedVoiceCall: vi.fn(),
     dequeueQueueEntry: vi.fn(),
     findCampaignInWorkspace: vi.fn(),
     env: {
@@ -60,8 +61,9 @@ vi.mock("@/lib/api-auth.server", () => ({
 vi.mock("@/lib/db-rpc.server", () => ({
   rpcCreateOutreachAttempt: (...a: any[]) => mocks.rpcCreateOutreachAttempt(...a),
 }));
-vi.mock("@/lib/telephony-db.server", () => ({
-  insertCallForWorkspace: (...a: any[]) => mocks.insertCallForWorkspace(...a),
+vi.mock("@/lib/voice-credit-dispatch.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/voice-credit-dispatch.server")>(),
+  dispatchReservedVoiceCall: mocks.dispatchReservedVoiceCall,
 }));
 vi.mock("@/lib/campaign-queue-db.server", () => ({
   dequeueQueueEntry: (...a: any[]) => mocks.dequeueQueueEntry(...a),
@@ -85,17 +87,17 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     mocks.requireWorkspaceAccess.mockReset();
     mocks.requireJsonAuth.mockReset();
     mocks.rpcCreateOutreachAttempt.mockReset();
-    mocks.insertCallForWorkspace.mockReset();
+    mocks.dispatchReservedVoiceCall.mockReset().mockImplementation(acceptVoiceDispatch);
     mocks.dequeueQueueEntry.mockReset();
-    mocks.findCampaignInWorkspace.mockReset().mockResolvedValue({ id: 1, voicemail_drop_enabled: false, voicemail_file: null });
+    mocks.findCampaignInWorkspace.mockReset().mockResolvedValue({ id: 1, type: "simple_ivr", voicemail_drop_enabled: false, voicemail_file: null });
     mocks.logger.error.mockReset();
     mocks.requireJsonAuth.mockResolvedValue({ user: { id: "u1" } });
     mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
     mocks.rpcCreateOutreachAttempt.mockResolvedValue(99);
     mocks.createWorkspaceTwilioInstance.mockResolvedValue({
+      accountSid: "ACfixture",
       calls: { create: async () => ({ sid: "CA1" }) },
     });
-    mocks.insertCallForWorkspace.mockResolvedValue({ sid: "CA1" });
     mocks.dequeueQueueEntry.mockResolvedValue(undefined);
     creditsState.credits = 10;
   });
@@ -191,16 +193,8 @@ describe("app/routes/api+/ivr/tsx.route", () => {
         queueId: 3,
       },
     );
-    expect(mocks.insertCallForWorkspace).toHaveBeenCalledWith(
-      "w1",
-      {
-        sid: "CA1",
-        to: "+1555",
-        from: "+1666",
-        campaign_id: 1,
-        contact_id: 2,
-        outreach_attempt_id: 99,
-      },
+    expect(mocks.dispatchReservedVoiceCall).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: "w1", campaignId: 1, contactId: 2, queueId: 3, kind: "ivr" }),
     );
     expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
       by: { id: 3 },
@@ -209,11 +203,12 @@ describe("app/routes/api+/ivr/tsx.route", () => {
       // authorised against, so a foreign row cannot be dequeued by id.
       workspaceId: "w1",
       reason: "IVR dial dispatched",
+      expectedGeneration: "00000000-0000-4000-8000-000000000001",
     });
   });
 
   test("the IVR API waits for the voicemail greeting when a drop is configured (#2774)", async () => {
-    mocks.findCampaignInWorkspace.mockResolvedValueOnce({ id: 1, voicemail_drop_enabled: true, voicemail_file: "drop.mp3" });
+    mocks.findCampaignInWorkspace.mockResolvedValueOnce({ id: 1, type: "simple_ivr", voicemail_drop_enabled: true, voicemail_file: "drop.mp3" });
     const create = vi.fn().mockResolvedValue({ sid: "CA1" });
     mocks.createWorkspaceTwilioInstance.mockResolvedValue({ calls: { create } });
     const { action } = await import("../app/routes/api+/ivr");
@@ -247,11 +242,11 @@ describe("app/routes/api+/ivr/tsx.route", () => {
       statusCode: 500,
     });
 
-    mocks.insertCallForWorkspace.mockResolvedValueOnce(null);
+    mocks.dispatchReservedVoiceCall.mockRejectedValueOnce(new Error("Owned call persistence failure"));
     res = await asRouteResponse(mod.action({ request: makeReq() } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({
-      error: "Failed to insert call record",
+      error: "Error processing IVR request",
       code: "INTERNAL_SERVER_ERROR",
       statusCode: 500,
     });

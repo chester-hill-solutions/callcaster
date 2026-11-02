@@ -11,12 +11,14 @@ import {
 } from "@/hooks/call/audio-device-selection";
 
 type UseCallAudioControlsOptions = {
+  enabled?: boolean;
   device: Device | null;
   activeCall: Call | null;
   micCoordinator: MicCoordinator;
 };
 
 export function useCallAudioControls({
+  enabled = true,
   device,
   activeCall,
   micCoordinator,
@@ -27,30 +29,39 @@ export function useCallAudioControls({
   const [availableMicrophones, setAvailableMicrophones] = useState<MediaDeviceInfo[]>([]);
   const [availableSpeakers, setAvailableSpeakers] = useState<MediaDeviceInfo[]>([]);
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [inputError, setInputError] = useState<string | null>(null);
+  const [selectedInput, setSelectedInput] = useState<{ device: Device; id: string } | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const microphoneRequestGenerationRef = useRef(0);
-  const selectInput = useTwilioAudioInput(device);
+  const selectInput = useTwilioAudioInput(enabled ? device : null);
 
   const isMicrophoneMuted = micCoordinator.isMicMuted;
 
   /**
-   * @effect Invalidate pending microphone requests when this hook unmounts.
-   * @effect-deps [] — one generation belongs to this hook lifetime.
-   * @effect-side-effects none (guards async media acquisition).
+   * @effect Release browser capture on suspension and invalidate late requests.
+   * @effect-deps enabled (one generation per committed browser transport).
+   * @effect-side-effects capture state is cleared; stream cleanup stops tracks.
    * @effect-why-not-loader Media acquisition is a browser-only operation.
    */
   useEffect(() => {
     const generation = ++microphoneRequestGenerationRef.current;
+    if (!enabled) {
+      setStream(null);
+      setPermissionError(null);
+    }
     return () => {
       if (microphoneRequestGenerationRef.current === generation) {
         microphoneRequestGenerationRef.current += 1;
       }
     };
-  }, []);
+  }, [enabled]);
 
   const refreshDevices = useCallback(async () => {
+    if (!enabled) return;
+    const generation = microphoneRequestGenerationRef.current;
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
+      if (generation !== microphoneRequestGenerationRef.current) return;
       const microphones = getUsableAudioDevices(devices, "audioinput");
       const speakers = getUsableAudioDevices(devices, "audiooutput");
       setAvailableMicrophones(microphones);
@@ -58,15 +69,17 @@ export function useCallAudioControls({
       setMicrophone((current) => reconcileAudioDeviceId(microphones, current));
       setOutput((current) => reconcileAudioDeviceId(speakers, current));
     } catch (error) {
+      if (generation !== microphoneRequestGenerationRef.current) return;
       logger.error("Error enumerating audio devices:", error);
       setAvailableMicrophones([]);
       setAvailableSpeakers([]);
       setMicrophone(null);
       setOutput(null);
     }
-  }, []);
+  }, [enabled]);
 
   const requestMicrophoneAccess = useCallback(async () => {
+    if (!enabled) return;
     const generation = microphoneRequestGenerationRef.current;
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -83,6 +96,7 @@ export function useCallAudioControls({
       setPermissionError(null);
       await refreshDevices();
     } catch (error: unknown) {
+      if (microphoneRequestGenerationRef.current !== generation) return;
       logger.error("Error accessing microphone:", error);
       if (error instanceof Error && error.name === "NotAllowedError") {
         setPermissionError(
@@ -95,7 +109,7 @@ export function useCallAudioControls({
         );
       }
     }
-  }, [refreshDevices]);
+  }, [enabled, refreshDevices]);
 
   /**
    * @effect Stop microphone tracks when the stream is replaced or this hook unmounts.
@@ -125,86 +139,93 @@ export function useCallAudioControls({
   );
 
   const handleMuteMicrophone = useCallback(() => {
-    if (!device?.audio) return;
+    if (!enabled || !device?.audio) return;
     const newMuteState = !micCoordinator.isMicMuted;
     micCoordinator.setMicMuted(newMuteState);
     logger.debug("Mute active call", newMuteState);
-  }, [device, micCoordinator]);
+  }, [enabled, device, micCoordinator]);
 
   const handleDTMF = useCallback(
     (key: string) => {
+      if (!enabled) return;
       if (audioContextRef.current) playTone(key, audioContextRef.current);
       sendCallDigits(activeCall, key);
     },
-    [activeCall],
+    [enabled, activeCall],
   );
 
   /**
-   * @effect Create a Web Audio API AudioContext on mount for DTMF tone
-   * playback (handleDTMF), and close it on unmount to release the audio
-   * hardware resource.
-   * @effect-deps [] — intentionally mount-once; the AudioContext should be
-   * created exactly once per hook lifetime, not recreated per render.
+   * @effect Own a Web Audio API AudioContext while browser audio is enabled.
+   * @effect-deps enabled (release on transport suspension or unmount).
    * @effect-side-effects dom (Web Audio API AudioContext construction/close)
    * @effect-why-not-loader Browser audio API object construction, not
    * request/response data.
    */
   useEffect(() => {
-    audioContextRef.current = new (window.AudioContext ||
+    if (!enabled) return;
+    const context = new (window.AudioContext ||
       (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
+    audioContextRef.current = context;
     return () => {
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-      }
+      context.close();
+      if (audioContextRef.current === context) audioContextRef.current = null;
     };
-  }, []);
+  }, [enabled]);
 
   /**
    * @effect Enumerate audio devices on mount and subscribe to OS
    * devicechange events so mic/speaker pickers stay in sync with hardware.
-   * @effect-deps refreshDevices (stable callback)
+   * @effect-deps enabled, refreshDevices (no browser routing in phone mode).
    * @effect-side-effects subscription (mediaDevices "devicechange" listener)
    * @effect-why-not-loader Browser hardware enumeration is a client-only API.
    */
   useEffect(() => {
+    if (!enabled) return;
     void refreshDevices();
     navigator.mediaDevices?.addEventListener?.("devicechange", refreshDevices);
     return () => {
       navigator.mediaDevices?.removeEventListener?.("devicechange", refreshDevices);
     };
-  }, [refreshDevices]);
+  }, [enabled, refreshDevices]);
 
   /**
    * @effect Serialize microphone selection on the current SDK audio helper.
-   * @effect-deps selectInput, microphone (device ownership and selected input).
+   * @effect-deps enabled, device, selectInput, microphone (browser ownership and input).
    * @effect-side-effects media capture through SDK setInputDevice.
    * @effect-why-not-loader Live browser hardware selection follows user input.
    */
   useEffect(() => {
-    if (!microphone) return;
-    void selectInput(microphone).catch((error: unknown) => {
+    if (!enabled || !device || !microphone) return;
+    let current = true;
+    setSelectedInput(null);
+    setInputError(null);
+    void selectInput(microphone).then((ready) => {
+      if (current && ready) setSelectedInput({ device, id: microphone });
+    }).catch((error: unknown) => {
+      if (current) setInputError("The microphone could not connect. Select another microphone or check the connection again.");
       logger.error("Error setting microphone:", error);
     });
-  }, [selectInput, microphone]);
+    return () => { current = false; };
+  }, [enabled, device, selectInput, microphone]);
 
   /**
    * @effect Apply the selected speaker to the current Twilio device.
-   * @effect-deps device, output (the active device and selected speaker).
+   * @effect-deps enabled, device, output (browser ownership and speaker).
    * @effect-side-effects SDK speaker output routing.
    * @effect-why-not-loader Speaker routing is a live browser hardware operation.
    */
   useEffect(() => {
-    if (!device?.audio || !output) return;
+    if (!enabled || !device?.audio || !output) return;
     void device.audio.speakerDevices.set(output).catch((error: unknown) => {
       logger.error("Error setting speaker:", error);
     });
-  }, [device, output]);
+  }, [enabled, device, output]);
 
   /**
    * @effect Auto-request microphone access whenever there's no live stream
    * and no prior permission error, so audio controls have a mic stream ready
    * by default (on mount, and again if the stream/error state is reset).
-   * @effect-deps stream, permissionError, requestMicrophoneAccess (re-runs
+   * @effect-deps enabled, stream, permissionError, requestMicrophoneAccess (re-runs
    * whenever these change; the internal guard prevents repeated prompts once
    * a stream exists or permission was denied)
    * @effect-side-effects dom (navigator.mediaDevices.getUserMedia browser
@@ -213,10 +234,10 @@ export function useCallAudioControls({
    * client-only side effect gated on user consent, not app request data.
    */
   useEffect(() => {
-    if (!stream && !permissionError) {
+    if (enabled && !stream && !permissionError) {
       requestMicrophoneAccess();
     }
-  }, [stream, permissionError, requestMicrophoneAccess]);
+  }, [enabled, stream, permissionError, requestMicrophoneAccess]);
 
   return {
     stream,
@@ -226,6 +247,8 @@ export function useCallAudioControls({
     availableMicrophones,
     availableSpeakers,
     permissionError,
+    inputError,
+    inputReady: enabled && Boolean(stream) && selectedInput?.device === device && selectedInput?.id === microphone,
     requestMicrophoneAccess,
     handleMicrophoneChange,
     handleSpeakerChange,

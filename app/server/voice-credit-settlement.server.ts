@@ -1,0 +1,58 @@
+import { and, eq, or } from "drizzle-orm";
+import { workspace, workspace_voice_reservation as reservations } from "@/db/schema";
+import { db } from "@/server/db";
+import { callKey } from "@/lib/billing-keys";
+import { debitAmountFromCredits, TERMINAL_BILLABLE_CALL_STATUSES, voiceCreditsFromDurationSeconds } from "@/lib/pricing";
+import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { emitTransactionHistoryInsertEvent } from "@/lib/workspace-events.server";
+import { logger } from "@/lib/logger.server";
+
+const TERMINAL_STATUSES = new Set<string>([...TERMINAL_BILLABLE_CALL_STATUSES, "canceled"]);
+
+export async function settleVoiceReservation(args: {
+  workspaceId: string;
+  callSid: string;
+  status: string;
+  duration: number;
+  note: string;
+}) {
+  const result = await db.transaction(async (tx) => {
+    // Admission and source-generation fences take workspace before reservation.
+    // The ledger reuses this workspace lock; duplicate callbacks keep one owner.
+    await tx.select({ id: workspace.id }).from(workspace).where(eq(workspace.id, args.workspaceId)).for("no key update");
+    const [reservation] = await tx.select().from(reservations).where(and(
+      eq(reservations.workspace, args.workspaceId),
+      or(eq(reservations.provider_sid, args.callSid), eq(reservations.setup_sid, args.callSid)),
+    )).for("update");
+    if (!reservation) return { handled: false as const, billingResult: null };
+    if (reservation.provider_sid !== args.callSid || !TERMINAL_STATUSES.has(args.status)) {
+      return { handled: true as const, billingResult: null };
+    }
+    const status = reservation.terminal_status ?? args.status;
+    const duration = reservation.terminal_duration == null ? args.duration : Number(reservation.terminal_duration);
+    const billable = status !== "canceled" && Number.isFinite(duration) && duration > 0;
+    const amount = billable ? debitAmountFromCredits(voiceCreditsFromDurationSeconds(duration, reservation.kind)) : 0;
+    const billingResult = billable ? await insertTransactionHistoryIdempotent(tx, {
+      workspaceId: args.workspaceId, type: "DEBIT", amount, note: args.note,
+      idempotencyKey: callKey(args.callSid), callSid: args.callSid,
+      campaignId: reservation.campaign_id, emitEvent: false,
+    }) : null;
+    await tx.update(reservations).set({ state: "settled", terminal_status: status, terminal_duration: String(duration),
+      human_state: reservation.human_state && reservation.human_state !== "refused" ? "ended" : reservation.human_state,
+      lease_expires_at: reservation.customer_phase_id && !reservation.media_call_started_at ? new Date() : reservation.lease_expires_at,
+      updated_at: new Date(), last_error: null })
+      .where(eq(reservations.id, reservation.id));
+    return { handled: true as const, billingResult, amount };
+  });
+  if (result.billingResult?.inserted && result.billingResult.existingId) {
+    try {
+      await emitTransactionHistoryInsertEvent(args.workspaceId, {
+        id: result.billingResult.existingId, workspace: args.workspaceId,
+        type: "DEBIT", amount: result.amount, idempotency_key: callKey(args.callSid),
+      });
+    } catch (error) {
+      logger.error("Voice reservation ledger event failed", error);
+    }
+  }
+  return result;
+}

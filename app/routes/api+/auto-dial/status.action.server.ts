@@ -1,3 +1,4 @@
+import { handleConferenceParticipantHangup } from "@/lib/conference-participant-hangup.server";
 import { recordPredictiveSuccessorCallback } from "@/server/predictive-successor-callback.server";
 import { getPredictiveMachineOperation } from "@/server/predictive-machine-operation.server";
 import { needsPredictiveTerminalContinuation } from "@/lib/predictive-terminal-status";
@@ -8,20 +9,16 @@ import {
 import {
   isParticipantHangup,
   isParticipantJoin,
+  isParticipantLeave,
   parseTwilioVoiceCallback,
   userIdFromConferenceName,
-  type ParticipantJoinEvent,
-  type ParticipantLeaveEvent,
   type TwilioVoiceCallback,
 } from "@/lib/twilio/voice-callback";
-import { buildProviderStatusQueueUpdate } from "@/lib/queue-status";
-import { updateCampaignQueueByContactAndCampaign } from "@/lib/campaign-queue-updates.server";
-import {
-  dequeueQueueEntry
-} from "@/lib/campaign-queue-db.server";
+import { handlePredictiveParticipantJoin, handlePredictiveParticipantLeave } from "@/lib/predictive-participant-join.server";
+import { dequeueLegacyVoiceAttempt } from "@/server/legacy-voice-queue.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { data as routeData } from "react-router";
-import { runAutoDialerTurn } from "@/lib/auto-dial.server";
+import { runAutoDialerTurn, sendFundedPredictiveRecipient, stopRefusedPredictiveSetup } from "@/lib/auto-dial.server";
 import { logger } from "@/lib/logger.server";
 import { OutreachAttempt } from "@/lib/types";
 import { Tables } from "@/lib/db-types";
@@ -30,28 +27,25 @@ import {
   claimTerminalCallStatus,
   findCallBySid,
   findCampaignTypeByCampaignId,
-  findOutreachAttemptById,
-  updateCallBySid,
   updateOutreachAttemptForWorkspace,
 } from "@/lib/telephony-db.server";
-import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import { requireTwilioSignature, resolveCanonicalTwilioWebhookUrl, twilioWebhookForbiddenHangup } from "@/lib/twilio-webhook.server";
 import { defineAction } from "@/lib/handler.server";
 import { emitPredictiveBroadcast } from "@/lib/workspace-events.server";
+import { predictiveCustomerBroadcast } from "@/lib/predictive-customer-broadcast.server";
+import { bindVerifiedVoiceReservationRequest } from "@/lib/voice-reservation-webhook.server";
+import { enqueueCallStatusSideEffects } from "@/lib/worker/enqueue-call-status.server";
+import { runCallStatusSideEffects } from "@/lib/worker/webhook-side-effects.server";
+import { hasVoiceReservationCallBinding } from "@/server/voice-bridge-reservation.server";
+import { bindVerifiedFundedCallStatus } from "@/lib/voice-bridge-webhook.server";
+import { bindPredictiveConferenceEvent, claimFirstPredictiveRecipient } from "@/server/predictive-conference-reservation.server";
+import { createOriginalVoiceAccountClient } from "@/lib/voice-original-account.server";
+import { handleBoundVoiceAudioParticipant } from "@/lib/voice-audio-participant.server";
+import { isRetiredVoiceAudioSource } from "@/server/voice-audio-classification.server";
+import { requestDialerStopForAgentHangup } from "@/server/voice-dialer-stop.server";
+import { normalizeVerifiedVoiceParams } from "@/lib/twilio/verified-voice-params";
 
 type TwilioClient = Twilio.Twilio;
-
-const updateCall = async (sid: string, workspaceId: string, update: Partial<Tables<"call">>) => {
-  try {
-    const data = await updateCallBySid(workspaceId, sid, update);
-    if (!data) {
-      throw new Error(`Call ${sid} not found`);
-    }
-    return data;
-  } catch (error) {
-    logger.error("Error updating call:", error);
-    throw error;
-  }
-};
 
 const requireValue = (
   value: string | null | undefined,
@@ -63,43 +57,12 @@ const requireValue = (
   return value;
 };
 
-type OutreachAttemptUpdateResult =
-  | Pick<Tables<"outreach_attempt">, "disposition" | "contact_id">
-  | Tables<"outreach_attempt">
-  | Response;
-
-function resolveOutreachUpdate(
-  result: OutreachAttemptUpdateResult,
-): Pick<Tables<"outreach_attempt">, "disposition" | "contact_id"> | Tables<"outreach_attempt"> | null {
-  if (result instanceof Response) {
-    return null;
-  }
-  return result;
-}
-
 export const updateOutreachAttempt = async (
   id: string,
   workspaceId: string,
   update: Partial<OutreachAttempt>,
 ) => {
   return updateOutreachAttemptForWorkspace(workspaceId, id, update);
-};
-
-const updateCampaignQueue = async (
-  contactId: number,
-  campaignId: number,
-  update: Record<string, unknown>,
-) => {
-  try {
-    return await updateCampaignQueueByContactAndCampaign({
-      contactId,
-      campaignId,
-      update,
-    });
-  } catch (error) {
-    logger.error("Error updating campaign queue:", error);
-    throw error;
-  }
 };
 
 /**
@@ -157,38 +120,17 @@ const handleCallStatus = async (
 
     const { call: callUpdate } = await processCallStatusWebhook(updateData, {
       campaignType,
+      skipBilling: true,
       workspaceId: workspace,
       campaignId: dbCall.campaign_id ?? null,
       contactId: dbCall.contact_id ?? null,
       outreachAttemptId: dbCall.outreach_attempt_id ?? null,
     });
 
-    if (!callUpdate.outreach_attempt_id) {
-      throw new Error(
-        "Missing outreach_attempt_id for auto-dial status update",
-      );
-    }
-    const outreachStatus = await findOutreachAttemptById(
-      workspace,
-      callUpdate.outreach_attempt_id,
-    );
-    if (!outreachStatus) {
-      return;
-    }
-
-    await dequeueQueueEntry({
-      by: {
-        contactId: outreachStatus.contact_id,
-        campaignId: outreachStatus.campaign_id,
-      },
-      workspaceId: workspace,
-      household: true,
-      // A conference name is `${userId}~${uuid}`, and this argument is bound
-      // as ::uuid — passing the raw name raised 22P02 on every terminal call,
-      // so the contact was never dequeued and the dialer stopped after one.
-      userId: resolveUserIdFromConferenceName(callUpdate.conference_id) || null,
-      reason: `Call ${status?.toLowerCase()}`,
-    });
+    const outcome = await enqueueCallStatusSideEffects(callUpdate, event.raw);
+    await runCallStatusSideEffects({ callSid: callUpdate.sid, event: outcome });
+    const queueOutcome = await dequeueLegacyVoiceAttempt(workspace, callUpdate.sid);
+    if (!queueOutcome.ownedPrimary) return;
     const conferences = await twilio.conferences.list({
       friendlyName: callUpdate.conference_id ?? "",
       status: "in-progress",
@@ -209,113 +151,40 @@ const handleCallStatus = async (
   }
 };
 
-const handleParticipantLeave = async (
-  event: ParticipantLeaveEvent,
-  dbCall: Tables<"call">,
-  twilio: TwilioClient,
-) => {
-  try {
-    const callSid = requireValue(event.callSid, "CallSid");
-    const workspaceId = requireValue(dbCall.workspace, "workspace");
-    let conferenceName = event.conferenceName ?? dbCall.conference_id;
-    if (!conferenceName && event.conferenceSid) {
-      const conference = await twilio.conferences(event.conferenceSid).fetch();
-      conferenceName = conference.friendlyName;
-    }
-    const conferences = await twilio.conferences.list({
-      friendlyName: requireValue(conferenceName, "conference name"),
-      status: "in-progress",
-    });
-    await Promise.all(
-      conferences.map(({ sid }: { sid: string }) =>
-        twilio.conferences(sid).update({ status: "completed" }),
-      ),
-    );
-
-    await emitPredictiveBroadcast(workspaceId, {
-      contact_id: dbCall.contact_id,
-      status: "completed",
-      conference_id: requireValue(conferenceName, "conference name"),
-      conference_ended: true,
-    });
-
-    // Terminal call.status owns the ordinary callback's billing/replay claim.
-    // A participant event must not take that claim before billing runs.
-    try {
-      const update: Partial<Tables<"call">> = {};
-      if (event.timestamp) {
-        const endedAt = new Date(event.timestamp);
-        if (Number.isFinite(endedAt.getTime())) update.end_time = endedAt;
-      }
-      if (event.durationSeconds !== null) update.duration = String(event.durationSeconds);
-      if (Object.keys(update).length) await updateCall(callSid, workspaceId, update);
-    } catch (error) {
-      logger.error("Participant conference stopped but call metadata update failed", error);
-    }
-  } catch (error) {
-    logger.error("Error in handleParticipantLeave:", error);
-    throw error;
-  }
-};
-
-const handleParticipantJoin = async (
-  event: ParticipantJoinEvent,
-  dbCall: Tables<"call">,
-) => {
-  try {
-    const workspaceId = requireValue(dbCall.workspace, "workspace");
-    if (!dbCall.conference_id) {
-      await updateCall(requireValue(event.callSid, "CallSid"), workspaceId, {
-        // `conferenceRef`, not `conferenceUserId`: `call.conference_id` holds
-        // the conference NAME. Reading the user id back out of it is
-        // `resolveUserIdFromConferenceName`'s job, at the point of use.
-        conference_id: requireValue(event.conferenceRef, "ConferenceSid"),
-        start_time: new Date(requireValue(event.timestamp, "Timestamp")),
-      });
-    }
-    if (dbCall.outreach_attempt_id) {
-      if (!dbCall.campaign_id) {
-        throw new Error("Missing campaign_id for participant join");
-      }
-      // Replayed join callbacks must not restamp answered_at — it feeds
-      // answer-time metrics, and each redelivery was overwriting it with
-      // the replay's clock instead of the actual answer moment.
-      const existingAttempt = await findOutreachAttemptById(
-        workspaceId,
-        dbCall.outreach_attempt_id,
-      );
-      if (existingAttempt && (existingAttempt as { answered_at?: string | null }).answered_at) {
+async function handleFundedConferenceEvent(
+  context: Awaited<ReturnType<typeof bindPredictiveConferenceEvent>>, event: Extract<TwilioVoiceCallback, { kind: "participant" }>,
+) {
+      if (context.audio) {
+        await handleBoundVoiceAudioParticipant(context.reservation.workspace, context.audio.conference_callback, event);
         return;
       }
-      const outreachStatus = resolveOutreachUpdate(
-        await updateOutreachAttempt(
-          `${dbCall.outreach_attempt_id}`,
-          workspaceId,
-          { answered_at: new Date().toISOString() },
-        ),
-      );
-      if (!outreachStatus) {
-        return;
+      if (await isRetiredVoiceAudioSource({ workspaceId: context.reservation.workspace, accountSid: context.reservation.account_sid,
+        conferenceId: context.reservation.conference_id ?? "", callSid: context.call.sid })) return;
+      const twilio = await createOriginalVoiceAccountClient(context.reservation);
+      if (isParticipantJoin(event)) {
+        if (context.setup && context.reservation.setup_sid === context.call.sid) {
+          const first = await claimFirstPredictiveRecipient(context.reservation, context.call.sid);
+          if (first?.send) await sendFundedPredictiveRecipient(first.reservation, twilio);
+          else if (first) await stopRefusedPredictiveSetup(first.reservation, twilio);
+        }
+        await handlePredictiveParticipantJoin(event, context.call);
+      } else if (isParticipantLeave(event)) {
+        const owned = context.setup || await handlePredictiveParticipantLeave(event, context.call);
+        if (owned && isParticipantHangup(event)) {
+          if (context.setup && !await requestDialerStopForAgentHangup(context.reservation, context.call.sid)) return;
+          await handleConferenceParticipantHangup(event, context.call, twilio);
+        }
       }
-      await updateCampaignQueue(outreachStatus.contact_id, dbCall.campaign_id, {
-        ...buildProviderStatusQueueUpdate(event.conferenceRef ?? "in-progress"),
-      });
-    }
-  } catch (error) {
-    logger.error("Error in handleParticipantJoin:", error);
-    throw error;
-  }
-};
+}
 
 export const action = defineAction({
   auth: async ({ request }) => {
     // Clone before reading — Bun yields empty params on re-read after consume.
     const formData = await request.clone().formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
-    // Parse the payload ONCE, here, into a discriminated union. Everything
-    // downstream takes a typed event instead of re-narrowing the same form
-    // fields with `typeof x === "string"` — see @/lib/twilio/voice-callback.
-    const event = parseTwilioVoiceCallback(params);
+    // Read the raw call identity for signature lookup. Normalize aliases only
+    // after signature validation, then parse the verified event for dispatch.
+    let event = parseTwilioVoiceCallback(params);
 
     const callSidValue = event.callSid;
     if (!callSidValue) {
@@ -327,13 +196,44 @@ export const action = defineAction({
       params,
     });
     if (forbidden) return forbidden;
-
-    return { event, callSidValue };
+    if (Array.from(formData.keys()).some((key) => formData.getAll(key).length !== 1) || !normalizeVerifiedVoiceParams(params))
+      return twilioWebhookForbiddenHangup();
+    event = parseTwilioVoiceCallback(params);
+    let conferenceEvent: Awaited<ReturnType<typeof bindPredictiveConferenceEvent>> | null = null;
+    let setupStatus = false;
+    const query = new URL(request.url).searchParams;
+    if (event.kind === "participant") {
+      if (query.get("conference_events") === "1") {
+        try {
+          conferenceEvent = await bindPredictiveConferenceEvent({
+            reservationId: query.get("credit_reservation") ?? "", requestUrl: resolveCanonicalTwilioWebhookUrl(request),
+            accountSid: event.accountSid ?? "", callSid: callSidValue,
+            conferenceId: event.conferenceName ?? "", conferenceSid: event.conferenceSid ?? "",
+            event: event.event, participantLabel: params.ParticipantLabel, muted: params.Muted,
+          });
+        } catch { return twilioWebhookForbiddenHangup(); }
+      } else if (await hasVoiceReservationCallBinding(callSidValue)) return twilioWebhookForbiddenHangup();
+    } else if (query.get("credit_leg") === "setup") {
+      const bound = await bindVerifiedFundedCallStatus(request, params);
+      if (bound instanceof Response) return bound;
+      if (!bound?.setup) return twilioWebhookForbiddenHangup();
+      setupStatus = true;
+    } else {
+      const blocked = await bindVerifiedVoiceReservationRequest(request, params, "status");
+      if (blocked) return blocked;
+      event = parseTwilioVoiceCallback(params);
+    }
+    return { event, callSidValue, funded: query.has("credit_reservation"), conferenceEvent, setupStatus };
   },
   sideEffects: ["db-write", "credit", "twilio"],
   handler: async ({ auth, request }) => {
-    const { event, callSidValue } = auth;
+    const { event, callSidValue, funded, conferenceEvent, setupStatus } = auth;
     try {
+    if (setupStatus) return routeData({ success: true });
+    if (conferenceEvent && event.kind === "participant") {
+      await handleFundedConferenceEvent(conferenceEvent, event);
+      return routeData({ success: true });
+    }
     let dbCall = await findCallBySid(callSidValue);
     if (!dbCall?.workspace) {
       await recordPredictiveSuccessorCallback(request, event.raw);
@@ -349,10 +249,19 @@ export const action = defineAction({
       return routeData({ success: true, resolved: false });
     }
 
+    if (funded && event.kind !== "participant") {
+      const { call } = await processCallStatusWebhook(buildCallUpsertFromTwilioParams(event.raw), {
+        workspaceId: dbCall.workspace, skipBilling: true,
+      });
+      const outcome = await enqueueCallStatusSideEffects(call, event.raw);
+      await runCallStatusSideEffects({ callSid: call.sid, event: outcome });
+      return routeData({ success: true });
+    }
+
     const twilio = await createWorkspaceTwilioInstance({ workspace_id: requireValue(dbCall.workspace, "workspace"),
     });
     if (isParticipantHangup(event)) {
-      await handleParticipantLeave(event, dbCall, twilio);
+      await handleConferenceParticipantHangup(event, dbCall, twilio);
       return routeData({ success: true });
     }
     const callStatusValue = event.callStatus;
@@ -364,11 +273,8 @@ export const action = defineAction({
     // so agents see dialing/connected/outcome even if that handling errors.
     // Best-effort by design: emitPredictiveBroadcast never throws.
     if (dbCall.contact_id && callStatusValue) {
-      await emitPredictiveBroadcast(requireValue(dbCall.workspace, "workspace"), {
-        contact_id: dbCall.contact_id,
-        status: callStatusValue.toLowerCase(),
-        ...(dbCall.conference_id ? { conference_id: dbCall.conference_id } : {}),
-      });
+      const broadcast = predictiveCustomerBroadcast(dbCall, callStatusValue.toLowerCase());
+      if (broadcast) await emitPredictiveBroadcast(requireValue(dbCall.workspace, "workspace"), broadcast);
     }
     switch (callStatusValue) {
       case "failed":
@@ -404,7 +310,7 @@ export const action = defineAction({
         break;
       default:
         if (isParticipantJoin(event)) {
-          await handleParticipantJoin(event, dbCall);
+          await handlePredictiveParticipantJoin(event, dbCall);
         }
     }
 

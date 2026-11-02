@@ -124,6 +124,103 @@ dial.conference(
 
 **Note:** Conference recording captures the main audio mix. Coach/whisper audio is NOT included. See `twilio-conference-calls`.
 
+Preserve the application's existing channel and consent policy during an audio
+handoff. A Dial recording can end when its child leaves the Dial, before the
+parent Call ends. Own the replacement capture before that transition. Retain
+each RecordingSid under a distinct storage key and logical-call link; an older
+call-level audio URL does not prove a later recording part was copied.
+
+Bind an operation callback to its saved account SID as well as its raw signature.
+A replacement workspace account token cannot own an older operation. In this
+repository, pass `expectedAccountSid` to `requireTwilioSignature` and use the
+shared strict form reader before normalizing aliases.
+
+For a two-leg call, the Recording resource's `callSid` refers to the parent.
+Keep the physical capture source separate from that reported ID. Do not infer
+a child capture's lifetime or callback mapping from a mocked response. Prove
+that contract before enabling it. GET `processing` is not an active-capture
+receipt. Unknown recording recovery needs the saved callback nonce and one
+RecordingSid in provider history; missing, ambiguous or truncated history stays
+pending. See [Recording properties](https://www.twilio.com/docs/voice/api/recording).
+
+For an existing-call recording create, commit one send checkpoint before the
+provider request. Recheck the owned live bridge at that boundary. A lost reply
+or failed acknowledgement write is uncertain; retain the nonce for recovery and
+do not repeat the create. A validated create reply may save accepted identity
+after a recovery lease changes, but it does not prove fresh capture readiness.
+Test through the pinned SDK transport and valid database constraints; a rejected
+fixture write does not prove that the intended ownership guard ran.
+
+Keep exact-intent history ahead of a shared live capture lookup. A confirmed
+terminal parent part keeps its accepted identity and copy work, but cannot own
+the live slot forever. A fresh intent may capture the still-live original call;
+the old intent replays its old part. An uncertain send still owns the live slot.
+
+Use explicit RecordingSids when a call has multiple or concurrent recordings;
+`Twilio.CURRENT` is ambiguous in that case. Check the pinned helper before
+selecting a create API: its Call Recordings helper supports `create`, while its
+Conference Recordings helper does not. Use a documented supported primitive.
+See [Recordings resource](https://www.twilio.com/docs/voice/api/recording).
+
+Conference recording callbacks use `ConferenceSid` and `RecordingSource=Conference`,
+not a required customer `CallSid`. Save the nonce with the physical join
+instruction, and keep the instruction Call and recording Conference identities
+separate. A callback can precede the participant join; require both to agree
+before any transport commit. Request `trim="do-not-trim"` when preserving the
+logical timeline. Do not add unsupported Conference channel attributes.
+
+Scope a shared live capture to its physical room. Preserve exact-intent terminal
+history, but do not let an old room or terminal part block a new admitted attempt.
+Save each sharing audio intent's selected recording ID with its join instruction;
+a retry cannot borrow a successor's capture after the shared part ends.
+Keep distinct parts and storage keys when a fresh capture is needed. Test fresh-room
+retry, terminal-part retry and old-intent replay as separate behaviors.
+
+For shared room media, retain signed customer joins and leaves with the provider
+SequenceNumber and Timestamp. Keep them under the original account, room and
+funded customer. Arrival time and a parent join cannot establish a customer
+interval. Save uncertain timing as unknown; do not drop that evidence and later
+infer a complete interval. Keep delayed and out-of-order events, and reject a
+conflicting replay of one sequence without replacing history. Intersect closed
+customer visits with each recording's own time range before assembly. Waiting
+audio and gaps between visits are not customer media. An open visit or missing,
+conflicting or truncated history keeps assembly pending. Save neutral room events
+as sequence witnesses too. A missing sequence can hide a delayed leave and rejoin;
+do not count only customer events as a complete range. Even covered observed
+offsets stay provisional until assembly proves its call and recording boundaries.
+Test the signed route, database rollback, rejoin gaps and delayed callbacks after
+the first phone ends. A schema extension must retain the persisted customer event
+key encoding. Test exact callback replay against a retained pre-extension row;
+adding new witness identity must not change existing customer keys.
+
+Keep signed Call-progress event time and sequence separate from actual Call
+start/end/duration recovered through the original account. Save them through the
+canonical funded customer owner, with first facts immutable. Recovery parameters
+cannot acquire signed callback provenance. A root ending cannot prove customer
+completion. Read the customer and full capture set under workspace-before-
+reservation locks before admitting journaled single-part batch work. Retain a
+provider-duration conflict as evidence and keep its manifest pending. Test both
+live and ended customers with the batch flag on and off; a completed recording
+alone must not make an old fixture eligible. Conference sequence contiguity and
+initial numbering are not documented Call-progress rules. Customer terminal time
+does not prove complete room history or replace an atomic final publication fence.
+If customer timing follows a completed copy, retain the existing recording job in
+the same timing transaction. Retry batch admission from that saved object; do
+not copy again. Propagate enqueue failure to the durable job. Prove copy-before-
+callback, missing-clock replay, provider recovery, duplicate delivery and job-write
+rollback. A passing terminal-before-copy fixture does not cover this ordering.
+
+For final single-part publication, hold workspace, original reservation and Call
+locks through the manifest recheck, transcript insert, Call link and canonical
+ledger RPC. Suppress ledger events inside that transaction; emit after commit
+and keep event failures non-fatal. Initial nonce preparation uses only the
+reservation, so lock a known owner even before its first recording row exists.
+A saved customer nonce with missing journal evidence is pending, not legacy.
+Compare physical media identity; stronger matching timing does not change the
+copied bytes. Preserve unjournaled legacy policy and the queued flag-off/no-debit
+contract. Do not adopt unknown unlinked transcripts. Prove write rollback,
+concurrent delivery, changed media, first-nonce blocking and after-commit visibility.
+
 ### ConversationRelay Recording
 
 **Critical:** `record:true` on the REST API call is **silently ignored** with ConversationRelay. No error. No recording.
@@ -258,10 +355,10 @@ client.recordings(recording_sid).delete()
 
 ## CANNOT
 
-- **`recordingTrack` has no observable effect via TwiML** — The `<Start><Recording>` TwiML parameter `recordingTrack` does not isolate tracks. Use the Recordings REST API with `recordingTrack` for actual track isolation.
+- **Do not use the REST `recordingTrack` name as a TwiML attribute.** `<Start><Recording>` uses `track` (`inbound`, `outbound`, `both`) and `channels` (`mono`, `dual`). See the [Recording noun](https://www.twilio.com/docs/voice/twiml/recording).
 - **Cannot start API recordings on ConversationRelay calls** — REST API `record:true` is silently ignored ("not eligible for recording"). Must use `<Start><Recording>` before `<Connect>` in TwiML.
 - **Cannot pause/resume recordings via TwiML** — Only available via the REST API (`update` with `status="paused"` or `status="in-progress"`).
-- **Cannot get dual-channel conference recordings** — Conference recording is always mono (mixed).
+- **Conference download format depends on account settings.** Conference media downloads default to mono. Dual-channel conference recordings require the account feature and `RequestedChannels=2`; unavailable dual media returns 400 and can fall back to `RequestedChannels=1`. See [Recording media formats](https://www.twilio.com/docs/voice/api/recording#retrieve-a-recordings-media-file).
 - **Cannot get dual-channel from Calls API without explicit param** — `Record=true` defaults to mono. Must specify `recordingChannels: 'dual'`.
 - **Cannot transcribe PCI-mode recordings** — Recordings created while PCI mode was enabled cannot be transcribed, even after PCI is disabled.
 - **Cannot use `<Record>` verb for call recording** — `<Record>` captures the caller only (voicemail-style). Use `<Dial record>` or `<Start><Recording>` for call recording.

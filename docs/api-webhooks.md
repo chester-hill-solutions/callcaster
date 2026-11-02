@@ -47,7 +47,10 @@ Complete spec: [`/api/docs/openapi/all`](/api/docs/openapi/all) (tag: **Provider
 | POST | `/api/inbound-handset-dial-end` | Handset dial end |
 | POST | `/api/auto-dial/:roomId` | Conference/AMD TwiML |
 | POST | `/api/auto-dial/status` | Auto-dial status |
-| GET | `/api/connect-campaign-conference/:workspaceId/:campaignId` | Conference connect voice URL |
+| POST | `/api/voice-audio` | Operation-bound agent audio instructions, status and conference events |
+| GET | `/api/connect-campaign-conference/:workspaceId/:campaignId` | Legacy campaign conference voice URL |
+| POST | `/api/voice-continuation` | Signed manual and SDK parent continuation; live handoff integration in progress |
+| POST | `/api/voice-recording` | Saved recording operation status and queued recording-part copies; initial call wiring in progress |
 | POST | `/api/caller-id/status` | Caller ID verification status |
 
 `POST /api/auto-dial/status` handles a signed `participant-leave` event with
@@ -65,6 +68,111 @@ available for the next dialer turn.
 Call end metadata is saved on a best-effort basis. The participant event does
 not claim `call.status`; the ordinary terminal callback retains its billing
 and outcome work. See [Twilio's conference callback parameters](https://www.twilio.com/docs/voice/twiml/conference#statuscallback).
+
+Agent audio callbacks bind the original account, saved URL and owned leg. Phone
+acceptance and answered status do not activate the transport. A first idle phone
+requires press-1 confirmation followed by its labeled conference join; a live
+replacement joins muted and waits for a completed handoff. The first participant keeps ownership of the conference
+callback URL. Current, pending and retired audio roles are resolved from the
+event's actual participant SID. Retired leaves cannot end the current room.
+Agent audio never dispatches the first contact or writes customer billing,
+disposition or queue outcomes. A genuine current-agent hangup ends its exact
+owned conference through the existing conference-end owner. Transient stop
+failures return 500 so the provider can retry.
+
+New manual REST and SDK customer instructions save a `POST /api/voice-continuation`
+URL before issuing their one customer Dial. The query contains the saved
+`credit_reservation` UUID. The original account, parent SID and known customer
+SID bind the signed form. Ordinary completion returns Hangup. Only a joined,
+uncommitted direct-call promotion that is already in progress can return the
+original parent to its saved conference. Available provider parent and child
+facts must match. Their lookup has a one-second limit; an unavailable API keeps
+the authenticated original parent on its saved target and leaves replacement
+commit pending. A known ended call returns Hangup. The callback does not create a
+call, change customer identity, bill, dispose or advance the queue. Calls issued
+without this saved continuation keep their existing behavior. Live promotion,
+media continuity and transport commit are still in development.
+
+Parent rescue is separate from replacement activation. If the replacement phone
+fails after promotion starts, the still-active original parent can rejoin its
+owned customer. Failed, canceled or retired phone status alone cannot end that
+parent. After a successor commits, the old parent cannot rejoin through an older
+failed operation.
+
+Manual parent rescue accepts only unresolved or confirmed topology. Rejected
+or closed promotions return Hangup. A confirmed room survives its first phone
+and stays bound to the original account, actor, parent and customer. Another
+audio intent cannot create a parallel unresolved promotion. Recording and
+transcript continuity still need integration before source retirement.
+
+Parent Dial action URLs and new owned audio conference callback URLs explicitly retry connection/read failures and 5xx, with
+two retries inside the 15-second voice limit. The delivery-override fragment is
+added only to TwiML; the saved URL and signature comparison exclude it. A 500
+response alone does not enable provider retries. See [Twilio connection overrides](https://www.twilio.com/docs/usage/webhooks/webhooks-connection-overrides).
+An existing conference keeps its first participant's callback delivery policy.
+Later audio joins cannot replace it. Provider retries are finite. A genuine
+owned hangup saves a room-stop intent before provider I/O; the audio recovery
+worker resumes it through the original account and exact room SID. Terminal
+phone status and call-row repair cannot discard the stop. Lost provider or
+local acknowledgements retain the intent; an already completed room does not
+need another provider update. New audio preparation, sends and initial
+activation cannot proceed while an earlier room stop is pending. Live
+customer promotion, transport commit and media continuity remain unfinished.
+
+`POST /api/voice-recording?recording=<uuid>` accepts only the saved recording
+operation's original account, physical CallSid, source and RecordingSid. It
+validates the raw signature before alias normalization. A replacement account
+token cannot authenticate an old account's operation. The send checkpoint must
+already exist. Completed parts are saved before the existing recording job
+queues their copy. Each part uses a distinct storage key under its logical
+call. A delivery lease fences stale jobs. The existing one-minute voice recovery
+job retries completed parts with no stored copy, including after queue failure
+or a lost storage reply. Initial Dial wiring and media hydration remain in
+development; this callback does not create a recording or bill the call.
+For a customer started through a confirmed idle phone, the funded send saves
+the recording operation ID and callback before the single customer Call POST.
+That Call requests dual-channel, both-track, untrimmed recording and has source
+`OutboundAPI`. Its real Call SID becomes the recording's physical and logical
+owner; the persistent agent phone is a separate audio leg. If this callback
+arrives before local Call acceptance, its saved launch and original-account
+signature are checked first. A bounded provider read must then prove the exact
+customer root before canonical acceptance and recording-part registration.
+It cannot create another Call or charge the agent phone. Recording parts keep
+their existing copy lease, playback acknowledgement and recovery path. Start
+and client integration remain in development.
+Agent audio and parent continuation callbacks use the same original-account
+check and strict raw form reader.
+
+New manual and SDK Dial instructions use this owned callback. The recording
+nonce is prepared before rendering, then armed in the same transaction as the
+single customer instruction. A checkpoint failure returns no customer Dial.
+Already issued legacy calls keep their existing callback. Completed initial
+parts update the matching root Call's playback fields in the copy acknowledgement
+transaction. A missing or changed product Call leaves the accepted part retryable;
+later capture phases cannot overwrite the initial playback pointer.
+
+Single-part calls retain the existing default-off batch transcription flag and
+logical-call job key. A later capture journal prevents a segment from being
+queued as the whole call. The batch worker checks again before downloading and
+before saving a transcript. Segment assembly and complete handoff playback remain
+in development; no segment is billed as a complete multi-part transcript here.
+
+The voice recovery job also observes issued recordings on root Calls. A known
+RecordingSid is fetched through the original account and saved physical Call.
+An unknown SID needs one matching RecordingSid in the saved callback URL's
+provider request history. Missing, ambiguous or limit-sized history stays
+pending. [Call Events](https://www.twilio.com/docs/voice/api/call-event-resource)
+becomes available 15 minutes after the Call ends; the existing readiness check
+adds 30 seconds. No recording is created or restarted by recovery.
+
+Recording lookup has a five-second read budget. Late results cannot write, and
+expired leases cannot change another observation. GET `processing` can bind an
+identity but cannot prove active capture. The original parent verification keeps
+its one-second response budget. Root-only recovery is deliberate: Twilio reports
+two-leg [recordings](https://www.twilio.com/docs/voice/api/recording) under the
+parent CallSid. Inherited child sources stay pending until their physical capture
+contract is proved. A stable Conference capture and the live switch remain in
+development; Conference recording starts when the first two participants bridge.
 
 ## Stripe
 

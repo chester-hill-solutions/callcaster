@@ -1,6 +1,8 @@
 import { useCallback } from "react";
 import { recordFlashBreadcrumb } from "@/lib/flash-telemetry.client";
 import type { Call } from "@twilio/voice-sdk";
+import type { VoiceAudioSourceIdentity } from "@/lib/voice-audio-connection";
+import type { StartCallArgs } from "@/lib/manual-dial-client";
 import type {
   Campaign,
   Contact,
@@ -9,16 +11,6 @@ import type {
 } from "@/lib/types";
 
 type CallStateMachineSend = (action: { type: string }) => void;
-
-type StartCallArgs = {
-  contact: Contact;
-  campaign: Campaign;
-  user: { id: string };
-  workspaceId: string;
-  nextRecipient: QueueItem | null;
-  recentAttempt: OutreachAttempt | null;
-  selectedDevice: string | null;
-};
 
 type UseCampaignDialActionsOptions = {
   campaign: Campaign | null | undefined;
@@ -33,6 +25,8 @@ type UseCampaignDialActionsOptions = {
   workspaceId: string;
   recentAttempt: OutreachAttempt | null;
   selectedDevice: string;
+  audioReady?: boolean;
+  audioSource?: VoiceAudioSourceIdentity;
   send: (action: { type: string }) => void;
   /**
    * Resets the canonical call lifecycle for the new dial, in the same batch as
@@ -41,7 +35,7 @@ type UseCampaignDialActionsOptions = {
    * FSM→lifecycle bridge effect can clear it — the residual flash left over
    * from #1220.
    */
-  beginDial: () => void;
+  beginDial: () => ((sid: string) => boolean) | void;
 };
 
 export function useCampaignDialActions({
@@ -57,15 +51,17 @@ export function useCampaignDialActions({
   workspaceId,
   recentAttempt,
   selectedDevice,
+  audioReady = true,
+  audioSource,
   send,
   beginDial,
 }: UseCampaignDialActionsOptions) {
   return useCallback(() => {
-    if (!campaign) return;
+    if (!campaign || !audioReady) return;
     recordFlashBreadcrumb("dial-press", `type=${campaign.dial_type}`);
 
     if (campaign.dial_type === "predictive") {
-      if (deviceIsBusy || incomingCall || deviceStatus !== "Registered") {
+      if (deviceIsBusy || incomingCall || (selectedDevice === "computer" && deviceStatus !== "Registered")) {
         return;
       }
       begin();
@@ -75,7 +71,7 @@ export function useCampaignDialActions({
       if (callState === "dialing" || callState === "connected") return;
 
       send({ type: "START_DIALING" });
-      beginDial();
+      const acceptCustomer = beginDial();
       startCall({
         contact: nextRecipient.contact,
         campaign,
@@ -84,6 +80,8 @@ export function useCampaignDialActions({
         nextRecipient,
         recentAttempt,
         selectedDevice,
+        ...(audioSource ? { audioSource } : {}),
+        ...(acceptCustomer ? { acceptCustomer } : {}),
       });
     }
   }, [
@@ -99,6 +97,8 @@ export function useCampaignDialActions({
     workspaceId,
     recentAttempt,
     selectedDevice,
+    audioReady,
+    audioSource,
     send,
     beginDial,
   ]);
@@ -122,10 +122,11 @@ type UseCampaignDequeueActionsOptions = {
   setCallDuration: (duration: number) => void;
   handleDialButton: () => void;
   saveData: () => void;
-  dequeue: (args: { contact: QueueItem }) => void;
+  dequeue: (args: { contact: QueueItem }) => Promise<boolean>;
+  isCurrentQueue: () => boolean;
   fetchMore: (args: { householdMap: Record<string, QueueItem[]> }) => Promise<void>;
   householdMap: Record<string, QueueItem[]>;
-  handleNextNumber: (skipHousehold?: boolean) => void;
+  handleNextNumber: (skipHousehold?: boolean, completedContact?: QueueItem) => void;
   setRecentAttempt: (attempt: OutreachAttempt | null) => void;
   setUpdate: (update: Record<string, unknown> | null) => void;
 };
@@ -138,14 +139,15 @@ export function useCampaignDequeueActions({
   handleDialButton,
   saveData,
   dequeue,
+  isCurrentQueue,
   fetchMore,
   householdMap,
   handleNextNumber,
   setRecentAttempt,
   setUpdate,
 }: UseCampaignDequeueActionsOptions) {
-  return useCallback(() => {
-    if (!campaign || !questionContact) return;
+  return useCallback(async () => {
+    if (!campaign || !questionContact || !isCurrentQueue()) return;
 
     if (campaign.dial_type === "predictive") {
       send({ type: "HANG_UP" });
@@ -154,9 +156,9 @@ export function useCampaignDequeueActions({
       saveData();
     } else if (campaign.dial_type === "call") {
       saveData();
-      dequeue({ contact: questionContact });
+      if (!await dequeue({ contact: questionContact }) || !isCurrentQueue()) return;
       fetchMore({ householdMap });
-      handleNextNumber(campaign?.group_household_queue || false);
+      handleNextNumber(campaign?.group_household_queue || false, questionContact);
       // NEXT resets a finished call to idle; HANG_UP here parked the FSM in
       // "completed" even from idle, which the next dial then flashed (#1220).
       send({ type: "NEXT" });
@@ -172,6 +174,7 @@ export function useCampaignDequeueActions({
     handleDialButton,
     saveData,
     dequeue,
+    isCurrentQueue,
     fetchMore,
     householdMap,
     handleNextNumber,

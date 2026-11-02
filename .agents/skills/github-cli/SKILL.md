@@ -71,6 +71,10 @@ Normalize both forms before matching a test file and collected count. A failed
 raw-string match does not prove that the suite was skipped. Require the expected
 executed cases and a completed successful job.
 
+Keep full job logs out of shell arguments; encoding them as JSON does not
+avoid the operating system's argument limit. Save bounded job identity and
+execution evidence. When full bytes are needed, stream them to a file instead.
+
 ## Aggregating REST Pages
 
 `gh api --paginate --jq` filters each page separately. For one total across

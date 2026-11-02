@@ -31,8 +31,11 @@ interface Conference {
 
 export interface CallAreaProps {
   isBusy: boolean;
+  isAdvancingQueue?: boolean;
   isStartingConference?: boolean;
   startDisabledReason?: string | null;
+  awaitingCustomerReceipt?: boolean;
+  hasDialerSession?: boolean;
   nextRecipient: QueueItem | null;
   /**
    * The contact the script/disposition panel is currently recording an
@@ -147,6 +150,8 @@ type CallControlsProps = Pick<
   | "isBusy"
   | "isStartingConference"
   | "startDisabledReason"
+  | "awaitingCustomerReceipt"
+  | "hasDialerSession"
   | "nextRecipient"
   | "hangUp"
   | "handleVoiceDrop"
@@ -171,6 +176,8 @@ export function CallControls({
   isBusy,
   isStartingConference = false,
   startDisabledReason = null,
+  awaitingCustomerReceipt = false,
+  hasDialerSession = false,
   nextRecipient,
   hangUp,
   handleVoiceDrop,
@@ -216,7 +223,7 @@ export function CallControls({
   };
 
   const inCall = callState === "connected" || callState === "dialing";
-  const showInCall = inCall && (!predictive || !!conference);
+  const showInCall = predictive ? Boolean(conference) || hasDialerSession || isStartingConference || awaitingCustomerReceipt : inCall;
 
   /**
    * @effect Arm a "click again to dial" guard on the Dial button whenever it
@@ -258,10 +265,11 @@ export function CallControls({
         <div className="flex flex-1 gap-2">
           <Button
             onClick={handleHangUpClick}
+            disabled={!predictive && awaitingCustomerReceipt}
             variant="destructive"
             className="flex-1 rounded-full"
           >
-            {confirmingHangUp ? "Click again to hang up" : "Hang Up"}
+            {!predictive && awaitingCustomerReceipt ? "Confirming call…" : confirmingHangUp ? "Click again to hang up" : predictive ? "Stop Dialing" : "Hang Up"}
           </Button>
           {voiceDrop ? (
             <Button
@@ -292,7 +300,7 @@ export function CallControls({
             </Button>
           ) : null}
         </div>
-        {onResetCall ? (
+        {onResetCall && !awaitingCustomerReceipt ? (
           <button
             type="button"
             onClick={onResetCall}
@@ -341,7 +349,7 @@ export function CallControls({
     <div className="flex flex-col gap-3 px-4 py-3">
       <Button
         onClick={handleDialClick}
-        disabled={isBusy || (predictive && (isStartingConference || Boolean(startDisabledReason)))}
+        disabled={isBusy || Boolean(startDisabledReason) || (predictive && isStartingConference)}
         isPending={predictive && isStartingConference}
         data-testid="call-screen-dial"
         className="w-full rounded-full bg-success text-success-foreground hover:bg-success/80"
@@ -351,7 +359,7 @@ export function CallControls({
             : undefined
         }
       >
-        {predictive ? (isStartingConference ? "Starting…" : startDisabledReason || dialLabel) : dialLabel}
+        {predictive && isStartingConference ? "Starting…" : startDisabledReason || dialLabel}
       </Button>
     </div>
   );
@@ -360,6 +368,7 @@ export function CallControls({
 type DispositionBarProps = Pick<
   CallAreaProps,
   | "isBusy"
+  | "isAdvancingQueue"
   | "questionContact"
   | "handleDequeueNext"
   | "disposition"
@@ -369,6 +378,7 @@ type DispositionBarProps = Pick<
 
 export function DispositionBar({
   isBusy,
+  isAdvancingQueue = false,
   questionContact,
   handleDequeueNext,
   disposition,
@@ -387,7 +397,7 @@ export function DispositionBar({
       <Select
         value={disposition}
         onValueChange={setDisposition}
-        disabled={!questionContact}
+        disabled={isAdvancingQueue || !questionContact}
       >
         <SelectTrigger
           data-testid="call-screen-disposition"
@@ -413,7 +423,7 @@ export function DispositionBar({
       </Select>
       <Button
         type="button"
-        disabled={isBusy || !hasValidDisposition}
+        disabled={isBusy || isAdvancingQueue || !hasValidDisposition}
         onClick={handleDequeueNext}
         className="flex-1 rounded-full text-xs"
       >
@@ -425,8 +435,11 @@ export function DispositionBar({
 
 export const CallArea: React.FC<CallAreaProps> = ({
   isBusy,
+  isAdvancingQueue,
   isStartingConference,
   startDisabledReason,
+  awaitingCustomerReceipt,
+  hasDialerSession,
   nextRecipient,
   questionContact,
   displayState,
@@ -461,6 +474,8 @@ export const CallArea: React.FC<CallAreaProps> = ({
           isBusy={isBusy}
           isStartingConference={isStartingConference}
           startDisabledReason={startDisabledReason}
+          awaitingCustomerReceipt={awaitingCustomerReceipt}
+          hasDialerSession={hasDialerSession}
           nextRecipient={nextRecipient}
           hangUp={hangUp}
           handleVoiceDrop={handleVoiceDrop}
@@ -475,7 +490,8 @@ export const CallArea: React.FC<CallAreaProps> = ({
           onResetCall={onResetCall}
         />
         <DispositionBar
-          isBusy={isBusy}
+          isAdvancingQueue={isAdvancingQueue}
+          isBusy={isBusy || awaitingCustomerReceipt || displayState === "dialing" || displayState === "connected"}
           questionContact={questionContact}
           handleDequeueNext={handleDequeueNext}
           disposition={disposition}

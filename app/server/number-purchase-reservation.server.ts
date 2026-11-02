@@ -9,6 +9,7 @@ import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.se
 import { invalidateWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import { emitTransactionHistoryInsertEvent } from "@/lib/workspace-events.server";
 import { logger } from "@/lib/logger.server";
+import { getOutboundHeldCredits } from "./outbound-credit-reservations.server";
 
 export type NumberPurchase = typeof workspace_number_purchase.$inferSelect;
 export type PurchaseTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -43,7 +44,7 @@ export async function reserveNumberPurchase(args: {
     if (existing.length || active.some((purchase) => purchase.phone_number === args.phoneNumber)) {
       return { ok: false as const, status: 409, error: "This number is already owned or its purchase needs recovery." };
     }
-    const held = active.reduce((total, purchase) => total + purchase.credits, 0);
+    const held = await getOutboundHeldCredits(tx, args.workspaceId);
     if (balance.credits - held < NUMBER_RENTAL_MONTHLY_CREDITS) {
       return { ok: false as const, status: 402, error: "Insufficient credits for number rental", creditsError: true as const };
     }
@@ -79,7 +80,9 @@ export async function finalizeNumberPurchase<T>(purchase: NumberPurchase, provid
       throw new Error("Number purchase reservation is no longer owned");
     }
     // Another billed operation can settle while provider creation is in flight.
-    if (!balance || balance.credits < owned.credits) throw new Error("Insufficient credits for number rental");
+    if (!balance || balance.credits < await getOutboundHeldCredits(tx, purchase.workspace)) {
+      throw new Error("Insufficient credits for number rental");
+    }
     const output = await write(tx);
     const ledger = await insertTransactionHistoryIdempotent(tx, {
       workspaceId: purchase.workspace, type: "DEBIT",

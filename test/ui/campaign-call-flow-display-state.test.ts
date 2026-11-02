@@ -365,7 +365,7 @@ describe("useCampaignCallFlow displayState", () => {
       expect(mocks.pollingEnabled).toBe(true);
     });
 
-    test("terminal customer-leg status forces the live SDK call to disconnect", () => {
+    test.each([[false, 1], [true, 0]])("terminal customer status disconnects SDK audio only for manual calls (predictive %s)", (isPredictive, disconnects) => {
       // Regression: a provider-detected hangup (SSE/poll) only ever flipped
       // FSM/UI state — it never told the still-live Twilio SDK Call object
       // the leg was over. That's why a client hangup could update the
@@ -378,6 +378,8 @@ describe("useCampaignCallFlow displayState", () => {
         callSid: "CA-live",
         agentLegSid: "CA-live",
         activeCall: mockCall as any,
+        isPredictive,
+        confirmedCustomerSid: isPredictive ? "CA-child" : null,
       });
 
       act(() => {
@@ -390,9 +392,11 @@ describe("useCampaignCallFlow displayState", () => {
         callSid: "CA-live",
         agentLegSid: "CA-live",
         activeCall: mockCall as any,
+        isPredictive,
+        confirmedCustomerSid: isPredictive ? "CA-child" : null,
       }));
 
-      expect(mockCall.disconnect).toHaveBeenCalled();
+      expect(mockCall.disconnect).toHaveBeenCalledTimes(disconnects);
     });
   });
 

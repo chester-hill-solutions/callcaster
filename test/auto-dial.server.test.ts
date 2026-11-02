@@ -14,23 +14,20 @@ vi.mock("@/lib/logger.server", () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
 
+const admissionMock = vi.hoisted(() => vi.fn());
+vi.mock("@/server/predictive-voice-admission.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/predictive-voice-admission.server")>(),
+  admitPredictiveVoiceRecipient: admissionMock,
+}));
+
 const rpcMocks = vi.hoisted(() => ({
-  rpcCreateOutreachAttempt: vi.fn(),
   rpcTryCompleteCampaignIfDrained: vi.fn(),
 }));
 vi.mock("@/lib/db-rpc.server", () => ({
-  rpcCreateOutreachAttempt: (...args: unknown[]) => rpcMocks.rpcCreateOutreachAttempt(...args),
   rpcTryCompleteCampaignIfDrained: (...args: unknown[]) =>
     rpcMocks.rpcTryCompleteCampaignIfDrained(...args),
 }));
 
-const claimNextQueueContactMock = vi.hoisted(() => vi.fn());
-const requeueCampaignQueueByIdMock = vi.hoisted(() => vi.fn());
-const dequeueQueueEntryMock = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/campaign-queue-db.server", () => ({
-  claimNextQueueContact: (...args: unknown[]) => claimNextQueueContactMock(...args),
-  dequeueQueueEntry: (...args: unknown[]) => dequeueQueueEntryMock(...args),
-}));
 // Spreads the real module: only the keyed write is asserted here, and a frozen
 // factory breaks the day the module gains an export.
 vi.mock("@/lib/campaign-queue-updates.server", async (importOriginal) => ({
@@ -53,31 +50,17 @@ vi.mock("@/lib/database/workspace.server", () => ({
   })),
 }));
 
-const windowMock = vi.hoisted(() => ({
-  recipientCallingWindowStatus: vi.fn(),
-}));
-vi.mock("@/lib/recipient-calling-window", () => ({
-  recipientCallingWindowStatus: (...args: unknown[]) =>
-    windowMock.recipientCallingWindowStatus(...args),
-}));
-
-const creditGateMock = vi.hoisted(() => ({
-  requireOutboundCredits: vi.fn(async () => ({ ok: true }) as { ok: boolean; reason?: string }),
-}));
-vi.mock("@/lib/outbound-credit-gate.server", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/outbound-credit-gate.server")>()),
-  requireOutboundCredits: (...args: unknown[]) =>
-    creditGateMock.requireOutboundCredits(...args),
-}));
-
 const tenantDbMocks = vi.hoisted(() => ({
   findFirst: vi.fn(),
   update: vi.fn(),
   insert: vi.fn(),
   execute: vi.fn(),
+  findAudio: vi.fn(async () => null),
+  findAudioReservation: vi.fn(async () => null),
 }));
 
-vi.mock("@/server/tenant-db", () => ({
+vi.mock("@/server/tenant-db", async importOriginal => ({
+  ...await importOriginal<typeof import("@/server/tenant-db")>(),
   createTenantDb: vi.fn(() => ({
     call: {
       findFirst: (...args: unknown[]) => tenantDbMocks.findFirst(...args),
@@ -85,15 +68,14 @@ vi.mock("@/server/tenant-db", () => ({
       insert: (...args: unknown[]) => tenantDbMocks.insert(...args),
     },
     execute: (...args: unknown[]) => tenantDbMocks.execute(...args),
+    workspace_voice_audio_connection: { findFirst: (...args: unknown[]) => tenantDbMocks.findAudio(...args) },
+    workspace_voice_reservation: { findFirst: (...args: unknown[]) => tenantDbMocks.findAudioReservation(...args) },
   })),
 }));
 
 import {
   completeAllConferences,
-  createOutreachAttempt,
   createTwilioCall,
-  getNextAutoDialQueueContact,
-  normalizePhoneNumber,
   runAutoDialerTurn,
   saveCallToDatabase,
 } from "../app/lib/auto-dial.server";
@@ -101,49 +83,7 @@ import {
 describe("auto-dial.server", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    rpcMocks.rpcCreateOutreachAttempt.mockReset();
-    claimNextQueueContactMock.mockReset();
-  });
-
-  test("normalizePhoneNumber re-exports shared helper", () => {
-    expect(normalizePhoneNumber("+1 (555) 123-4567")).toBe("+15551234567");
-  });
-
-  test("getNextAutoDialQueueContact returns first record", async () => {
-    claimNextQueueContactMock.mockResolvedValueOnce({ queue_id: 1 });
-    const result = await getNextAutoDialQueueContact(1, "user-1");
-    expect(result).toEqual({ queue_id: 1 });
-    expect(claimNextQueueContactMock).toHaveBeenCalledWith(expect.anything(), 1, "user-1");
-  });
-
-  test("getNextAutoDialQueueContact returns null when empty", async () => {
-    claimNextQueueContactMock.mockResolvedValueOnce(null);
-    expect(await getNextAutoDialQueueContact(1, "user-1")).toBeNull();
-  });
-
-  test("getNextAutoDialQueueContact throws on rpc error", async () => {
-    claimNextQueueContactMock.mockRejectedValueOnce(new Error("rpc fail"));
-    await expect(
-      getNextAutoDialQueueContact(1, "user-1"),
-    ).rejects.toThrow("rpc fail");
-  });
-
-  test("createOutreachAttempt calls rpc and returns data", async () => {
-    rpcMocks.rpcCreateOutreachAttempt.mockResolvedValueOnce({ id: 9 });
-    const result = await createOutreachAttempt(
-      { queue_id: 1, contact_id: 2, contact_phone: "+15551234567" },
-      3,
-      "ws-1",
-      "user-1",
-    );
-    expect(result).toEqual({ id: 9 });
-    expect(rpcMocks.rpcCreateOutreachAttempt).toHaveBeenCalledWith(expect.anything(), {
-      contactId: 2,
-      campaignId: 3,
-      userId: "user-1",
-      workspaceId: "ws-1",
-      queueId: 1,
-    });
+    admissionMock.mockReset().mockResolvedValue({ ok: false, reason: "queue_empty" });
   });
 
   test("createTwilioCall uses BASE_URL callbacks", async () => {
@@ -154,7 +94,6 @@ describe("auto-dial.server", () => {
       "+15551234567",
       "+15557654321",
       "conf-1",
-      "device-1",
     );
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -232,12 +171,6 @@ describe("auto-dial.server", () => {
 
   test("an ended predictive conference cannot claim a queued contact or place another call", async () => {
     twilioMocks.conferencesList.mockResolvedValueOnce([]);
-    claimNextQueueContactMock.mockResolvedValueOnce({
-      queue_id: 11,
-      contact_id: 101,
-      contact_phone: "+15551234567",
-      caller_id: "+15550001111",
-    });
     const result = await runAutoDialerTurn({
       user_id: "agent-1",
       workspace_id: "ws-1",
@@ -246,197 +179,34 @@ describe("auto-dial.server", () => {
       selected_device: "",
     });
     expect(result).toEqual({ success: true, message: "Conference ended, stopping auto-dial" });
-    expect(claimNextQueueContactMock).not.toHaveBeenCalled();
-    expect(rpcMocks.rpcCreateOutreachAttempt).not.toHaveBeenCalled();
+    expect(admissionMock).not.toHaveBeenCalled();
     expect(twilioMocks.callsCreate).not.toHaveBeenCalled();
   });
 
-  describe("runAutoDialerTurn recipient calling window", () => {
-    const turnInput = {
-      user_id: "user-1",
-      workspace_id: "ws-1",
-      campaign_id: 5,
-      conference_id: "user-1",
-      selected_device: "",
-    };
-    const contactA = {
-      queue_id: 11,
-      contact_id: 101,
-      contact_phone: "+17095550100",
-      caller_id: "+15555501001",
-    };
-    const contactB = {
-      queue_id: 12,
-      contact_id: 102,
-      contact_phone: "+16045550100",
-      caller_id: "+15555501001",
-    };
-    const blocked = {
-      allowed: false,
-      timezone: "America/St_Johns",
-      reason: "outside_window",
-    };
-    const open = {
-      allowed: true,
-      timezone: "America/Vancouver",
-      reason: "in_window",
-    };
-
-    /**
-     * Until this was wired, NOTHING set a campaign to "complete": the only
-     * caller of the completion RPC lived in the dead Supabase-era dispatch
-     * module. A campaign that had dialed its entire queue displayed "Running"
-     * forever and a customer had no way to tell it had finished.
-     */
-    test("marks the campaign complete when the queue is drained", async () => {
-      claimNextQueueContactMock.mockResolvedValueOnce(null);
+  // Funding, window selection and provider failures use real SQL in
+  // integration-db/voice-credit-predictive.test.ts. This adapter owns drain handling.
+  describe("runAutoDialerTurn admission outcomes", () => {
+    const input = { user_id: "user-1", workspace_id: "ws-1", campaign_id: 5, conference_id: "user-1" };
+    test("asks the completion gate only when admission proves the queue is empty", async () => {
       rpcMocks.rpcTryCompleteCampaignIfDrained.mockResolvedValueOnce(true);
-
-      const result = await runAutoDialerTurn(turnInput);
-
-      expect(result).toMatchObject({ success: true });
-      expect(rpcMocks.rpcTryCompleteCampaignIfDrained).toHaveBeenCalledWith(
-        expect.anything(),
-        5,
-      );
+      expect(await runAutoDialerTurn(input)).toMatchObject({ success: true });
+      expect(rpcMocks.rpcTryCompleteCampaignIfDrained).toHaveBeenCalledWith(expect.anything(), 5);
+      expect(twilioMocks.callsCreate).not.toHaveBeenCalled();
     });
-
-    test("a failure to mark complete does not fail the dial turn", async () => {
-      claimNextQueueContactMock.mockResolvedValueOnce(null);
+    test.each(["queue_pending", "outside_window", "insufficient_credits", "dispatch_in_progress", "campaign_deferred"])(
+      "%s cannot complete the campaign or send a provider call", async (reason) => {
+        admissionMock.mockResolvedValueOnce({ ok: false, reason });
+        expect(await runAutoDialerTurn(input)).toMatchObject({ success: true });
+        expect(rpcMocks.rpcTryCompleteCampaignIfDrained).not.toHaveBeenCalled();
+        expect(twilioMocks.callsCreate).not.toHaveBeenCalled();
+      },
+    );
+    test("a completion-label failure does not fail the drained turn", async () => {
       rpcMocks.rpcTryCompleteCampaignIfDrained.mockRejectedValueOnce(new Error("db down"));
-
-      // Losing a status label must never take down dialing.
-      await expect(runAutoDialerTurn(turnInput)).resolves.toMatchObject({ success: true });
+      expect(await runAutoDialerTurn(input)).toMatchObject({ success: true });
       expect(logger.warn).toHaveBeenCalledWith("campaign.completion_failed", {
         campaignId: 5, workspaceId: "ws-1", reason: "auto_dial_drain", error: "db down",
       });
-    });
-
-    test("requeues out-of-window contacts and stops without dialing", async () => {
-      // The released row is claimable again immediately; seeing it a second
-      // time proves everything claimable is out of window.
-      claimNextQueueContactMock
-        .mockResolvedValueOnce(contactA)
-        .mockResolvedValueOnce(contactA);
-      windowMock.recipientCallingWindowStatus.mockReturnValue(blocked);
-
-      const result = await runAutoDialerTurn(turnInput);
-
-      expect(requeueCampaignQueueByIdMock).toHaveBeenCalledTimes(2);
-      expect(requeueCampaignQueueByIdMock).toHaveBeenCalledWith(11, "ws-1");
-      expect(twilioMocks.callsCreate).not.toHaveBeenCalled();
-      expect(rpcMocks.rpcCreateOutreachAttempt).not.toHaveBeenCalled();
-      expect(result).toEqual({
-        success: true,
-        message: "No contacts within recipient calling hours",
-      });
-    });
-
-    test("skips a blocked contact and dials the next in-window one", async () => {
-      claimNextQueueContactMock
-        .mockResolvedValueOnce(contactA)
-        .mockResolvedValueOnce(contactB);
-      windowMock.recipientCallingWindowStatus
-        .mockReturnValueOnce(blocked)
-        .mockReturnValueOnce(open);
-      rpcMocks.rpcCreateOutreachAttempt.mockResolvedValue(77);
-      twilioMocks.callsCreate.mockResolvedValue({
-        sid: "CA123",
-        status: "queued",
-      });
-      tenantDbMocks.findFirst.mockResolvedValue(null);
-      tenantDbMocks.insert.mockResolvedValue([{ sid: "CA123" }]);
-
-      const result = await runAutoDialerTurn(turnInput);
-
-      expect(requeueCampaignQueueByIdMock).toHaveBeenCalledTimes(1);
-      expect(requeueCampaignQueueByIdMock).toHaveBeenCalledWith(11, "ws-1");
-      expect(twilioMocks.callsCreate).toHaveBeenCalledTimes(1);
-      expect(twilioMocks.callsCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ to: "+16045550100" }),
-      );
-      expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          by: { contactId: 102, campaignId: 5 },
-          household: true,
-        }),
-      );
-      expect(result).toEqual({ success: true });
-    });
-  });
-
-  describe("runAutoDialerTurn dial-failure handling", () => {
-    const turnInput = {
-      user_id: "user-1",
-      workspace_id: "ws-1",
-      campaign_id: 5,
-      conference_id: "user-1",
-      selected_device: "",
-    };
-    const contact = {
-      queue_id: 21,
-      contact_id: 201,
-      contact_phone: "+16045550100",
-      caller_id: "+15555501001",
-    };
-
-    beforeEach(() => {
-      claimNextQueueContactMock.mockResolvedValueOnce(contact);
-      windowMock.recipientCallingWindowStatus.mockReturnValue({
-        allowed: true,
-        timezone: "America/Vancouver",
-        reason: "in_window",
-      });
-      rpcMocks.rpcCreateOutreachAttempt.mockResolvedValue(88);
-    });
-
-    test("requeues when Twilio definitively rejected the create (REST error)", async () => {
-      const restError = Object.assign(new Error("Invalid phone number"), {
-        status: 400,
-        code: 21211,
-      });
-      twilioMocks.callsCreate.mockRejectedValueOnce(restError);
-
-      const result = await runAutoDialerTurn(turnInput);
-
-      expect(requeueCampaignQueueByIdMock).toHaveBeenCalledWith(21, "ws-1");
-      expect(dequeueQueueEntryMock).not.toHaveBeenCalled();
-      expect(result).toEqual({ success: false, error: "Invalid phone number" });
-    });
-
-    test("stops and releases the claim when credits run out mid-session (#1508)", async () => {
-      creditGateMock.requireOutboundCredits.mockResolvedValueOnce({
-        ok: false,
-        reason: "insufficient_credits",
-      });
-
-      const result = await runAutoDialerTurn(turnInput);
-
-      expect(twilioMocks.callsCreate).not.toHaveBeenCalled();
-      expect(rpcMocks.rpcCreateOutreachAttempt).not.toHaveBeenCalled();
-      expect(requeueCampaignQueueByIdMock).toHaveBeenCalledWith(21, "ws-1");
-      expect(result).toEqual({
-        success: true,
-        message: "Insufficient credits, stopping auto-dial",
-      });
-    });
-
-    test("parks (dequeues with reason) on ambiguous network failure — never requeues", async () => {
-      twilioMocks.callsCreate.mockRejectedValueOnce(
-        new Error("socket hang up"),
-      );
-
-      const result = await runAutoDialerTurn(turnInput);
-
-      expect(requeueCampaignQueueByIdMock).not.toHaveBeenCalled();
-      expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          by: { contactId: 201, campaignId: 5 },
-          household: false,
-          reason: expect.stringContaining("Ambiguous dial failure"),
-        }),
-      );
-      expect(result).toEqual({ success: false, error: "socket hang up" });
     });
   });
 });

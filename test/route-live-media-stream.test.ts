@@ -57,16 +57,30 @@ vi.mock("twilio", async () => {
 
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
-// Mocked outright rather than via importOriginal: the real module pulls in a
-// JWT dep chain that does not load under this suite's module mocks.
-vi.mock("@/lib/twilio-webhook.server", () => ({
+// Keep raw provider parsing real; this rendering suite replaces signature I/O.
+vi.mock("@/lib/twilio-webhook.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/twilio-webhook.server")>(),
   requireTwilioSignature: vi.fn(async () => null),
+  resolveCanonicalTwilioWebhookUrl: () => "https://base.example/api/call",
   twilioWebhookForbidden: (message = "Invalid Twilio signature") =>
     new Response(message, { status: 403 }),
   twilioWebhookBadRequest: (message: string) => new Response(message, { status: 400 }),
   twilioWebhookNotFound: (message = "Not Found") => new Response(message, { status: 404 }),
   twilioWebhookInternalError: (message = "Internal Server Error") =>
     new Response(message, { status: 500 }),
+}));
+vi.mock("@/server/handset-voice-reservation.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/handset-voice-reservation.server")>(),
+  startPreparedHandsetVoiceRecipient: async (_args: unknown, build: (row: {
+    user_id: string; caller_id: string; recipient: string;
+  }, recording: { callback_url: string }) => unknown) => ({ instruction: build(
+    { user_id: "user-1", caller_id: "+15550001111", recipient: "+15552223333" },
+    { callback_url: "https://base.example/api/voice-recording?recording=10000000-0000-4000-8000-000000000002" }) }),
+}));
+vi.mock("@/server/voice-recording-operation.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/voice-recording-operation.server")>(),
+  prepareVoiceDialRecording: async () => ({ id: "10000000-0000-4000-8000-000000000002",
+    callback_url: "https://base.example/api/voice-recording?recording=10000000-0000-4000-8000-000000000002" }),
 }));
 vi.mock("@/lib/workspace-members-db.server", () => ({
   getWorkspaceById: (...a: unknown[]) => mocks.getWorkspaceById(...a),
@@ -120,6 +134,21 @@ vi.mock("@/lib/campaign-queue-db.server", () => ({
 }));
 vi.mock("@/lib/object-storage.server", () => ({
   createSignedObjectUrl: (...a: unknown[]) => mocks.createSignedObjectUrl(...a),
+}));
+
+vi.mock("@/lib/voice-bridge-webhook.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/voice-bridge-webhook.server")>(),
+  bindVerifiedVoiceSetupRequest: async () => {
+    const call = await mocks.findCallBySid();
+    return { ...call, status_callback: "https://base.example/api/call-status/", recipient: "+15552223333", caller_id: "+15550001111" };
+  },
+  voiceBridgeCallbackArgs: () => ({}),
+}));
+vi.mock("@/server/voice-bridge-reservation.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/voice-bridge-reservation.server")>(),
+  claimVoiceBridgeRecipient: async () => ({ issued: true }),
+  hasVoiceReservationCallBinding: async () => false,
+  findVoiceReservationForCall: async () => null,
 }));
 
 /** The three capability states each route is exercised against. */
@@ -178,7 +207,11 @@ describe("api/call — outbound handset call", () => {
     fd.set("To", "+15552223333");
     fd.set("workspace_id", "ws-1");
     fd.set("client_identity", "agent-1");
-    fd.set("CallSid", "CA-outbound");
+    fd.set("credit_reservation", "10000000-0000-4000-8000-000000000001");
+    fd.set("CallSid", "CA00000000000000000000000000000001");
+    fd.set("AccountSid", "AC00000000000000000000000000000001");
+    fd.set("From", "client:agent-1");
+    fd.set("Direction", "inbound");
     return new Request("http://localhost/api/call", { method: "POST", body: fd });
   }
 
@@ -203,14 +236,14 @@ describe("api/call — outbound handset call", () => {
 
     expect(xml).toContain("<Stream");
     expect(xml).toContain('track="both_tracks"');
-    expect(xml).toContain('name="call-CA-outbound"');
+    expect(xml).toContain('name="call-CA00000000000000000000000000000001"');
     expect(xml).toContain("<Dial");
 
     expect(streamParameters(xml)).toMatchObject({
       workspaceId: "ws-1",
       userId: "user-1",
       direction: "outbound",
-      callSid: "CA-outbound",
+      callSid: "CA00000000000000000000000000000001",
     });
   });
 
@@ -284,7 +317,7 @@ describe("api/dial/$number — outbound dial", () => {
     expect(await run()).toContain("<Stream");
   });
 
-  test("no <Stream> when the call row has no user to attribute the stream to", async () => {
+  test("rejects a setup without an authenticated stream owner", async () => {
     mocks.getWorkspaceById.mockResolvedValue(workspaceWithFlags(FLAGS_TRANSCRIPTION));
     mocks.findCallBySid.mockResolvedValue({
       sid: "CA-dial",
@@ -294,7 +327,8 @@ describe("api/dial/$number — outbound dial", () => {
     const xml = await run();
 
     expect(xml).not.toContain("<Stream");
-    expect(xml).toContain("<Dial");
+    expect(xml).not.toContain("<Dial");
+    expect(xml).toContain("<Hangup");
   });
 });
 

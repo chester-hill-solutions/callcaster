@@ -1,4 +1,8 @@
+import "./helpers/legacy-voice-reservation-mock";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+vi.mock("@/server/voice-recording-batch.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/voice-recording-batch.server")>(), isSinglePartCallRecording: vi.fn(async () => true),
+}));
 
 vi.hoisted(() => {
   process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
@@ -16,7 +20,7 @@ const mocks = vi.hoisted(() => ({
   findOutreachAttemptWithCampaignType: vi.fn(),
   updateOutreachAttemptForWorkspace: vi.fn(),
   emitPredictiveBroadcast: vi.fn(),
-  dequeueQueueEntry: vi.fn(),
+  dequeueLegacyVoiceAttempt: vi.fn(),
   tenantDb: {
     campaign: { findFirst: vi.fn(async () => null) },
     campaign_queue: { findFirst: vi.fn(async () => null) },
@@ -94,8 +98,9 @@ vi.mock("@/server/tenant-db", () => ({
   createTenantDb: vi.fn(() => mocks.tenantDb),
 }));
 
-vi.mock("@/lib/campaign-queue-db.server", () => ({
-  dequeueQueueEntry: (...args: unknown[]) => mocks.dequeueQueueEntry(...args),
+vi.mock("@/server/legacy-voice-queue.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/server/legacy-voice-queue.server")>(),
+  dequeueLegacyVoiceAttempt: (...args: unknown[]) => mocks.dequeueLegacyVoiceAttempt(...args),
 }));
 
 vi.mock("@/lib/twilio-geo-permissions.server", () => ({
@@ -139,6 +144,7 @@ describe("webhook side-effect handlers", () => {
       status: "completed",
       duration: "61",
       outreach_attempt_id: 10,
+      user_id: "u1", campaign_id: 42, contact_id: 123, conference_id: "u1~owned-room",
     });
     mocks.billTerminalCallStatus.mockResolvedValue({ inserted: true });
     // Batch transcription is default-off; individual tests opt in.
@@ -193,6 +199,18 @@ describe("webhook side-effect handlers", () => {
     );
   });
 
+  test("customer broadcasts identify the actual root, actor, campaign, outreach and room", async () => {
+    const root = "CA11111111111111111111111111111111";
+    mocks.findCallBySid.mockResolvedValue({ sid: root, workspace: "w1", user_id: "u1", campaign_id: 42,
+      contact_id: 123, outreach_attempt_id: 10, conference_id: "u1~owned-room", status: "ringing", duration: "0" });
+    const { runCallStatusSideEffects } = await import("@/lib/worker/webhook-side-effects.server");
+    await runCallStatusSideEffects({ callSid: root, event: parseTwilioVoiceCallback({ CallSid: root, CallStatus: "ringing" }) });
+    expect(mocks.emitPredictiveBroadcast).toHaveBeenCalledWith("w1", expect.objectContaining({
+      call_sid: root, user_id: "u1", campaign_id: 42, outreach_attempt_id: 10,
+      contact_id: 123, conference_id: "u1~owned-room", status: "ringing",
+    }));
+  });
+
   test.each([
     ["no-answer", "no-answer"],
     ["busy", "busy"],
@@ -216,7 +234,7 @@ describe("webhook side-effect handlers", () => {
   // /api/hangup does, or the agent's nextRecipient keeps showing a finished
   // contact. The assignee comes from the queue row because a webhook has no
   // acting user, and the guarded RPC keeps a double hang-up idempotent.
-  test("terminal status dequeues the contact's queue row with the row assignee", async () => {
+  test("terminal status delegates its saved Call identity without borrowing the queue assignee", async () => {
     mocks.findCallBySid.mockResolvedValue({
       sid: "CA1",
       workspace: "w1",
@@ -240,17 +258,8 @@ describe("webhook side-effect handlers", () => {
       event: parseTwilioVoiceCallback({ CallSid: "CA1", CallStatus: "completed" }),
     });
 
-    expect(mocks.dequeueQueueEntry).toHaveBeenCalledTimes(1);
-    expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith(
-      expect.objectContaining({
-        by: { contactId: 123, campaignId: 7 },
-        workspaceId: "w1",
-        household: false,
-        userId: "user-1",
-        reason: "Call completed",
-        exec: mocks.tenantDb,
-      }),
-    );
+    expect(mocks.dequeueLegacyVoiceAttempt).toHaveBeenCalledTimes(1);
+    expect(mocks.dequeueLegacyVoiceAttempt).toHaveBeenCalledWith("w1", "CA1");
   });
 
   test("terminal child call uses its resolved parent outreach attempt to dequeue", async () => {
@@ -283,7 +292,7 @@ describe("webhook side-effect handlers", () => {
     });
 
     expect(mocks.findOutreachAttemptWithCampaignType).toHaveBeenCalledWith("w1", 10);
-    expect(mocks.dequeueQueueEntry).toHaveBeenCalledTimes(1);
+    expect(mocks.dequeueLegacyVoiceAttempt).toHaveBeenCalledExactlyOnceWith("w1", "CAchild");
   });
 
   test("test call to a queued contact leaves the queue untouched (#1869)", async () => {
@@ -313,12 +322,12 @@ describe("webhook side-effect handlers", () => {
 
     expect(mocks.tenantDb.campaign_queue.findFirst).not.toHaveBeenCalled();
     expect(mocks.tenantDb.campaign.findFirst).not.toHaveBeenCalled();
-    expect(mocks.dequeueQueueEntry).not.toHaveBeenCalled();
+    expect(mocks.dequeueLegacyVoiceAttempt).not.toHaveBeenCalled();
     expect(mocks.findOutreachAttemptWithCampaignType).not.toHaveBeenCalled();
     expect(mocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
   });
 
-  test("a terminal call without a campaign keeps billing but does not dequeue", async () => {
+  test("a terminal call without inline campaign metadata delegates its saved identity", async () => {
     mocks.findCallBySid.mockResolvedValue({
       sid: "CA1", workspace: "w1", status: "completed", contact_id: 123,
       campaign_id: null, outreach_attempt_id: 10,
@@ -328,7 +337,7 @@ describe("webhook side-effect handlers", () => {
       callSid: "CA1", event: parseTwilioVoiceCallback({ CallSid: "CA1", CallStatus: "completed" }),
     });
     expect(mocks.billTerminalCallStatus).toHaveBeenCalled();
-    expect(mocks.dequeueQueueEntry).not.toHaveBeenCalled();
+    expect(mocks.dequeueLegacyVoiceAttempt).toHaveBeenCalledWith("w1", "CA1");
     expect(mocks.tenantDb.campaign_queue.findFirst).not.toHaveBeenCalled();
   });
 
@@ -350,7 +359,7 @@ describe("webhook side-effect handlers", () => {
       event: parseTwilioVoiceCallback({ CallSid: "CA1", CallStatus: "in-progress" }),
     });
 
-    expect(mocks.dequeueQueueEntry).not.toHaveBeenCalled();
+    expect(mocks.dequeueLegacyVoiceAttempt).not.toHaveBeenCalled();
   });
 
   test("runCallStatusSideEffects never downgrades a terminal disposition (AMD voicemail)", async () => {    mocks.findOutreachAttemptWithCampaignType.mockResolvedValue({

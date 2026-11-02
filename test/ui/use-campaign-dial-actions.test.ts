@@ -161,12 +161,12 @@ describe("useCampaignDialActions", () => {
 });
 
 describe("useCampaignDequeueActions", () => {
-  test("predictive dequeue hangs up and re-dials", () => {
+  test("predictive dequeue hangs up and re-dials", async () => {
     const send = vi.fn();
     const setCallDuration = vi.fn();
     const handleDialButton = vi.fn();
     const saveData = vi.fn();
-    const dequeue = vi.fn();
+    const dequeue = vi.fn(async () => true);
 
     const { result } = renderHook(() =>
       useCampaignDequeueActions({
@@ -177,6 +177,7 @@ describe("useCampaignDequeueActions", () => {
         handleDialButton,
         saveData,
         dequeue,
+        isCurrentQueue: () => true,
         fetchMore: vi.fn(),
         householdMap: {},
         handleNextNumber: vi.fn(),
@@ -185,7 +186,7 @@ describe("useCampaignDequeueActions", () => {
       }),
     );
 
-    act(() => result.current());
+    await act(async () => { await result.current(); });
     expect(send).toHaveBeenCalledWith({ type: "HANG_UP" });
     expect(setCallDuration).toHaveBeenCalledWith(0);
     expect(handleDialButton).toHaveBeenCalledTimes(1);
@@ -193,12 +194,12 @@ describe("useCampaignDequeueActions", () => {
     expect(dequeue).not.toHaveBeenCalled();
   });
 
-  test("manual dequeue saves, dequeues, and advances queue", () => {
+  test("manual dequeue saves, dequeues, and advances queue", async () => {
     const send = vi.fn();
     const setCallDuration = vi.fn();
     const handleDialButton = vi.fn();
     const saveData = vi.fn();
-    const dequeue = vi.fn();
+    const dequeue = vi.fn(async () => true);
     const fetchMore = vi.fn();
     const handleNextNumber = vi.fn();
     const setRecentAttempt = vi.fn();
@@ -213,6 +214,7 @@ describe("useCampaignDequeueActions", () => {
         handleDialButton,
         saveData,
         dequeue,
+        isCurrentQueue: () => true,
         fetchMore,
         householdMap: { h1: [nextRecipient] },
         handleNextNumber,
@@ -221,11 +223,11 @@ describe("useCampaignDequeueActions", () => {
       }),
     );
 
-    act(() => result.current());
+    await act(async () => { await result.current(); });
     expect(saveData).toHaveBeenCalledTimes(1);
     expect(dequeue).toHaveBeenCalledWith({ contact: nextRecipient });
     expect(fetchMore).toHaveBeenCalledWith({ householdMap: { h1: [nextRecipient] } });
-    expect(handleNextNumber).toHaveBeenCalledWith(false);
+    expect(handleNextNumber).toHaveBeenCalledWith(false, nextRecipient);
     // NEXT (not HANG_UP): advancing the queue must not park the FSM in
     // "completed" from idle — the next dial flashed that stale outcome (#1220).
     expect(send).toHaveBeenCalledWith({ type: "NEXT" });
@@ -241,12 +243,12 @@ describe("useCampaignDequeueActions", () => {
   // up on the last queued contact. The gate (and the dequeue target) must
   // follow questionContact — the contact the panel is showing — so the
   // button still works with an empty queue right after a call ends.
-  test("#1253: manual dequeue still saves/dequeues/advances when the queue is empty but questionContact is set", () => {
+  test("#1253: manual dequeue still saves/dequeues/advances when the queue is empty but questionContact is set", async () => {
     const send = vi.fn();
     const setCallDuration = vi.fn();
     const handleDialButton = vi.fn();
     const saveData = vi.fn();
-    const dequeue = vi.fn();
+    const dequeue = vi.fn(async () => true);
     const fetchMore = vi.fn();
     const handleNextNumber = vi.fn();
     const setRecentAttempt = vi.fn();
@@ -261,6 +263,7 @@ describe("useCampaignDequeueActions", () => {
         handleDialButton,
         saveData,
         dequeue,
+        isCurrentQueue: () => true,
         fetchMore,
         // The queue is empty — this is the "0 of 1 remaining" screenshot
         // from #1253, reached after hangup.action dequeued the sole contact.
@@ -271,15 +274,15 @@ describe("useCampaignDequeueActions", () => {
       }),
     );
 
-    act(() => result.current());
+    await act(async () => { await result.current(); });
     expect(saveData).toHaveBeenCalledTimes(1);
     expect(dequeue).toHaveBeenCalledWith({ contact: nextRecipient });
     expect(handleNextNumber).toHaveBeenCalled();
   });
 
-  test("no-ops when there is no campaign or no questionContact", () => {
+  test("no-ops when there is no campaign or no questionContact", async () => {
     const saveData = vi.fn();
-    const dequeue = vi.fn();
+    const dequeue = vi.fn(async () => true);
 
     const { result } = renderHook(() =>
       useCampaignDequeueActions({
@@ -290,6 +293,7 @@ describe("useCampaignDequeueActions", () => {
         handleDialButton: vi.fn(),
         saveData,
         dequeue,
+        isCurrentQueue: () => true,
         fetchMore: vi.fn(),
         householdMap: {},
         handleNextNumber: vi.fn(),
@@ -298,7 +302,7 @@ describe("useCampaignDequeueActions", () => {
       }),
     );
 
-    act(() => result.current());
+    await act(async () => { await result.current(); });
     expect(saveData).not.toHaveBeenCalled();
     expect(dequeue).not.toHaveBeenCalled();
   });

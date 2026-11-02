@@ -1,17 +1,17 @@
 import { z } from "zod";
 import { coerceEntityIdSchema, workspaceIdSchema } from "@/lib/schemas/api/common";
+import { phoneAudioSourceFields, requirePhoneAudioSource } from "./phone-audio-source";
 
+const positiveDialId = z.string().refine((value) => Number.isSafeInteger(Number(value)) && Number(value) > 0).transform(Number);
 export const dialBodySchema = z.object({
-  to_number: z.string().min(1),
-  user_id: z.string().min(1),
-  campaign_id: z.string().min(1),
-  contact_id: z.string().min(1),
-  workspace_id: z.string().min(1),
-  queue_id: z.string().min(1),
-  caller_id: z.string().min(1),
-  outreach_id: z.string().optional(),
+  to_number: z.string().min(1), user_id: z.string().min(1), campaign_id: positiveDialId, contact_id: positiveDialId,
+  workspace_id: z.string().min(1), queue_id: positiveDialId, caller_id: z.string().min(1),
+  outreach_id: z.preprocess((value) => value === "" ? undefined : value, positiveDialId.optional()),
   selected_device: z.string().optional(),
-});
+  dial_intent_id: z.string().uuid().transform((value) => value.toLowerCase()).optional(),
+  expected_queue_generation: z.string().uuid().transform((value) => value.toLowerCase()).optional(),
+  ...phoneAudioSourceFields,
+}).superRefine(requirePhoneAudioSource);
 
 export const hangupBodySchema = z.object({
   conference_id: z.string().optional(),

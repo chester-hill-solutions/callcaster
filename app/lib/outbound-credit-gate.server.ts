@@ -36,7 +36,7 @@ export type OutboundCreditsResult =
 export type OutboundCreditsBlocked = Extract<OutboundCreditsResult, { ok: false }>;
 
 /**
- * Read the workspace credit balance and apply the outbound floor policy.
+ * Read available credits after existing holds and apply the outbound floor policy.
  * Pure result: never throws for a blocked/unknown-workspace outcome, so
  * it is safe to call from both HTTP route handlers and plain service
  * functions.
@@ -44,7 +44,7 @@ export type OutboundCreditsBlocked = Extract<OutboundCreditsResult, { ok: false 
 export async function requireOutboundCredits(
   workspaceId: string,
 ): Promise<OutboundCreditsResult> {
-  const balance = await getWorkspaceCreditsBalance(workspaceId);
+  const balance = await getWorkspaceCreditsBalance(workspaceId, { excludeOutboundHolds: true });
   if (balance === null) {
     return { ok: false, reason: "workspace_not_found" };
   }

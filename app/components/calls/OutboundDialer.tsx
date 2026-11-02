@@ -13,6 +13,7 @@ import {
 type OutboundDialerProps = {
   value: string;
   error: string | null;
+  pending?: boolean;
   disabled?: boolean;
   disabledReason?: string;
   onChange: (value: string) => void;
@@ -23,12 +24,14 @@ type OutboundDialerProps = {
 export function OutboundDialer({
   value,
   error,
+  pending = false,
   disabled = false,
   disabledReason,
   onChange,
   onDial,
   onClearError,
 }: OutboundDialerProps) {
+  const isDisabled = disabled || pending;
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium text-muted-foreground">Dial out</p>
@@ -37,6 +40,7 @@ export function OutboundDialer({
           type="tel"
           placeholder="+1 (555) 123-4567"
           value={value}
+          disabled={pending}
           onChange={(e) => {
             onChange(e.target.value);
             onClearError();
@@ -49,18 +53,19 @@ export function OutboundDialer({
             <TooltipTrigger asChild>
               {/* A disabled button cannot receive focus, so its tooltip needs a focusable wrapper. */}
               {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
-              <span className={disabled ? "inline-flex cursor-not-allowed" : "inline-flex"} tabIndex={disabled && disabledReason ? 0 : undefined}>
+              <span className={isDisabled ? "inline-flex cursor-not-allowed" : "inline-flex"} tabIndex={isDisabled && disabledReason ? 0 : undefined}>
                 <Button
                   type="button"
                   onClick={onDial}
                   className="shrink-0 gap-2"
-                  disabled={disabled}
+                  disabled={isDisabled}
+                  aria-busy={pending}
                   aria-describedby={
-                    disabled && disabledReason ? "outbound-dial-disabled-reason" : undefined
+                    isDisabled && disabledReason ? "outbound-dial-disabled-reason" : undefined
                   }
                 >
                   <Phone size={16} />
-                  Dial
+                  {pending ? "Preparing…" : "Dial"}
                 </Button>
               </span>
             </TooltipTrigger>

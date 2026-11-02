@@ -13,6 +13,7 @@ import {
 import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
 import { SMS_STATUS_SIDE_EFFECTS_JOB_TYPE } from "@/lib/worker/job-types.server";
 import { isSettledSmsStatus, normalizeSmsStatus } from "@/lib/sms-status";
+import { unreservedVoiceCallPredicate } from "@/server/voice-bridge-reservation.server";
 
 /**
  * An intent row (#1582) normally gets its real SID within seconds, from the
@@ -207,7 +208,7 @@ export async function triggerTwilioOpenSync({
     // Once a row is repaired it leaves this population, so the backlog drains
     // at callLimit rows per run.
     const localOpenCalls = await tdb.call.findMany({
-      where: inArray(call.status, [...OPEN_CALL_STATUSES]),
+      where: and(inArray(call.status, [...OPEN_CALL_STATUSES]), unreservedVoiceCallPredicate(workspaceId)),
       orderBy: [asc(call.date_created)],
       limit: callLimit,
     });

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { QueueItem } from "@/lib/types";
+import type { OutreachAttempt, QueueItem } from "@/lib/types";
 import type { PredictiveBroadcastPayload } from "@/lib/workspace-events.shared";
 
 type UsePredictiveCallSyncOptions = {
@@ -11,7 +11,22 @@ type UsePredictiveCallSyncOptions = {
   setUpdate: (update: Record<string, unknown> | null) => void;
   conference: string | null;
   setConference: (conference: string | null) => void;
+  recoveredSubject?: { owns: boolean; contact: QueueItem | null; attempt: OutreachAttempt | null };
+  setQuestionContact?: (contact: QueueItem | null) => void;
+  setRecentAttempt?: (attempt: OutreachAttempt | null) => void;
 };
+
+function syncRecipient(options: Pick<UsePredictiveCallSyncOptions, "queue" | "predictiveState" | "setNextRecipient" | "setQuestionContact" | "setRecentAttempt">,
+  owns: boolean | undefined, recoveredContact: QueueItem | null | undefined, recoveredAttempt: OutreachAttempt | null | undefined) {
+  if (owns) {
+    options.setNextRecipient(recoveredContact ?? null);
+    options.setQuestionContact?.(recoveredContact ?? null);
+    options.setRecentAttempt?.(recoveredAttempt ?? null);
+    return;
+  }
+  const contact = options.queue.find(c => c.contact_id === options.predictiveState.contact_id);
+  if (contact) options.setNextRecipient(contact);
+}
 
 /**
  * Syncs predictive dialer room state with call screen recipient and state machine.
@@ -25,7 +40,11 @@ export function usePredictiveCallSync({
   setUpdate,
   conference,
   setConference,
+  recoveredSubject,
+  setQuestionContact,
+  setRecentAttempt,
 }: UsePredictiveCallSyncOptions) {
+  const ownsSubject = recoveredSubject?.owns, recoveredContact = recoveredSubject?.contact, recoveredAttempt = recoveredSubject?.attempt;
   /**
    * @effect Bridge predictive-dialer room state (pushed via the workspace SSE
    * stream, see useCallRoom) into the local call state machine: advance the
@@ -33,7 +52,8 @@ export function usePredictiveCallSync({
    * status, and clear the pending questionnaire update when the dialer starts
    * dialing a different (or no) contact.
    * @effect-deps predictiveState, queue, nextRecipient?.contact_id, send,
-   * setNextRecipient, setUpdate, conference, setConference (reacts to every server-pushed predictive
+   * setNextRecipient, setUpdate, conference, setConference, ownsSubject,
+   * recoveredContact, recoveredAttempt, setQuestionContact, setRecentAttempt (reacts to every server-pushed predictive
    * status/contact change and needs the current queue to resolve the contact
    * and the current nextRecipient to detect a contact swap)
    * @effect-side-effects none (dispatches to state setters/reducer passed in;
@@ -53,10 +73,7 @@ export function usePredictiveCallSync({
       }
     }
     if (predictiveState.contact_id && predictiveState.status) {
-      const contact = queue.find(
-        (c) => c.contact_id === predictiveState.contact_id,
-      );
-      if (contact) setNextRecipient(contact);
+      syncRecipient({ queue, predictiveState, setNextRecipient, setQuestionContact, setRecentAttempt }, ownsSubject, recoveredContact, recoveredAttempt);
 
       switch (predictiveState.status) {
         case "dialing":
@@ -92,5 +109,6 @@ export function usePredictiveCallSync({
     setUpdate,
     conference,
     setConference,
+    ownsSubject, recoveredContact, recoveredAttempt, setQuestionContact, setRecentAttempt,
   ]);
 }

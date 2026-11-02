@@ -3,12 +3,8 @@ import type { Call, Device } from "@twilio/voice-sdk";
 import { useCallDuration } from "./useCallDuration";
 import { useTwilioConnection } from "./useTwilioConnection";
 import { useCallHandling } from "./useCallHandling";
+import { useOwnedSdkCallCleanup } from "./useOwnedSdkCallCleanup";
 import { logger } from "@/lib/logger.client";
-
-interface CallConnectParams {
-  To: string;
-  [key: string]: string;
-}
 
 interface TwilioDeviceHook {
   device: Device | null;
@@ -18,8 +14,8 @@ interface TwilioDeviceHook {
   incomingCall: Call | null;
   isMicMuted: boolean;
   setMicMuted: (muted: boolean) => void;
-  makeCall: (params: CallConnectParams) => void;
-  hangUp: () => void;
+  makeCall: ReturnType<typeof useCallHandling>["makeCall"];
+  hangUp: ReturnType<typeof useCallHandling>["hangUp"];
   answer: () => void;
   holdAndAnswer: () => void;
   callState: string;
@@ -27,6 +23,8 @@ interface TwilioDeviceHook {
   setCallDuration: React.Dispatch<React.SetStateAction<number>>;
   setIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
   deviceIsBusy: boolean;
+  hasOwnedCalls: boolean;
+  hasHeldCalls: boolean;
   /** Manually recover from a terminal Device error — see useTwilioConnection. */
   reconnect: () => void;
 }
@@ -40,6 +38,8 @@ interface UseTwilioDeviceOptions {
   /** Gate device creation/registration behind explicit Join (#1313). Defaults
    * to true so callers that don't opt in keep connecting on mount. */
   enabled?: boolean;
+  /** Agent resource events must not terminate the independent customer owner. */
+  managesCustomerAudio?: () => boolean;
 }
 
 /**
@@ -52,6 +52,7 @@ export function useTwilioDevice({
   send,
   onTokenWillExpire,
   enabled = true,
+  managesCustomerAudio,
 }: UseTwilioDeviceOptions): TwilioDeviceHook {
   if (!token) {
     logger.error("useTwilioDevice: token is required");
@@ -92,12 +93,13 @@ export function useTwilioDevice({
   }, []);
 
   const onCallState = useCallback((newCallState: string) => {
+    if (managesCustomerAudio?.()) return;
     switch (newCallState) {
       case "dialing": send({ type: "START_DIALING" }); break;
       case "completed": send({ type: "HANG_UP" }); break;
       case "failed": send({ type: "FAIL" }); break;
     }
-  }, [send]);
+  }, [send, managesCustomerAudio]);
 
   const ownedCallsRef = useRef<readonly (Call | null)[]>([]);
   const connection = useTwilioConnection({
@@ -121,6 +123,19 @@ export function useTwilioDevice({
     onDeviceBusyChange: onDeviceBusy,
   });
   ownedCallsRef.current = [callHandling.activeCall, callHandling.incomingCall, ...callHandling.heldCalls];
+  const releaseIdleDevice = connection.releaseIdleDevice;
+
+  /**
+   * @effect Release a suspended SDK after its last active, incoming or held call closes.
+   * @effect-deps enabled, releaseIdleDevice, callHandling.activeCall,
+   * callHandling.incomingCall, callHandling.heldCalls (actual SDK ownership).
+   * @effect-side-effects idle Device teardown through the connection owner.
+   * @effect-why-not-loader Provider call-close events can arrive after the phone
+   * handoff. See https://react.dev/learn/synchronizing-with-effects.
+   */
+  useEffect(() => {
+    if (!enabled) releaseIdleDevice();
+  }, [enabled, releaseIdleDevice, callHandling.activeCall, callHandling.incomingCall, callHandling.heldCalls]);
 
   /**
    * @effect Mirror the latest `callHandling.receiveIncoming` handler into a
@@ -139,37 +154,7 @@ export function useTwilioDevice({
 
   const { callDuration, setCallDuration } = useCallDuration(callHandling.callState);
 
-  const activeCallRef = useRef(callHandling.activeCall);
-  const hangUpRef = useRef(callHandling.hangUp);
-  const callStateRef = useRef(callHandling.callState);
-
-  activeCallRef.current = callHandling.activeCall;
-  hangUpRef.current = callHandling.hangUp;
-  callStateRef.current = callHandling.callState;
-
-  /**
-   * @effect End the active call through the provider when
-   * the component unmounts, so calls do not stay live and consume credits
-   * after the agent navigates away.
-   * @effect-deps [] — mount-once cleanup-only; reads latest values via refs
-   * kept fresh on every render so the unmount teardown always acts on the
-   * current call regardless of stale closures. Device cleanup belongs to
-   * useTwilioConnection.
-   * @effect-side-effects hangUp calls the provider hangup API.
-   * @effect-why-not-loader Teardown of imperative SDK resources on unmount.
-   */
-  useEffect(() => {
-    return () => {
-      const hasActiveCall = Boolean(activeCallRef.current);
-      const isActive =
-        callStateRef.current === "connected" || callStateRef.current === "dialing";
-      if (hasActiveCall || isActive) {
-        hangUpRef.current?.().catch(() => {
-          logger.debug("Call hung up during unmount cleanup");
-        });
-      }
-    };
-  }, []);
+  useOwnedSdkCallCleanup(callHandling.activeCall, workspaceId);
 
   return {
     device: connection.device,
@@ -188,6 +173,8 @@ export function useTwilioDevice({
     setCallDuration,
     setIsBusy,
     deviceIsBusy,
+    hasOwnedCalls: [callHandling.activeCall, callHandling.incomingCall, ...callHandling.heldCalls].some(call => call && call.status?.() !== "closed"),
+    hasHeldCalls: callHandling.heldCalls.some(call => call.status?.() !== "closed"),
     reconnect: connection.reconnect,
   };
 }

@@ -21,6 +21,98 @@ Caller ──→ Conference Room ←── Agent
 
 ---
 
+## Conference callback ownership
+
+Twilio uses the first participant's `statusCallback` URL and event selection
+for the whole conference. Later participants do not replace that URL. Bind a
+signed event to its stored account, conference name and conference SID, then
+resolve the event's actual CallSid within that conference. Do not assume that
+the callback URL's owner is the participant named by every event.
+Conference names and SIDs are identities, not provider statuses. A validated
+customer join writes `in-progress`; never write `FriendlyName` or `ConferenceSid`
+into queue `provider_status`. Test with a real room name, not a status-like name.
+
+The callback owner can leave while the conference stays active. Keep verified
+parent/customer bridge events after that owner's physical call becomes
+terminal. Its terminal status does not end the logical bridge. A genuine
+legacy parent or customer hangup must still reach the conference-end owner;
+a source retired by a committed successor cannot end that room.
+For a confirmed persistent phone, customer leave and queue drain retain the
+phone room. Only the owned agent stop path ends that reusable audio connection.
+
+Save a room-stop intent before provider I/O. Recover that intent even after
+its callback owner becomes terminal or ordinary call-row repair clears an
+error. A lost acknowledgement needs a verified read of the same account,
+conference name and SID. Block new audio work for the actor while the stop
+is pending. Order source retirement and stop intent under the workspace lock.
+
+A participant event does not establish final call duration. Keep final billing
+on the recipient call-status contract. For a legacy funded predictive start, emit the
+agent's conference TwiML first; use its validated join event to claim the first
+recipient's single-send checkpoint. Recheck recipient calling hours at that
+checkpoint because the agent can answer after the admission window closes.
+An already-confirmed phone needs no new agent setup. Explicit Start and each
+successor recheck its source through the existing customer funding/send owner.
+
+Predictive customer events must retain the actual customer SID, actor, workspace,
+campaign, outreach and room. Use the signed conference SequenceNumber for joins
+and leaves; keep it separate from call-progress ordering. Ignore foreign owners
+and older conference events before changing the current customer. A background
+candidate cannot replace or end the joined human. A late join must check both
+the funded terminal status and the Call terminal status before queue writes.
+Customer leave can end the conversation display while the reusable phone stays
+connected; it cannot settle a debit or set a final duration.
+
+Source: [Twilio Conference status callbacks](https://www.twilio.com/docs/voice/twiml/conference#statuscallback).
+
+## Client Start ownership
+
+Keep an unknown Start result tied to its full saved request and intent UUID.
+A changed phone selection must not create another customer while the first
+result is unknown. Network errors, malformed accepted replies, HTTP 409 and
+5xx responses do not prove that no call was sent. Change the saved request only
+after a definite refusal or confirmed stop. A phone Start must retain the real
+customer SID from its response.
+
+Own asynchronous replies by the committed actor, workspace and campaign.
+An uncommitted React render must not retire the current request. Ignore retired
+UI updates and end a late known customer through its original workspace.
+An agent audio SID change is not a new customer generation. Retain its customer
+SID and outcome; only a logical dial or reset invalidates old provider callbacks.
+On a new dial, wait for its own accepted customer or SDK source. Test fresh
+callbacks on the previous source as well as callbacks captured before reset.
+Capture old poll callbacks while enabled. A callback saved after a terminal
+status is already disabled and cannot prove the customer ownership fence.
+An SDK parent status is not a customer status; only its resolved child can bind.
+Once bound, reject a different root before lifecycle changes or SDK disconnect.
+Keep a control where a new SDK source and dialing state commit together.
+Clearing old room metadata is not a Stop acknowledgement for a new Start.
+Capture the pending Start intent ID before Stop, and retire only that matching
+intent after acknowledgement. An old acknowledgement cannot clear a successor.
+
+Use `createOriginalVoiceAccountClient(reservation)` for funded customer controls,
+including hangup. Refuse a replacement account before provider commands or queue
+and disposition changes. Keep the saved reservation for a retry after the
+original account is restored.
+
+## Replacing agent audio on a direct call
+
+Save a signed parent Dial action before issuing the one customer child. Keep
+the customer SID, direction, parent, account, reservation and billing key.
+The parent action preserves the original audio after customer promotion; it
+does not activate the replacement. If the replacement ends before commit,
+allow the still-owned, active original parent to rejoin its customer. Do not
+gate that rescue on replacement liveness. Once a successor commits, fence the
+original parent across all earlier failed operations and conference names.
+Save promotion intent before provider I/O and keep one unresolved promotion
+and one owned topology for the customer. An uncertain child redirect cannot
+start another promotion. Keep the canonical room after a failed phone, and
+bind it to the original account, actor, parent and customer. Positive rejection
+permits a fresh room only while the original call remains live. Confirmed room
+closure fences reuse even before delayed customer status arrives. Mark topology
+ready only after genuine joins and fresh physical role proof. Source checks do not prove physical continuity;
+require an isolated provider test before accepting the complete handoff.
+
 ## Prerequisites
 
 - Twilio account with a voice-capable phone number — see `twilio-account-setup`

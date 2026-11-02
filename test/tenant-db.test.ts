@@ -14,13 +14,14 @@ import { WORKSPACE_SCOPED_TABLES, type WorkspaceScopedTableName } from "@/db/wor
 // this list against the real registry.
 const SCOPED_TABLE_NAMES = [
   "campaign", "campaign_queue", "contact", "contact_merge_receipt", "audience", "audience_upload", "audience_import_run", "audience_import_row", "call", "message",
-  "outreach_attempt", "predictive_machine_operation", "inbound_voicemail_recipient", "inbound_voicemail_delivery", "script", "survey", "webhook", "workspace_number", "workspace_number_purchase", "workspace_number_release",
+  "outreach_attempt", "predictive_machine_operation", "inbound_voicemail_recipient", "inbound_voicemail_delivery", "script", "survey", "webhook", "workspace_number", "workspace_number_purchase", "workspace_number_release", "workspace_voice_reservation",
   "workspace_invite", "transaction_history",
   "households", "inbound_queue", "inbound_queue_member", "inbound_queue_entry",
   "agent_status", "agent_status_event", "handset_session", "workspace_users",
   "workspace_member",
   "workspace_api_key", "workspace_events", "workspace_audit_event",
-  "workspace_audio",
+  "workspace_audio", "workspace_voice_audio_connection", "workspace_voice_audio_intent", "workspace_voice_dialer_intent", "workspace_voice_recording_operation", "workspace_voice_recording_customer_event",
+  "workspace_voice_customer_phase", "workspace_voice_customer_phase_event",
 ] as const;
 
 type Captured = {
@@ -47,7 +48,7 @@ const hoisted = vi.hoisted(() => {
   };
   const TABLES = [
     "campaign", "campaign_queue", "contact", "contact_merge_receipt", "audience", "audience_upload", "audience_import_run", "audience_import_row", "call", "message",
-    "outreach_attempt", "predictive_machine_operation", "inbound_voicemail_recipient", "inbound_voicemail_delivery", "script", "survey", "webhook", "workspace_number", "workspace_number_purchase", "workspace_number_release",
+    "outreach_attempt", "predictive_machine_operation", "inbound_voicemail_recipient", "inbound_voicemail_delivery", "script", "survey", "webhook", "workspace_number", "workspace_number_purchase", "workspace_number_release", "workspace_voice_reservation",
     "workspace_invite", "transaction_history",
     "households", "inbound_queue", "inbound_queue_member", "inbound_queue_entry",
     "agent_status", "agent_status_event", "handset_session", "workspace_users",

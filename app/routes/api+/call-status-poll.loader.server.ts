@@ -1,5 +1,6 @@
 import {
   normalizeProviderStatus,
+  isTerminalStatus,
   type CallStatusEnum,
 } from "@/lib/call-status";
 import { createErrorResponse } from "@/lib/errors.server";
@@ -17,6 +18,8 @@ import {
   findCallSidByParentCallSid,
   updateCallBySid,
 } from "@/lib/telephony-db.server";
+import { findVoiceReservationForCall } from "@/server/voice-bridge-reservation.server";
+import { requestVoiceReservationRecovery } from "@/server/voice-credit-reservation.server";
 
 export const loader = defineLoader({
   auth: ({ request }) => requireJsonAuth(request),
@@ -81,6 +84,14 @@ export const loader = defineLoader({
 
       const currentDbStatus = (dbCall.status ?? null) as CallStatusEnum | null;
       const statusChanged = currentDbStatus !== normalizedStatus;
+
+      // Polling supplies UI status. Funded persistence and settlement require
+      // the original-account and final-duration checks in reservation recovery.
+      const reservation = await findVoiceReservationForCall(workspaceId, callSid, dbCall.parent_call_sid);
+      if (reservation) {
+        if (isTerminalStatus(normalizedStatus)) await requestVoiceReservationRecovery(reservation.id);
+        return routeData({ status: normalizedStatus, callSid }, { headers });
+      }
 
       if (statusChanged) {
         const now = new Date();

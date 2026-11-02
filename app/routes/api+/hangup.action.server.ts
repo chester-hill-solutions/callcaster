@@ -4,15 +4,16 @@ import {
 } from "@/lib/database/workspace.server";
 import { parseActionRequest } from "@/lib/request-utils.server";
 import { findCallBySid, updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
-import { campaign as campaignTable } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
-import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
+import { dequeueLegacyVoiceAttempt } from "@/server/legacy-voice-queue.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
 import { defineAction } from "@/lib/handler.server";
+import { findVoiceReservationForCall } from "@/server/voice-bridge-reservation.server";
+import { dequeueFundedVoiceAttempt } from "@/server/voice-attempt-queue.server";
+import { createOriginalVoiceAccountClient } from "@/lib/voice-original-account.server";
 
 export const action = defineAction({
   auth: ({ request }) => requireJsonAuth(request),
@@ -35,7 +36,9 @@ export const action = defineAction({
         }
 
         const tdb = createTenantDb(workspaceId);
-        const twilio = await createWorkspaceTwilioInstance({ workspace_id: workspaceId});
+        const reservation = await findVoiceReservationForCall(workspaceId, callSid);
+        const twilio = reservation ? await createOriginalVoiceAccountClient(reservation)
+            : await createWorkspaceTwilioInstance({ workspace_id: workspaceId});
         try {
             await twilio.calls(callSid).update({ twiml: hangupTwiml() });
         } catch (twilioErr: unknown) {
@@ -50,19 +53,10 @@ export const action = defineAction({
             // Household fan-out follows the campaign's setting; it was
             // hardcoded true, dequeuing whole households on campaigns that
             // never asked for household grouping.
-            if (call.campaign_id) {
-                const campaign = await tdb.campaign.findFirst({
-                    where: eq(campaignTable.id, call.campaign_id),
-                    columns: { group_household_queue: true },
-                });
-                await dequeueQueueEntry({
-                    by: { contactId: call.contact_id, campaignId: call.campaign_id },
-                    workspaceId,
-                    household: campaign?.group_household_queue ?? false,
-                    userId: user.id,
-                    reason: "Call completed",
-                    exec: tdb,
-                });
+            if (reservation) {
+                await dequeueFundedVoiceAttempt(reservation);
+            } else {
+                await dequeueLegacyVoiceAttempt(workspaceId, callSid);
             }
             // Scope the disposition to THIS call's attempt. The old
             // updateOutreachDispositionByContactId rewrote every attempt for

@@ -124,4 +124,28 @@ describe("startConferenceAndDial", () => {
     await expect(startConferenceAndDial(params)).resolves.toEqual({ success: false, error: "Campaign is paused." });
   });
 
+  test("confirmed phone Start sends its saved source and returns the real customer root", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(Response.json({ success: true, conferenceName: "saved-phone-room",
+      callSid: "CA11111111111111111111111111111111" }));
+    const { startConferenceAndDial } = await import("../app/lib/services/hooks-api");
+    const result = await startConferenceAndDial({ ...params, selected_device: "+15550000001",
+      dial_intent_id: "11111111-1111-4111-8111-111111111111",
+      audioSource: { connectionId: "22222222-2222-4222-8222-222222222222", generation: 7 } });
+    expect(result).toEqual({ success: true, conferenceName: "saved-phone-room", callSid: "CA11111111111111111111111111111111" });
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toEqual({ caller_id: "c1", selected_device: "+15550000001",
+      dial_intent_id: "11111111-1111-4111-8111-111111111111", audio_connection_id: "22222222-2222-4222-8222-222222222222", audio_generation: 7 });
+  });
+
+  test.each([undefined, null, "", "CA1", "CF11111111111111111111111111111111", 42])(
+    "a phone Start without a valid customer root remains an unknown result: %s", async (callSid) => {
+      vi.mocked(fetch).mockResolvedValueOnce(Response.json({ success: true, conferenceName: "saved-phone-room", callSid }));
+      const { startConferenceAndDial } = await import("../app/lib/services/hooks-api");
+      await expect(startConferenceAndDial({ ...params, selected_device: "+15550000001",
+        dial_intent_id: "11111111-1111-4111-8111-111111111111",
+        audioSource: { connectionId: "22222222-2222-4222-8222-222222222222", generation: 7 } }))
+        .rejects.toThrow("Could not start dialing. Try again.");
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
 });

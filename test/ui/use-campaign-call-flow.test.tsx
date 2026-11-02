@@ -2,16 +2,201 @@ import { act, renderHook } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, test, vi } from "vitest";
 import { useCampaignCallFlow } from "@/hooks/call/useCampaignCallFlow";
+import type { UseCallStatusPollingOptions } from "@/hooks/call/useCallStatusPolling";
+import { manualRecovery } from "../helpers/manual-recovery-fixture";
 
 const polling = vi.hoisted(() => ({
-  onStatus: null as ((status: string) => void) | null,
+  onStatus: null as UseCallStatusPollingOptions["onStatus"],
+  options: null as UseCallStatusPollingOptions | null,
+}));
+const subscription = vi.hoisted(() => ({
+  options: null as Parameters<typeof import("@/hooks/realtime/useWorkspaceEventSubscription").useWorkspaceEventSubscription>[0] | null,
 }));
 
-vi.mock("@/hooks/call/useCallStatusPolling", () => ({
-  useCallStatusPolling: (options: { onStatus: (status: string) => void }) => {
+vi.mock("@/hooks/call/useCallStatusPolling", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/call/useCallStatusPolling")>()),
+  useCallStatusPolling: (options: UseCallStatusPollingOptions) => {
+    polling.options = options;
     polling.onStatus = options.onStatus;
   },
 }));
+vi.mock("@/hooks/realtime/useWorkspaceEventSubscription", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/realtime/useWorkspaceEventSubscription")>()),
+  useWorkspaceEventSubscription: (options: NonNullable<typeof subscription.options>) => { subscription.options = options; },
+}));
+
+describe("current customer control ownership", () => {
+  const previous = "CA11111111111111111111111111111111", current = "CA22222222222222222222222222222222";
+  const agent = "CAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  test.each(["ringing", "in-progress", "completed"] as const)("manual recovery keeps the actual %s state and terminal status wins over later reads", status => {
+    const saved = manualRecovery({ provider_status: status }), send = vi.fn(), onServerCustomerOwned = vi.fn();
+    const { result, rerender } = renderHook(({ recovery }) => useCampaignCallFlow({
+      callSid: null, agentLegSid: saved.agent_call_sid, workspaceId: saved.workspace_id, state: "idle", activeCall: null,
+      recentAttemptDisposition: null, predictiveState: { status: "idle", contact_id: null }, isPredictive: false, send,
+      manualRecovery: recovery, onServerCustomerOwned,
+    }), { initialProps: { recovery: saved } });
+    expect(result.current.customerCallSid).toBe(saved.call_sid);
+    expect(result.current.displayState).toBe(status === "ringing" ? "dialing" : status === "in-progress" ? "connected" : "completed");
+    expect(onServerCustomerOwned).toHaveBeenCalledWith(true);
+    act(() => result.current.confirmCustomerEnded());
+    rerender({ recovery: { ...saved, provider_status: "in-progress" } });
+    expect(result.current.displayState).toBe("completed");
+  });
+  test.each(["Start", "Next", "Hangup"])("a local %s retires an older manual current read even while idle", command => {
+    const saved = manualRecovery(), send = vi.fn();
+    const { result, rerender } = renderHook(({ recovery }: { recovery: ReturnType<typeof manualRecovery> | null }) => useCampaignCallFlow({
+      callSid: null, agentLegSid: saved.agent_call_sid, workspaceId: saved.workspace_id, state: "idle", activeCall: null,
+      recentAttemptDisposition: null, predictiveState: { status: "idle", contact_id: null }, isPredictive: false, send, manualRecovery: recovery,
+    }), { initialProps: { recovery: null } });
+    act(() => { if (command === "Start") result.current.beginDial(); else if (command === "Hangup") result.current.confirmCustomerEnded(); else result.current.retireManualRecovery(); }); rerender({ recovery: saved });
+    expect(result.current.customerCallSid).toBeNull(); expect(result.current.recoveredManual).toBeNull();
+    expect(result.current.displayState).toBe(command === "Start" ? "dialing" : command === "Hangup" ? "completed" : "idle");
+  });
+  function renderCustomer() {
+    const send = vi.fn();
+    const view = renderHook(({ callSid }) => useCampaignCallFlow({
+      callSid, agentLegSid: agent, workspaceId: "workspace-a", state: "dialing", activeCall: null,
+      recentAttemptDisposition: null, predictiveState: { status: "idle", contact_id: null }, isPredictive: false, send,
+    }), { initialProps: { callSid: previous } });
+    return { ...view, send };
+  }
+
+  test("a new dial does not poll the previous customer while its new identity is pending", () => {
+    const { result, rerender } = renderCustomer();
+    act(() => polling.onStatus?.("completed", previous));
+    act(() => result.current.beginDial());
+    expect(polling.options?.enabled).toBe(false);
+    expect(polling.options?.callSid).toBeNull();
+    rerender({ callSid: current });
+    expect(polling.options?.enabled).toBe(true);
+    expect(polling.options?.callSid).toBe(current);
+    act(() => polling.onStatus?.("in-progress", current));
+    expect(result.current.displayState).toBe("connected");
+  });
+
+  test("a manual receipt binds its root without claiming the customer has answered", () => {
+    const { result, send } = renderCustomer();
+    let accept: (sid: string) => boolean = () => false;
+    act(() => { accept = result.current.beginDial(); });
+    send.mockClear();
+    act(() => { expect(accept(current)).toBe(true); });
+    expect(result.current.customerCallSid).toBe(current);
+    expect(result.current.displayState).toBe("dialing");
+    expect(polling.options?.callSid).toBe(current);
+    expect(send).not.toHaveBeenCalledWith({ type: "CONNECT" });
+    act(() => polling.onStatus?.("in-progress", current));
+    expect(result.current.displayState).toBe("connected");
+    act(() => polling.onStatus?.("completed", current));
+    act(() => { expect(accept(current)).toBe(true); });
+    expect(result.current.displayState).toBe("completed");
+  });
+
+  test("a manual receipt cannot bind an agent leg or cross into the next customer owner", () => {
+    const { result } = renderCustomer();
+    let accept: (sid: string) => boolean = () => false;
+    act(() => { accept = result.current.beginDial(); });
+    act(() => { expect(accept(agent)).toBe(false); });
+    act(() => result.current.beginDial());
+    act(() => { expect(accept(current)).toBe(false); });
+    expect(result.current.customerCallSid).toBeNull();
+  });
+
+  test("a fresh callback cannot restore the previous customer during a new dial", () => {
+    const { result, send } = renderCustomer();
+    act(() => polling.onStatus?.("completed", previous));
+    act(() => result.current.beginDial());
+    send.mockClear();
+    act(() => polling.onStatus?.("completed", previous));
+    expect(result.current.displayState).toBe("dialing");
+    expect(result.current.terminalCallSid).toBeNull();
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  test.each([null, previous])("a new SDK source and dialing state in one commit can resolve their own customer (%s)", (initialSid) => {
+    const send = vi.fn();
+    const { result, rerender } = renderHook(({ callSid, state }: { callSid: string | null; state: string }) => useCampaignCallFlow({
+      callSid, agentLegSid: callSid === agent ? agent : null, workspaceId: "workspace-a", state, activeCall: null,
+      recentAttemptDisposition: null, predictiveState: { status: "idle", contact_id: null }, isPredictive: false, send,
+    }), { initialProps: { callSid: initialSid, state: "idle" } });
+    rerender({ callSid: agent, state: "dialing" });
+    expect(polling.options?.enabled).toBe(true);
+    expect(polling.options?.callSid).toBe(agent);
+    act(() => polling.onStatus?.("in-progress", agent));
+    expect(result.current.displayState).toBe("dialing");
+    expect(send).not.toHaveBeenCalled();
+    act(() => polling.onStatus?.("in-progress", current));
+    expect(result.current.displayState).toBe("connected");
+    expect(polling.options?.callSid).toBe(current);
+  });
+
+  test("a resolved root or sibling child cannot replace the accepted customer", () => {
+    const { result, rerender, send } = renderCustomer();
+    rerender({ callSid: current });
+    act(() => polling.onStatus?.("in-progress", current));
+    send.mockClear();
+    act(() => polling.onStatus?.("completed", previous));
+    act(() => subscription.options?.onChange({ eventType: "UPDATE", table: "call", new: {
+      sid: previous, parent_call_sid: agent, status: "completed", workspace: "workspace-a",
+    }, old: null }));
+    expect(result.current.displayState).toBe("connected");
+    expect(result.current.terminalCallSid).toBeNull();
+    expect(polling.options?.callSid).toBe(current);
+    expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe("customer identity across agent audio changes", () => {
+  const agentA = "CAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", agentB = "CAbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+  const customerA = "CA11111111111111111111111111111111", customerB = "CA22222222222222222222222222222222";
+  function renderCustomer() {
+    const send = vi.fn();
+    const view = renderHook(({ agent, state }: { agent: string | null; state: string }) => useCampaignCallFlow({
+      callSid: agent, agentLegSid: agent, workspaceId: "workspace-a", state, activeCall: null,
+      recentAttemptDisposition: null, predictiveState: { status: "idle", contact_id: null }, isPredictive: false, send,
+    }), { initialProps: { agent: null, state: "idle" } });
+    act(() => view.result.current.beginDial());
+    view.rerender({ agent: agentA, state: "dialing" });
+    return { ...view, send };
+  }
+
+  test("an agent replacement retains the connected customer and its poll target", () => {
+    const { result, rerender } = renderCustomer();
+    act(() => polling.onStatus?.("in-progress", customerA));
+    expect(result.current.displayState).toBe("connected");
+    rerender({ agent: agentB, state: "connected" });
+    expect(result.current.displayState).toBe("connected");
+    expect(polling.options?.callSid).toBe(customerA);
+  });
+
+  test("an agent replacement cannot erase the customer's terminal outcome", () => {
+    const { result, rerender } = renderCustomer();
+    act(() => polling.onStatus?.("no-answer", customerA));
+    rerender({ agent: agentA, state: "completed" });
+    expect(result.current.terminalCallSid).toBe(customerA);
+    rerender({ agent: agentB, state: "completed" });
+    expect(result.current.displayState).toBe("no-answer");
+    expect(result.current.terminalCallSid).toBe(customerA);
+    expect(polling.options?.callSid).toBe(customerA);
+  });
+
+  test("a retired provider callback cannot end the next logical dial", () => {
+    const { result, rerender, send } = renderCustomer();
+    act(() => polling.onStatus?.("in-progress", customerA));
+    expect(polling.options?.enabled).toBe(true);
+    const oldStatus = polling.onStatus;
+    act(() => polling.onStatus?.("no-answer", customerA));
+    act(() => result.current.beginDial());
+    send.mockClear();
+    act(() => oldStatus?.("completed", customerA));
+    expect(result.current.displayState).toBe("dialing");
+    expect(result.current.terminalCallSid).toBeNull();
+    expect(send).not.toHaveBeenCalled();
+    rerender({ agent: agentB, state: "dialing" });
+    act(() => polling.onStatus?.("in-progress", customerB));
+    expect(result.current.displayState).toBe("connected");
+    expect(polling.options?.callSid).toBe(customerB);
+  });
+});
 
 describe("useCampaignCallFlow", () => {
   test.each([
@@ -143,8 +328,9 @@ describe("useCampaignCallFlow", () => {
       const send = vi.fn();
       const view = renderHook(() => {
         const [fsmState, setFsmState] = useState("idle");
+        const [callSid, setCallSid] = useState<string | null>(null);
         const flow = useCampaignCallFlow({
-          callSid: "CA1",
+          callSid,
           agentLegSid: null,
           workspaceId: "w1",
           state: fsmState,
@@ -155,13 +341,15 @@ describe("useCampaignCallFlow", () => {
           send,
         });
         renders.push(flow.displayState);
-        return { ...flow, setFsmState };
+        return { ...flow, setFsmState, setCallSid };
       });
 
+      let dial = 0;
       const pressDial = () =>
         act(() => {
           view.result.current.setFsmState("dialing");
           view.result.current.beginDial();
+          view.result.current.setCallSid(`CA${++dial}`);
         });
 
       return { ...view, renders, pressDial };

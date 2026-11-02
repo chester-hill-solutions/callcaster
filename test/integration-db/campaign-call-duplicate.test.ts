@@ -1,22 +1,23 @@
 import { afterAll, describe, expect, test, vi } from "vitest";
 import { sql } from "drizzle-orm";
 import type { Database } from "@/server/db";
+import { acceptVoiceDispatch } from "../helpers/voice-dispatch-stub";
 
 const adapters = vi.hoisted(() => ({
   callsCreate: vi.fn(async () => ({ sid: "CA2093" })),
-  insertCall: vi.fn(async () => ({ sid: "CA2093" })),
   dequeue: vi.fn(async () => ({ dequeuedPrimary: true })),
 }));
 
 vi.mock("@/lib/database/workspace.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/database/workspace.server")>()),
   getWorkspaceTwilioPortalConfig: async () => ({ parallelDispatchEnabled: false }),
-  createWorkspaceTwilioInstance: async () => ({ calls: { create: adapters.callsCreate } }),
+  createWorkspaceTwilioInstance: async () => ({ accountSid: "ACfixture", calls: { create: adapters.callsCreate } }),
 }));
 vi.mock("@/lib/database/campaign.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/database/campaign.server")>()),
   getCampaignQueueById: async () => [{
     id: 501, contact_id: 9001, campaign_id: 42, queue_state: "queued",
+    dispatch_generation: "00000000-0000-4000-8000-000000000001",
     contact: { id: 9001, phone: "+16135550199", opt_out: false },
   }],
 }));
@@ -61,9 +62,11 @@ vi.mock("@/lib/twilio-client.server", async (importOriginal) => ({
     return fn();
   },
 }));
-vi.mock("@/lib/telephony-db.server", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/telephony-db.server")>()),
-  insertCallForWorkspace: adapters.insertCall,
+// This fixture proves the real SQL duplicate predicate. Funding and call-row
+// persistence are exercised against the full schema in voice-credit-ivr.test.ts.
+vi.mock("@/lib/voice-credit-dispatch.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/voice-credit-dispatch.server")>()),
+  dispatchReservedVoiceCall: acceptVoiceDispatch,
 }));
 
 const databaseUrl = process.env.INTEGRATION_DB_URL ?? process.env.DATABASE_URL;
@@ -84,7 +87,8 @@ suite("campaign duplicate history against Postgres (#2093)", () => {
     await db.transaction(async (transaction) => {
       // A session-local table shadows call without touching the app's rows or schema.
       await transaction.execute(sql`create temporary table "call" (
-        workspace uuid, campaign_id bigint, "to" text, outreach_attempt_id bigint
+        workspace uuid, campaign_id bigint, "to" text, outreach_attempt_id bigint,
+        sid text, date_created timestamptz default now()
       ) on commit drop`);
       const tx = transaction as unknown as Database;
       const tdb = tenantModule.createTenantDb(workspaceId, tx);
@@ -99,7 +103,7 @@ suite("campaign duplicate history against Postgres (#2093)", () => {
 
   test("test calls and other workspace, campaign or phone rows do not count", async () => {
     await withHistory(async (tdb, tx) => {
-      await tx.execute(sql`insert into "call" values
+      await tx.execute(sql`insert into "call" (workspace, campaign_id, "to", outreach_attempt_id) values
         (${workspaceId}, 42, ${to}, null),
         ('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', 42, ${to}, 11),
         (${workspaceId}, 43, ${to}, 12),
@@ -112,19 +116,19 @@ suite("campaign duplicate history against Postgres (#2093)", () => {
       const result = await dispatchCampaignIvrBatch({ workspaceId, campaignId: "42", userId: "u1" });
       expect(result).toMatchObject({ kind: "dispatched", counts: { called: 1, dequeued: 0, failed: 0 } });
       expect(adapters.callsCreate).toHaveBeenCalledWith(expect.objectContaining({ to }));
-      expect(adapters.insertCall).toHaveBeenCalledWith(workspaceId, expect.objectContaining({ outreach_attempt_id: 777 }));
       expect(adapters.dequeue).toHaveBeenCalledWith({
         by: { id: 501 },
         userId: "u1",
         workspaceId,
         reason: "IVR dial dispatched",
+        expectedGeneration: "00000000-0000-4000-8000-000000000001",
       });
     });
   });
 
   test("real outreach calls count and prevent the next dispatch", async () => {
     await withHistory(async (tdb, tx) => {
-      await tx.execute(sql`insert into "call" values
+      await tx.execute(sql`insert into "call" (workspace, campaign_id, "to", outreach_attempt_id) values
         (${workspaceId}, 42, ${to}, null),
         (${workspaceId}, 42, ${to}, null),
         (${workspaceId}, 42, ${to}, 21)`);
@@ -141,13 +145,14 @@ suite("campaign duplicate history against Postgres (#2093)", () => {
         userId: "u1",
         workspaceId,
         reason: "Duplicate IVR call prevented",
+        expectedGeneration: "00000000-0000-4000-8000-000000000001",
       });
     });
   });
 
   test("real-call-only history retains duplicate protection", async () => {
     await withHistory(async (tdb, tx) => {
-      await tx.execute(sql`insert into "call" values
+      await tx.execute(sql`insert into "call" (workspace, campaign_id, "to", outreach_attempt_id) values
         (${workspaceId}, 42, ${to}, 31),
         (${workspaceId}, 42, ${to}, 32)`);
       const { countCampaignCallsToPhone, hasDuplicateCampaignCall } = await import("@/lib/telephony-db.server");

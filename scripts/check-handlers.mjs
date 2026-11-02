@@ -59,6 +59,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { voiceBillingHandlerSignals } from "./lib/voice-billing-handler-signals.mjs";
 import { analyzeCapabilityLinkage } from "./lib/capability-linkage.mjs";
 
 const ROOT = process.cwd();
@@ -74,7 +75,7 @@ function walk(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     if (e.isDirectory()) walk(path.join(dir, e.name), out);
-    else if (/\.(tsx|ts)$/.test(e.name)) {
+    else if (/\.[jt]sx?$/.test(e.name)) {
       const rel = path.relative(ROOT, path.join(dir, e.name));
       if (!SKIP_FILE.some((re) => re.test(rel))) out.push(path.join(dir, e.name));
     }
@@ -213,12 +214,12 @@ const CREDIT_WRITE_SIGNALS = [
   {
     id: "sync-call-billing",
     kind: "sync",
-    matches: hasSyncCallBilling,
+    matches: (src, filename) => hasSyncCallBilling(src) || voiceBillingHandlerSignals(src, filename).has("sync"),
   },
   {
     id: "async-call-billing",
     kind: "async",
-    matches: (src) => /\bCALL_STATUS_SIDE_EFFECTS_JOB_TYPE\b/.test(src),
+    matches: (src, filename) => /\bCALL_STATUS_SIDE_EFFECTS_JOB_TYPE\b/.test(src) || voiceBillingHandlerSignals(src, filename).has("async"),
   },
   {
     id: "async-sms-billing",
@@ -236,14 +237,14 @@ const CREDIT_WRITE_SIGNALS = [
 const DECLARATION_RE = /(?:extraSideEffects|sideEffects):\s*\[([^\]]*)\]/g;
 
 /** Bidirectional credit facet check for a governed route module. */
-function creditViolations(src) {
+function creditViolations(src, filename) {
   const isRouteModule =
     /=\s*define(Action|Loader)\b/.test(src) || /sideEffects:\s*\[/.test(src);
   if (!isRouteModule) return { violations: [], matched: [] };
 
   const declarations = [...src.matchAll(DECLARATION_RE)].map((m) => m[1]);
   const declaresCredit = /"credit"/.test(declarations.join(","));
-  const matched = CREDIT_WRITE_SIGNALS.filter((s) => s.matches(src));
+  const matched = CREDIT_WRITE_SIGNALS.filter((s) => s.matches(src, filename));
 
   const violations = [];
   if (matched.length > 0 && !declaresCredit) {
@@ -320,7 +321,7 @@ for (const file of walk(ROUTES_DIR).sort()) {
   for (const v of facetViolations(src)) {
     violations.push(`  ${rel}: ${v}`);
   }
-  const credit = creditViolations(src);
+  const credit = creditViolations(src, rel);
   for (const v of credit.violations) {
     violations.push(`  ${rel}: ${v}`);
   }

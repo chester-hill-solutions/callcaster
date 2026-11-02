@@ -44,7 +44,8 @@ import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
 import { ivrMachineDetection } from "@/lib/ivr-machine-detection";
 import { createStartPacer, type StartPacer } from "@/lib/campaign-dispatch-pacing.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
-import { insertCallForWorkspace, hasDuplicateCampaignCall } from "@/lib/telephony-db.server";
+import { dispatchReservedVoiceCall, ivrQueueVoiceOperationKey, VoiceDispatchUncertainError } from "@/lib/voice-credit-dispatch.server";
+import { hasDuplicateCampaignCall } from "@/lib/telephony-db.server";
 import { logger } from "@/lib/logger.server";
 import {
   createPhoneClaim,
@@ -58,6 +59,7 @@ import {
   nextDispatchOpenAt,
 } from "@/lib/campaign-dispatch-policy";
 import type { CampaignDeferralCause } from "@/lib/campaign-batch-outcome";
+import { voiceBillingKindFromCampaignType, type VoiceBillingKind } from "@/lib/pricing";
 
 export const IVR_CALL_DEQUEUED_REASON = "IVR dial dispatched";
 export const OPTED_OUT_IVR_DEQUEUED_REASON = "Contact opted out";
@@ -71,7 +73,7 @@ export type CampaignIvrDispatchCounts = {
   exhausted: number;
   /** Dequeued without a call: opted out or duplicate. */
   dequeued: number;
-  /** Left queued for a later tick without a provider call. */
+  /** Left queued until calling, funding or provider recovery permits progress. */
   deferred: number;
 };
 
@@ -96,6 +98,7 @@ export type CampaignIvrBatchOutcome =
        * failed calls (which stay queued), and contacts beyond the claim.
        */
       queuedRemaining: number;
+      blocked?: "insufficient_credits" | "provider_recovery";
     };
 
 export async function dispatchCampaignIvrBatch(args: {
@@ -178,7 +181,7 @@ export async function dispatchCampaignIvrBatch(args: {
     deferred: queueSelection.deferredCount,
     exhausted: 0,
   };
-  const state: CampaignIvrDispatchState = { counts, deferredAt: null };
+  const state: CampaignIvrDispatchState = { counts, deferredAt: null, blocked: null };
 
   // A sibling row must wait until the first row either starts a provider call
   // or defers. Otherwise a window close during async preparation can leave the
@@ -196,6 +199,7 @@ export async function dispatchCampaignIvrBatch(args: {
         callerId,
         startPacer,
         machineDetection: ivrMachineDetection(campaign),
+        billingKind: voiceBillingKindFromCampaignType(campaign.type),
         ivrUrls,
         twilio,
         tdb,
@@ -209,7 +213,7 @@ export async function dispatchCampaignIvrBatch(args: {
   counts.exhausted = await sweepExhaustedQueueContacts(tdb, campaignId, counts.failed);
 
   const queuedRemaining = remainingIvrQueue(queueSelection, counts);
-  if (state.deferredAt) {
+  if (state.deferredAt && !state.blocked) {
     return {
       kind: "deferred",
       because: "send_window",
@@ -223,6 +227,7 @@ export async function dispatchCampaignIvrBatch(args: {
     nextBatchDelayMs: madeProgress ? nextBatchDelayMs : idleDelayMs,
     counts,
     queuedRemaining,
+    ...(state.blocked ? { blocked: state.blocked } : {}),
   };
 }
 
@@ -233,6 +238,7 @@ function campaignWindowNextOpenAt(policy: ReturnType<typeof ivrCallingPolicy>): 
 type CampaignIvrDispatchState = {
   counts: CampaignIvrDispatchCounts;
   deferredAt: Date | null;
+  blocked: "insufficient_credits" | "provider_recovery" | null;
 };
 
 type IvrQueueMember = Awaited<ReturnType<typeof getCampaignQueueById>>[number];
@@ -244,6 +250,7 @@ type IvrQueueMemberContext = {
   callerId: string;
   startPacer: StartPacer;
   machineDetection: ReturnType<typeof ivrMachineDetection>;
+  billingKind: VoiceBillingKind;
   ivrUrls: ReturnType<typeof resolveIvrCallUrls>;
   twilio: Twilio.Twilio;
   tdb: ReturnType<typeof createTenantDb>;
@@ -270,13 +277,7 @@ async function dispatchIvrQueueMember(
   }
 
   if (member.contact?.opt_out) {
-    await dequeueQueueEntry({
-      by: { id: member.id },
-      userId: context.userId,
-      workspaceId: context.workspaceId,
-      reason: OPTED_OUT_IVR_DEQUEUED_REASON,
-    });
-    context.state.counts.dequeued += 1;
+    if (await dequeueIvrQueueMember(member, context, OPTED_OUT_IVR_DEQUEUED_REASON)) context.state.counts.dequeued += 1;
     return;
   }
 
@@ -291,6 +292,7 @@ async function dispatchIvrQueueMember(
         workspaceId: context.workspaceId,
         campaignId: context.campaignId,
         to: phone,
+        queueIntent: { id: member.id, generation: member.dispatch_generation },
         tdb: context.tdb,
       }));
   } catch (error) {
@@ -300,13 +302,7 @@ async function dispatchIvrQueueMember(
 
   if (duplicateExists) {
     phoneClaim.claim?.resolve("duplicate");
-    await dequeueQueueEntry({
-      by: { id: member.id },
-      userId: context.userId,
-      workspaceId: context.workspaceId,
-      reason: DUPLICATE_IVR_DEQUEUED_REASON,
-    });
-    context.state.counts.dequeued += 1;
+    if (await dequeueIvrQueueMember(member, context, DUPLICATE_IVR_DEQUEUED_REASON)) context.state.counts.dequeued += 1;
     return;
   }
 
@@ -334,6 +330,7 @@ async function reserveIvrPhone(
     if (
       firstResult === "campaign_window_closed" ||
       firstResult === "recipient_window_closed" ||
+      firstResult === "provider_pending" ||
       firstResult === "failed_before_provider"
     ) {
       context.state.counts.deferred += 1;
@@ -343,13 +340,7 @@ async function reserveIvrPhone(
       return { claimed: false };
     }
 
-    await dequeueQueueEntry({
-      by: { id: member.id },
-      userId: context.userId,
-      workspaceId: context.workspaceId,
-      reason: DUPLICATE_IVR_DEQUEUED_REASON,
-    });
-    context.state.counts.dequeued += 1;
+    if (await dequeueIvrQueueMember(member, context, DUPLICATE_IVR_DEQUEUED_REASON)) context.state.counts.dequeued += 1;
     return { claimed: false };
   }
 
@@ -367,52 +358,65 @@ async function createOutreachAttemptAndCall(
   let outreachAttemptId: number | null = null;
   let providerAttemptStarted = false;
   try {
-    outreachAttemptId = await rpcCreateOutreachAttempt(context.tdb, {
-      contactId: member.contact_id,
-      campaignId: Number(context.campaignId),
-      userId: context.userId,
-      workspaceId: context.workspaceId,
-      queueId: member.id,
-    });
+    // A definite rejection releases its hold before retry. Uncertain sends
+    // throw VoiceDispatchUncertainError, which the retry helper does not repeat.
+    const dispatched = await withTwilioRetry(() => {
+      providerAttemptStarted = false;
+      return dispatchReservedVoiceCall({
+        workspaceId: context.workspaceId,
+        kind: context.billingKind, accountSid: context.twilio.accountSid, to: phone, from: context.callerId,
+        campaignId: Number(context.campaignId), contactId: member.contact_id,
+        queueId: member.id, userId: context.userId,
+        expectedQueueGeneration: member.dispatch_generation,
+        operationKey: ivrQueueVoiceOperationKey(member.id),
+        voiceUrl: context.ivrUrls.flowUrl, statusCallback: context.ivrUrls.statusCallback,
+        prepareOutreach: async (tx) => {
+          outreachAttemptId = await rpcCreateOutreachAttempt(createTenantDb(context.workspaceId, tx), {
+            contactId: member.contact_id, campaignId: Number(context.campaignId),
+            userId: context.userId, workspaceId: context.workspaceId, queueId: member.id,
+          });
+          return outreachAttemptId;
+        },
+        beforeCreate: async () => {
+          await context.startPacer.waitForTurn();
+          if (!isDispatchAllowedAt(context.callingPolicy)) {
+            throw new CallingWindowClosedError("campaign");
+          }
+          if (!recipientCallingWindowStatus(phone).allowed) {
+            throw new CallingWindowClosedError("recipient");
+          }
+        },
+        create: ({ voiceUrl, statusCallback }) => {
+          providerAttemptStarted = true;
+          return context.twilio.calls.create({
+            to: phone, from: context.callerId, url: voiceUrl,
+            machineDetection: context.machineDetection,
+            statusCallbackEvent: ["answered", "completed"], statusCallback,
+          });
+        },
+      });
+    }, { workspaceId: context.workspaceId, operation: "calls.create.ivr" });
+    if (!dispatched.ok) {
+      deferBlockedVoiceDispatch(dispatched.reason, phoneClaim, context);
+      return;
+    }
+    phoneClaim?.resolve(dispatched.replayed ? "duplicate" : "provider_attempted");
 
-    const call = await createIvrCall({
-      twilio: context.twilio,
-      phone,
-      callerId: context.callerId,
-      machineDetection: context.machineDetection,
-      startPacer: context.startPacer,
-      ivrUrls: context.ivrUrls,
-      workspaceId: context.workspaceId,
-      beforeAttempt: () => {
-        if (!isDispatchAllowedAt(context.callingPolicy)) {
-          throw new CallingWindowClosedError("campaign");
-        }
-        if (!recipientCallingWindowStatus(phone).allowed) {
-          throw new CallingWindowClosedError("recipient");
-        }
-        providerAttemptStarted = true;
-      },
-    });
-    phoneClaim?.resolve("provider_attempted");
-
-    const inserted = await insertCallForWorkspace(context.workspaceId, {
-      sid: call.sid,
-      to: phone,
-      from: context.callerId,
-      campaign_id: Number(context.campaignId),
-      contact_id: member.contact_id,
-      outreach_attempt_id: Number(outreachAttemptId),
-    });
-    if (!inserted) throw new Error("Failed to insert call row");
-
-    await dequeueQueueEntry({
-      by: { id: member.id },
-      userId: context.userId,
-      workspaceId: context.workspaceId,
-      reason: IVR_CALL_DEQUEUED_REASON,
-    });
-    context.state.counts.called += 1;
+    const dequeued = await dequeueIvrQueueMember(member, context,
+      dispatched.replayed ? DUPLICATE_IVR_DEQUEUED_REASON : IVR_CALL_DEQUEUED_REASON, dispatched.queueGeneration);
+    if (!dispatched.replayed) context.state.counts.called += 1;
+    else if (dequeued) context.state.counts.dequeued += 1;
   } catch (error) {
+    if (error instanceof VoiceDispatchUncertainError) {
+      phoneClaim?.resolve("provider_pending");
+      context.state.counts.deferred += 1;
+      context.state.blocked = "provider_recovery";
+      logger.warn("campaign_ivr_dispatch.provider_recovery", {
+        workspaceId: context.workspaceId, campaignId: context.campaignId,
+        queueId: member.id, reservationId: error.reservationId,
+      });
+      return;
+    }
     if (error instanceof CallingWindowClosedError) {
       const windowResult = error.scope === "campaign" ? "campaign_window_closed" : "recipient_window_closed";
       phoneClaim?.resolve(
@@ -435,6 +439,7 @@ async function createOutreachAttemptAndCall(
       queueId: member.id,
       error: message,
       workspaceId: context.workspaceId,
+      expectedGeneration: member.dispatch_generation,
     });
     logger.error("campaign_ivr_dispatch.call_failed", {
       campaignId: context.campaignId,
@@ -442,6 +447,32 @@ async function createOutreachAttemptAndCall(
       error: message,
     });
   }
+}
+
+function deferBlockedVoiceDispatch(
+  reason: Extract<Awaited<ReturnType<typeof dispatchReservedVoiceCall>>, { ok: false }>["reason"],
+  phoneClaim: IvrPhoneClaim | null,
+  context: IvrQueueMemberContext,
+) {
+  const pending = reason === "dispatch_in_progress";
+  phoneClaim?.resolve(pending ? "provider_pending" : "failed_before_provider");
+  context.state.counts.deferred += 1;
+  if (pending) context.state.blocked = "provider_recovery";
+  else if (reason === "insufficient_credits" || reason === "workspace_not_found") context.state.blocked ??= "insufficient_credits";
+}
+
+async function dequeueIvrQueueMember(
+  member: IvrQueueMember,
+  context: IvrQueueMemberContext,
+  reason: string,
+  generation: string | null = member.dispatch_generation,
+) {
+  const result = await dequeueQueueEntry({
+    by: { id: member.id }, userId: context.userId, workspaceId: context.workspaceId,
+    reason, expectedGeneration: generation,
+  });
+  if (!result.dequeuedPrimary) context.state.counts.deferred += 1;
+  return result.dequeuedPrimary;
 }
 
 function remainingIvrQueue(
@@ -472,38 +503,11 @@ async function deleteUnusedOutreachAttempt(
   });
 }
 
-function createIvrCall(args: {
-  twilio: Twilio.Twilio;
-  phone: string;
-  callerId: string;
-  machineDetection: ReturnType<typeof ivrMachineDetection>;
-  startPacer: StartPacer;
-  ivrUrls: ReturnType<typeof resolveIvrCallUrls>;
-  workspaceId: string;
-  beforeAttempt: () => void;
-}) {
-  const { twilio, phone, callerId, ivrUrls, workspaceId, beforeAttempt } = args;
-  return withTwilioRetry(
-    async () => {
-      await args.startPacer.waitForTurn();
-      beforeAttempt();
-      return twilio.calls.create({
-        to: phone,
-        from: callerId,
-        url: ivrUrls.flowUrl,
-        machineDetection: args.machineDetection,
-        statusCallbackEvent: ["answered", "completed"],
-        statusCallback: ivrUrls.statusCallback,
-      });
-    },
-    { workspaceId, operation: "calls.create.ivr" },
-  );
-}
-
 type IvrPhoneClaimResult =
   | "campaign_window_closed"
   | "recipient_window_closed"
   | "failed_before_provider"
+  | "provider_pending"
   | "duplicate"
   | "provider_attempted";
 

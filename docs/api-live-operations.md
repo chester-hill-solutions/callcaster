@@ -1,6 +1,6 @@
 # Live Operations API
 
-Bearer/session routes for dialer, call screen, handset, and call log. Not available with workspace API keys alone.
+Bearer/session routes for dialer, call screen, handset, and call log. Dialer start also accepts a workspace API key with an authorized `agentUserId`. The other routes below require a user session.
 
 ## Call log
 
@@ -14,9 +14,34 @@ Bearer/session routes for dialer, call screen, handset, and call log. Not availa
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET/DELETE | `/api/workspaces/:workspaceId/handset/session` | Handset session state |
-| GET | `/api/handset-token?workspace_id=` | Twilio token (legacy flat path) |
+| POST | `/api/workspaces/:workspaceId/handset/session` | Prepare one funded outbound handset call |
+| GET | `/api/handset-token?workspace=` | Twilio token (legacy flat path) |
+
+Before an outbound handset call, POST `to_number`, the user's active
+`client_identity`, and a UUID `dial_intent_id` to the session resource. Keep the
+same UUID for a retry of that action. The response contains `reservation_id` and
+`expires_at`. Pass the reservation as `credit_reservation` in `Device.connect`,
+with the same destination, workspace and client identity.
+
+Preparation holds four available credits for one staffed call. It returns the
+locked 402 credit error before the SDK starts when funds are insufficient.
+An accepted or uncertain call returns 409 on repeated preparation. A preparation
+that never starts expires through reservation recovery. Token creation and
+inbound availability remain credit-free.
+
+The signed voice request also needs the actual SDK parent: its original account
+and SID, `From=client:<identity>`, incoming direction and empty provider `To`.
+The requested destination is a separate SDK parameter. The server reads the
+provider parent before it issues one recipient instruction. Only the recipient
+child is billed; the SDK parent adds no customer debit. See
+[Twilio's SDK call-leg contract](https://www.twilio.com/docs/voice/sdks#outgoing-calls-from-the-voice-sdk).
+Missing scope or a missing reservation cannot use an app-level caller ID.
 
 ## Call screen
+
+`POST /api/workspaces/:workspaceId/campaigns/:campaignId/dialer/start` accepts `caller_id`, `selected_device`, and an optional UUID `dial_intent_id`. Use the same intent ID when retrying a request whose result is unknown. Use a new ID for a new call session. Workspace API keys also require `agentUserId`; the selected agent must have the caller role or above.
+
+The start reserves four available credits for the first eligible recipient before it calls the agent. The setup and first recipient share this hold. The recipient call starts when the agent joins the conference. Later recipients each need a new hold. A credit refusal returns 402 before any provider call. An uncertain provider result retains its hold for recovery.
 
 | Method | Path | Purpose |
 | --- | --- | --- |

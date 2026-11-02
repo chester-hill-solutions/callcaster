@@ -4,6 +4,10 @@ import {
   runSmsStatusSideEffects,
 } from "@/lib/worker/webhook-side-effects.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
+import { runVoiceRecordingCopy } from "@/lib/voice-recording-copy.server";
+import { runVoiceParentRecordingPreparation } from "@/lib/voice-parent-recording.server";
+import type { z } from "zod";
+import type { recordingSideEffectsParams } from "@/lib/worker/job-params.server";
 // `sidAndTwilioParamsSchema` moved to job-registry.server.ts in #1239 A3 so
 // job-params.server.ts (schema-only) can build these registrations without
 // depending on this file — see that module's doc comment for why.
@@ -34,8 +38,16 @@ export async function smsStatusSideEffectsHandler(
 
 export async function recordingSideEffectsHandler(
   job: ClaimedJobRow,
-  params: VoiceSideEffectsParams,
+  params: z.infer<typeof recordingSideEffectsParams>,
 ): Promise<unknown> {
+  if ("parentCaptureConnectionId" in params) {
+    if (!job.workspace_id) throw new Error("Parent capture job has no workspace");
+    return runVoiceParentRecordingPreparation(job.workspace_id, params.parentCaptureConnectionId);
+  }
+  if ("recordingOperationId" in params) {
+    if (!job.workspace_id) throw new Error("Recording part job has no workspace");
+    return runVoiceRecordingCopy(job.workspace_id, params.recordingOperationId, params.leaseToken);
+  }
   return runRecordingSideEffects({
     callSid: params.sid,
     event: params.event,

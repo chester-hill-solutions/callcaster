@@ -1,5 +1,15 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.mock("@/server/voice-audio-classification.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/voice-audio-classification.server")>(),
+  isVoiceAudioLeg: async () => false,
+}));
+
+vi.mock("@/server/voice-credit-settlement.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/voice-credit-settlement.server")>(),
+  settleVoiceReservation: async () => ({ handled: false, billingResult: null }),
+}));
+
 vi.hoisted(() => {
   process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
 });

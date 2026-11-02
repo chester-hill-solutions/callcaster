@@ -212,6 +212,16 @@ export function SpeakerField({
 }
 
 export interface CallingDeviceFieldProps {
+  audioConnection?: {
+    pendingDevice: string | null;
+    busy: boolean;
+    error: string | null;
+    cancelRequested: boolean;
+    canCancel?: boolean;
+    browserEnabled: boolean;
+    onRetry: () => void;
+    onCancel: () => void;
+  };
   phoneStatus: "disconnected" | "connecting" | "connected";
   selectedDevice: string;
   onDeviceSelect: (device: string) => void;
@@ -225,6 +235,13 @@ export interface CallingDeviceFieldProps {
   verificationPhoneNumber: string;
 }
 
+function callingDeviceDescription(props: Pick<CallingDeviceFieldProps, "audioConnection" | "phoneStatus" | "selectedDevice">) {
+  if (props.audioConnection?.cancelRequested) return "Canceling the audio change. Keep your current audio connected.";
+  if (props.phoneStatus === "connecting") return `Connecting ${props.audioConnection?.pendingDevice === "computer" ? "computer audio" : "your phone"}. Keep your current audio connected.`;
+  if (props.phoneStatus === "connected" && props.selectedDevice !== "computer") return "Your phone is the microphone and speaker.";
+  return undefined;
+}
+
 /**
  * Calling-device select with the Add Phone Number action on the same row
  * (stacked below it in a narrow container), followed by the inline
@@ -232,6 +249,7 @@ export interface CallingDeviceFieldProps {
  * reading as a stray control with its own "Add device" heading.
  */
 export function CallingDeviceField({
+  audioConnection,
   phoneStatus,
   selectedDevice,
   onDeviceSelect,
@@ -249,23 +267,25 @@ export function CallingDeviceField({
   return (
     <>
       <FormField
+        error={audioConnection?.error}
         label={
           <span className="flex items-center gap-2">
             <Phone size={16} /> Calling device
           </span>
         }
-        description={phoneStatus === "connecting" ? "Connecting..." : undefined}
+        description={callingDeviceDescription({ audioConnection, phoneStatus, selectedDevice })}
       >
         <div className="flex flex-col gap-2 @md:flex-row @md:items-center">
           <div className="relative min-w-0 flex-1">
-            <Select value={selectedDevice} onValueChange={onDeviceSelect}>
-              <SelectTrigger
+            <Select value={selectedDevice} onValueChange={onDeviceSelect} disabled={audioConnection?.busy}>
+              <FormFieldControl><SelectTrigger
                 className={cn(deviceSelectClass, "w-full cursor-pointer pr-8")}
               >
                 <SelectValue placeholder="Select device" />
-              </SelectTrigger>
+              </SelectTrigger></FormFieldControl>
               <SelectContent>
                 <SelectItem value="computer">Computer Audio</SelectItem>
+                {selectedDevice !== "computer" && !verifiedNumbers.includes(selectedDevice) ? <SelectItem value={selectedDevice} disabled>{selectedDevice}</SelectItem> : null}
                 {verifiedNumbers.map((number) => (
                   <SelectItem key={number} value={number}>
                     {number}
@@ -290,6 +310,12 @@ export function CallingDeviceField({
           ) : null}
         </div>
       </FormField>
+      {audioConnection?.canCancel || audioConnection?.cancelRequested || audioConnection?.error ? (
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={audioConnection.onRetry}>Check connection</Button>
+          {audioConnection.canCancel && !audioConnection.cancelRequested ? <Button type="button" variant="outline" onClick={audioConnection.onCancel}>Cancel audio change</Button> : null}
+        </div>
+      ) : null}
 
       {isAddingNumber ? (
         <div
@@ -355,7 +381,7 @@ export function DeviceSettingsPanel({
 }: DeviceSettingsPanelProps) {
   return (
     <div className="@container space-y-4">
-      <div className="grid grid-cols-1 gap-4 @lg:grid-cols-2">
+      {fields.audioConnection?.browserEnabled !== false ? <div className="grid grid-cols-1 gap-4 @lg:grid-cols-2">
         <MicrophoneField
           availableMicrophones={fields.availableMicrophones}
           selectedMicrophone={fields.selectedMicrophone}
@@ -373,7 +399,7 @@ export function DeviceSettingsPanel({
           onTestSpeaker={fields.onTestSpeaker}
           isSpeakerPlaying={fields.isSpeakerPlaying}
         />
-      </div>
+      </div> : null}
 
       {audioTestError ? (
         <p role="alert" data-severity="error" className="text-sm text-destructive-text" data-testid="audio-test-error">
@@ -382,6 +408,7 @@ export function DeviceSettingsPanel({
       ) : null}
 
       <CallingDeviceField
+        audioConnection={fields.audioConnection}
         phoneStatus={fields.phoneStatus}
         selectedDevice={fields.selectedDevice}
         onDeviceSelect={fields.onDeviceSelect}

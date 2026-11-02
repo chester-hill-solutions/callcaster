@@ -1,3 +1,4 @@
+import "./helpers/legacy-voice-reservation-mock";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 vi.hoisted(() => {
@@ -32,8 +33,9 @@ vi.mock("@/lib/telephony-db.server", () => ({
   updateOutreachAttemptForWorkspace: vi.fn(),
 }));
 
-vi.mock("@/lib/campaign-queue-db.server", () => ({
-  dequeueQueueEntry: vi.fn(),
+vi.mock("@/server/legacy-voice-queue.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/server/legacy-voice-queue.server")>(),
+  dequeueLegacyVoiceAttempt: vi.fn(),
 }));
 
 const tenantDbMocks = vi.hoisted(() => ({
@@ -48,7 +50,7 @@ vi.mock("@/server/tenant-db", () => ({
 }));
 
 import { findCallBySid, updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
-import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
+import { dequeueLegacyVoiceAttempt } from "@/server/legacy-voice-queue.server";
 
 function mockCall(overrides?: Partial<{
   workspace: string;
@@ -76,7 +78,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     mocks.logger.error.mockReset();
     vi.mocked(findCallBySid).mockReset();
     vi.mocked(updateOutreachAttemptForWorkspace).mockReset();
-    vi.mocked(dequeueQueueEntry).mockReset();
+    vi.mocked(dequeueLegacyVoiceAttempt).mockReset();
     tenantDbMocks.campaignFindFirst.mockReset();
     tenantDbMocks.campaignFindFirst.mockResolvedValue({ group_household_queue: false });
   });
@@ -94,9 +96,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     const mod = await import("../app/routes/api+/hangup");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(dequeueQueueEntry).toHaveBeenCalledWith(expect.objectContaining({
-      by: { contactId: 2, campaignId: 5 }, workspaceId: "w1",
-    }));
+    expect(dequeueLegacyVoiceAttempt).toHaveBeenCalledWith("w1", "CA1");
     // Scoped to the specific attempt (9), not every attempt for contact 2.
     expect(updateOutreachAttemptForWorkspace).toHaveBeenCalledWith(
       "w1",
@@ -106,7 +106,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     );
   });
 
-  test("household fan-out follows campaign.group_household_queue instead of always true", async () => {
+  test("household policy stays with the saved Call owner service", async () => {
     queueJsonAuthSession({ user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ workspaceId: "w1", callSid: "CA1" });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
@@ -118,9 +118,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     const mod = await import("../app/routes/api+/hangup");
     await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
 
-    expect(dequeueQueueEntry).toHaveBeenCalledWith(
-      expect.objectContaining({ household: true }),
-    );
+    expect(dequeueLegacyVoiceAttempt).toHaveBeenCalledWith("w1", "CA1");
   });
 
   test("does not update outreach when the call has no attempt id", async () => {
@@ -134,11 +132,11 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     const mod = await import("../app/routes/api+/hangup");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
-    expect(dequeueQueueEntry).toHaveBeenCalled();
+    expect(dequeueLegacyVoiceAttempt).toHaveBeenCalled();
     expect(updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
   });
 
-  test("a call without a campaign stops without dequeuing campaign contacts", async () => {
+  test("a call without inline campaign metadata delegates its saved identity after stopping", async () => {
     queueJsonAuthSession({ user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ workspaceId: "w1", callSid: "CA1" });
     const stop = vi.fn(async () => ({}));
@@ -148,7 +146,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(stop).toHaveBeenCalled();
-    expect(dequeueQueueEntry).not.toHaveBeenCalled();
+    expect(dequeueLegacyVoiceAttempt).toHaveBeenCalledWith("w1", "CA1");
     expect(updateOutreachAttemptForWorkspace).toHaveBeenCalledWith("w1", 9, { disposition: "completed" }, { tdb: expect.anything() });
   });
 
@@ -169,7 +167,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(dequeueQueueEntry).toHaveBeenCalled();
+    expect(dequeueLegacyVoiceAttempt).toHaveBeenCalled();
   });
 
   test("returns 500 when Twilio throws non-21220", async () => {
@@ -214,7 +212,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(dequeueQueueEntry).not.toHaveBeenCalled();
+    expect(dequeueLegacyVoiceAttempt).not.toHaveBeenCalled();
     expect(updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
   });
 

@@ -12,12 +12,17 @@ import {
 } from "@/lib/auto-dial-start.server";
 import { hasMinRole } from "@/lib/workspace-route.server";
 import type { DataPlaneAuthContextValue } from "@/lib/route-context.server";
+import { apiWriteRateLimitResponse } from "@/lib/api-write-rate-limit.server";
+import { phoneAudioSourceFields, requirePhoneAudioSource } from "@/lib/schemas/api/phone-audio-source";
+import { VOICE_AUDIO_ACTOR_HEADER } from "@/lib/voice-audio-connection";
 
 const dialerStartBodySchema = z.object({
   caller_id: z.string().min(1),
   selected_device: z.string().min(1),
+  dial_intent_id: z.string().uuid().transform((value) => value.toLowerCase()).optional(),
   agentUserId: z.string().min(1).optional(),
-});
+  ...phoneAudioSourceFields,
+}).superRefine(requirePhoneAudioSource);
 
 async function resolveAgentUserId(
   auth: DataPlaneAuthContextValue,
@@ -54,6 +59,13 @@ export const action = defineAction({
   auth: dataPlaneCapabilityAuthWithParam("calls.start", "campaignId"),
   sideEffects: ["db-write", "twilio"],
   handler: async ({ request, auth }) => {
+    const rateLimited = await apiWriteRateLimitResponse(
+      auth.auth.apiKey
+        ? { authType: "api_key", keyId: auth.auth.apiKey.keyId }
+        : { user: { id: auth.auth.userId } },
+      "api-voice",
+    );
+    if (rateLimited) return rateLimited;
     const campaignId = Number(auth.campaignId);
     if (!Number.isFinite(campaignId)) {
       return jsonError("Invalid campaignId", 400);
@@ -75,6 +87,8 @@ export const action = defineAction({
     if (agentUserId instanceof Response) {
       return agentUserId;
     }
+    const expectedActor = request.headers.get(VOICE_AUDIO_ACTOR_HEADER);
+    if (expectedActor && expectedActor !== agentUserId) return jsonError("The signed-in actor changed", 409);
 
     const result = await startAutoDialConference({
       userId: agentUserId,
@@ -82,6 +96,9 @@ export const action = defineAction({
       campaignId,
       callerId: parsed.caller_id,
       selectedDevice: parsed.selected_device,
+      dialIntentId: parsed.dial_intent_id,
+      audioSource: parsed.audio_connection_id && parsed.audio_generation !== undefined
+        ? { connectionId: parsed.audio_connection_id, generation: parsed.audio_generation } : undefined,
     });
 
     if (!result.ok) {
@@ -120,6 +137,7 @@ export const action = defineAction({
       },
     });
 
-    return jsonResponse({ success: true, conferenceName: result.conferenceName }, 200);
+    return jsonResponse({ success: true, conferenceName: result.conferenceName,
+      ...(result.callSid ? { callSid: result.callSid } : {}) }, 200);
   },
 });

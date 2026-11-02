@@ -227,9 +227,11 @@ export const smsStatusSideEffectsParams = sidAndTwilioParamsSchema(
   "messageSid",
   "sms_status_side_effects",
 );
-export const recordingSideEffectsParams = voiceSideEffectsParamsSchema(
-  "recording_side_effects",
-);
+export const recordingSideEffectsParams = z.union([
+  z.strictObject({ parentCaptureConnectionId: z.uuid(), version: z.literal(1) }),
+  z.strictObject({ recordingOperationId: z.uuid(), leaseToken: z.uuid() }),
+  voiceSideEffectsParamsSchema("recording_side_effects"),
+]);
 
 /** The repair sweep takes no params; its budget is a module constant. */
 export const recordingRepairSweepParams = noParams;
@@ -256,6 +258,7 @@ export const jobParamsRegistry = [
   { type: "campaign_schedule_sync", params: noParams },
   { type: "number_rental_billing", params: numberRentalBillingParams },
   { type: "number_purchase_recovery", params: noParams },
+  { type: "voice_credit_recovery", params: noParams },
   { type: "number_release_recovery", params: noParams },
   { type: "audience_upload", params: audienceUploadParams },
   { type: "low_credit_notify", params: noParams },

@@ -30,6 +30,24 @@ export const rateLimitResponse = {
 
 export const platformOpenApiComponents = {
   schemas: {
+    HandsetDialPreparationRequest: {
+      type: "object" as const,
+      required: ["to_number", "client_identity", "dial_intent_id"] as const,
+      properties: {
+        to_number: { type: "string" as const, description: "Destination phone number." },
+        client_identity: { type: "string" as const, description: "Active handset session owned by the signed-in user." },
+        dial_intent_id: { type: "string" as const, format: "uuid", description: "Keep this UUID when retrying the same dial action." },
+      },
+      additionalProperties: false,
+    },
+    HandsetDialPreparationResponse: {
+      type: "object" as const,
+      required: ["reservation_id", "expires_at"] as const,
+      properties: {
+        reservation_id: { type: "string" as const, format: "uuid" },
+        expires_at: { type: "string" as const, format: "date-time" },
+      },
+    },
     PlatformError: {
       type: "object" as const,
       required: ["error"] as const,
@@ -108,14 +126,27 @@ export const platformOpenApiComponents = {
     DialerStartRequest: {
       type: "object" as const,
       required: ["caller_id", "selected_device"] as const,
+      oneOf: [
+        { not: { anyOf: [{ required: ["audio_connection_id"] }, { required: ["audio_generation"] }] } },
+        { required: ["audio_connection_id", "audio_generation", "dial_intent_id"],
+          properties: { selected_device: { type: "string" as const, pattern: "^\\+[1-9][0-9]{7,14}$" } } },
+      ],
       properties: {
+        audio_connection_id: { type: "string" as const, format: "uuid",
+          description: "Owned confirmed phone connection. Requires audio_generation, dial_intent_id and that verified phone as selected_device." },
+        audio_generation: { oneOf: [{ type: "integer" as const, minimum: 1 }, { type: "string" as const, pattern: "^[1-9][0-9]*$" }],
+          description: "Positive safe integer generation of the confirmed phone connection." },
+        dial_intent_id: {
+          type: "string" as const, format: "uuid",
+          description: "Reuse this ID when retrying the same conference start. A new call session needs a new ID.",
+        },
         caller_id: {
           type: "string" as const,
           description: "E.164 caller ID to present on outbound dials.",
         },
         selected_device: {
           type: "string" as const,
-          description: "Twilio client device identifier for the agent leg.",
+          description: "computer or a verified E.164 phone. A confirmed phone Start requires its paired audio source fields.",
         },
         agentUserId: {
           type: "string" as const,
@@ -130,6 +161,8 @@ export const platformOpenApiComponents = {
       properties: {
         success: { type: "boolean" as const, enum: [true] as const },
         conferenceName: { type: "string" as const },
+        callSid: { type: "string" as const, pattern: "^CA[0-9a-fA-F]{32}$",
+          description: "Real customer root SID for a confirmed-phone Start. Legacy setup responses omit this field." },
       },
     },
     CallDisconnectResponse: {

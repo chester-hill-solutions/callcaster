@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 import { workspace } from "@/db/schema";
 import { adminDb } from "@/server/admin-db";
 import { NORMALIZED_AUDIO_CONTENT_TYPE } from "@/lib/audio-upload";
@@ -47,7 +48,7 @@ function isRetryableHttpStatus(status: number): boolean {
   return status === 429 || status >= 500;
 }
 
-function twilioRecordingMp3Url(accountSid: string, recordingSid: string): string {
+export function twilioRecordingMp3Url(accountSid: string, recordingSid: string): string {
   return `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Recordings/${recordingSid}.mp3`;
 }
 
@@ -139,7 +140,22 @@ type PersistCallRecordingArgs = {
   accountSid: string;
   recordingSid: string;
   existingAudioUrl?: string | null;
+  storageMode?: "recording";
 };
+
+const recordingPartIdentity = z.object({
+  workspaceId: z.uuid(), callSid: z.string().regex(/^CA[0-9a-f]{32}$/i),
+  accountSid: z.string().regex(/^AC[0-9a-f]{32}$/i), recordingSid: z.string().regex(/^RE[0-9a-f]{32}$/i),
+});
+
+export function callRecordingPartStoragePath(args: Pick<PersistCallRecordingArgs, "workspaceId" | "callSid" | "accountSid" | "recordingSid">) {
+  const part = recordingPartIdentity.parse(args);
+  return `${CALL_RECORDINGS_OBJECT_PREFIX}/${part.workspaceId}/recording-${part.callSid}-${part.recordingSid}.mp3`;
+}
+
+function recordingStoragePath(args: PersistCallRecordingArgs) {
+  return args.storageMode === "recording" ? callRecordingPartStoragePath(args) : callRecordingStoragePath(args.workspaceId, args.callSid);
+}
 
 type PersistCallRecordingDeps = FetchTwilioRecordingDeps & {
   uploadObject?: typeof uploadObject;
@@ -174,12 +190,13 @@ export async function persistCallRecordingToStorage(
   args: PersistCallRecordingArgs,
   deps: PersistCallRecordingDeps = {},
 ): Promise<PersistCallRecordingResult> {
-  const objectPath = callRecordingStoragePath(args.workspaceId, args.callSid);
+  const objectPath = recordingStoragePath(args);
+  const existingAudioUrl = args.existingAudioUrl?.trim();
 
-  if (args.existingAudioUrl?.trim()) {
+  if (existingAudioUrl && (args.storageMode !== "recording" || existingAudioUrl === objectPath)) {
     return {
       ok: true,
-      audioUrl: args.existingAudioUrl.trim(),
+      audioUrl: existingAudioUrl,
       skipped: true,
       reason: "already_persisted",
     };
@@ -191,6 +208,9 @@ export async function persistCallRecordingToStorage(
     throw new Error(
       `call_recording: permanent — workspace ${args.workspaceId} has no Twilio credentials on file, so the recording cannot be copied (call ${args.callSid})`,
     );
+  }
+  if (args.storageMode === "recording" && creds.sid !== args.accountSid) {
+    throw new Error("call_recording: original account credentials are unavailable for this recording part");
   }
 
   let audioBuffer: Buffer;

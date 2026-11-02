@@ -18,6 +18,7 @@ import { rpcGetAudiencesByCampaign, type AudienceByCampaignRow } from "@/lib/db-
 import { logger } from "@/lib/logger.server";
 import { fetchCampaignWithScriptForWorkspace } from "@/lib/campaign-ivr.server";
 import { createTenantDb } from "@/server/tenant-db";
+import { withQueueAdvanceSnapshots } from "@/server/queue-advance-snapshot.server";
 import { getUserById } from "@/lib/workspace-members-db.server";
 import { normalizeDispositionOptions } from "@/lib/outreach-disposition";
 
@@ -145,9 +146,11 @@ export async function getQueueByDialType(
     // caller. Returning them here gives every caller the same first page, so two
     // callers can scroll and dial the same contacts. Keep this operator's rows
     // so an in-progress queue is not dropped when the screen reloads.
-    return queueItems
+    const assigned = queueItems
       .filter((item) => isAssignedToUser(item, userId))
       .slice(0, 50);
+    const first = assigned[0];
+    return first ? withQueueAdvanceSnapshots(assigned, first.workspace) : assigned;
   }
   throw new Error("Invalid dial type");
 }

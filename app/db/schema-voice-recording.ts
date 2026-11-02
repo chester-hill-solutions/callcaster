@@ -1,0 +1,56 @@
+import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+export { workspace_voice_customer_phase, workspace_voice_customer_phase_event } from "./schema-voice-customer-phase";
+
+/** Each physical recording retains the original customer call's logical owner. */
+export const workspace_voice_recording_operation = pgTable("workspace_voice_recording_operation", {
+  id: uuid().primaryKey(),
+  workspace: uuid().notNull(),
+  reservation_id: uuid().notNull(),
+  user_id: text().notNull(),
+  kind: text().$type<"dial" | "parent" | "customer" | "conference">().notNull(),
+  intent_id: uuid().notNull(),
+  logical_call_sid: text().notNull(),
+  // For a Conference part this is the physical call that issued the instruction.
+  source_call_sid: text().notNull(),
+  source_conference_name: text(),
+  source_conference_sid: text(),
+  source_to: text().notNull(),
+  source_from: text().notNull(),
+  source_direction: text().notNull(),
+  source_parent_sid: text(),
+  account_sid: text().notNull(),
+  callback_url: text().notNull(),
+  state: text().$type<"prepared" | "creating" | "accepted" | "failed">().notNull().default("prepared"),
+  provider_sid: text(),
+  provider_status: text().$type<"in-progress" | "completed" | "absent">(),
+  send_started_at: timestamp({ withTimezone: true, mode: "date" }),
+  recording_started_at: timestamp({ withTimezone: true, mode: "date" }),
+  recording_duration_seconds: integer(),
+  channels: integer(),
+  terminal_at: timestamp({ withTimezone: true, mode: "date" }),
+  audio_url: text(),
+  lease_token: uuid().notNull(),
+  lease_expires_at: timestamp({ withTimezone: true, mode: "date" }).notNull(),
+  last_error: text(),
+  created_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updated_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+
+/** Signed customer membership. Unknown provider timing remains unknown. */
+export const workspace_voice_recording_customer_event = pgTable("workspace_voice_recording_customer_event", {
+  id: uuid().primaryKey(),
+  workspace: uuid().notNull(),
+  reservation_id: uuid().notNull(),
+  user_id: text().notNull(),
+  logical_call_sid: text().notNull(),
+  customer_call_sid: text().notNull(),
+  account_sid: text().notNull(),
+  conference_sid: text().notNull(),
+  conference_name: text().notNull(),
+  participant_call_sid: text(),
+  event: text().notNull(),
+  sequence_number: integer(),
+  occurred_at: timestamp({ withTimezone: true, mode: "date" }),
+  event_key: text().notNull(),
+  received_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});

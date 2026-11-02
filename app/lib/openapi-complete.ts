@@ -4,6 +4,11 @@
  */
 import { getCompleteOpenApiEntries } from "@/lib/api-surface";
 import { buildOpenApiSpec } from "@/lib/openapi-build";
+import { voiceAudioPathOverrides, voiceAudioProviderPathOverrides } from "@/lib/openapi-voice-audio";
+import { manualDialPathOverrides } from "@/lib/openapi-manual-dial";
+import { dialerStopPathOverrides } from "@/lib/openapi-dialer-stop";
+import { queueAdvancePathOverrides } from "@/lib/openapi-queue-advance";
+import { platformPathOverrides } from "@/lib/openapi-platform";
 
 export const completeOpenApiSpec = buildOpenApiSpec({
   entries: getCompleteOpenApiEntries(),
@@ -12,7 +17,10 @@ export const completeOpenApiSpec = buildOpenApiSpec({
     "Full classified inventory: user-facing routes (also in /api/docs/openapi), provider webhooks (Twilio/Stripe), internal telephony workers, and documented security gaps.",
   tagStrategy: "auth",
   useIntegratorPathOverrides: true,
+  pathOverrides: { ...voiceAudioPathOverrides, ...voiceAudioProviderPathOverrides, ...manualDialPathOverrides, ...dialerStopPathOverrides, ...queueAdvancePathOverrides,
+    "/api/workspaces/{workspaceId}/campaigns/{campaignId}/dialer/start": platformPathOverrides["/api/workspaces/{workspaceId}/campaigns/{campaignId}/dialer/start"] },
   includeIntegratorSchemas: true,
+  includePlatformSchemas: true,
   unsupportedDescription:
     "**Not supported for external use.** Webhook, internal, or security-gap route.",
 });

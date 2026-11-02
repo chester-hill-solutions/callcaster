@@ -166,4 +166,14 @@ describe("dialer/start route", () => {
       selectedDevice: "computer",
     });
   });
+  test("a saved actor header cannot start a call after the signed-in actor changes", async () => {
+    const { action } = await import("@/routes/api+/workspaces+/$workspaceId/campaigns/$campaignId/dialer/start.action.server");
+    const response = await asRouteResponse(action(await withDataPlaneRouteArgs({
+      request: new Request("http://localhost/api/workspaces/w1/campaigns/1/dialer/start", { method: "POST",
+        headers: { "Content-Type": "application/json", "X-Callcaster-Audio-Actor": "previous-actor" },
+        body: JSON.stringify({ caller_id: "+16135550101", selected_device: "computer" }) }),
+      params: { workspaceId: "w1", campaignId: "1" },
+    })));
+    expect(response.status).toBe(409); expect(mocks.startAutoDialConference).not.toHaveBeenCalled();
+  });
 });

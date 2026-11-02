@@ -51,14 +51,15 @@ type ProbeAudioDurationDeps = Partial<{
 
 /** Encoder flags shared by normalization and trimming so every object in the
  * workspaceAudio bucket is the same mono 44.1kHz MP3, whatever produced it. */
-const MP3_ENCODE_ARGS = [
+export const NORMALIZED_AUDIO_SAMPLE_RATE = 44100;
+export const MP3_ENCODE_ARGS = [
   "-vn",
   "-acodec",
   "libmp3lame",
   "-ac",
   "1",
   "-ar",
-  "44100",
+  String(NORMALIZED_AUDIO_SAMPLE_RATE),
   "-f",
   "mp3",
 ];

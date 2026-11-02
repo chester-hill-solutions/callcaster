@@ -1,4 +1,10 @@
+import "./helpers/legacy-voice-reservation-mock";
 import { describe, expect, test, vi, beforeEach } from "vitest";
+
+vi.mock("@/server/voice-credit-settlement.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/voice-credit-settlement.server")>(),
+  settleVoiceReservation: async () => ({ handled: false, billingResult: null }),
+}));
 
 vi.hoisted(() => {
   process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";

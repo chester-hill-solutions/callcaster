@@ -55,6 +55,7 @@ export type CallOutcome =
 
 export type CallLifecycleEvent =
   | { type: "START_DIALING" }
+  | { type: "CUSTOMER_JOINED"; customerSid: string }
   | { type: "CONNECT" }
   | { type: "HANG_UP" }
   | { type: "FAIL" }
@@ -84,6 +85,10 @@ export function callLifecycleReducer(
   state: CallLifecycleState,
   event: CallLifecycleEvent,
 ): CallLifecycleState {
+  if (event.type === "CUSTOMER_JOINED") {
+    if (state.customerSid === event.customerSid) return state;
+    return { ...state, phase: "connected", outcome: null, generation: state.generation + 1, customerSid: event.customerSid };
+  }
   const { phase, outcome } = state;
 
   // Terminal phases cannot regress on non-terminal events.

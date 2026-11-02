@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   findContactsByPhone: vi.fn(),
   createWorkspaceTwilioInstance: vi.fn(),
   callsCreate: vi.fn(),
-  insertCallForWorkspace: vi.fn(),
+  dispatchReservedVoiceCall: vi.fn(),
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
 
@@ -32,13 +32,9 @@ vi.mock("@/lib/database/workspace.server", async (importOriginal) => ({
   createWorkspaceTwilioInstance: (...args: unknown[]) =>
     mocks.createWorkspaceTwilioInstance(...args),
 }));
-vi.mock("@/lib/twilio-client.server", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/twilio-client.server")>()),
-  withTwilioRetry: (fn: () => unknown) => fn(),
-}));
-vi.mock("@/lib/telephony-db.server", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/telephony-db.server")>()),
-  insertCallForWorkspace: (...args: unknown[]) => mocks.insertCallForWorkspace(...args),
+vi.mock("@/lib/voice-credit-dispatch.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/voice-credit-dispatch.server")>()),
+  dispatchReservedVoiceCall: (...args: unknown[]) => mocks.dispatchReservedVoiceCall(...args),
 }));
 vi.mock("@/lib/logger.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/logger.server")>()),
@@ -62,10 +58,14 @@ describe("sendCampaignTestCall", () => {
     mocks.findFirst.mockResolvedValue(campaign());
     mocks.findContactsByPhone.mockResolvedValue([]);
     mocks.createWorkspaceTwilioInstance.mockResolvedValue({
+      accountSid: "ACfixture",
       calls: { create: mocks.callsCreate },
     });
     mocks.callsCreate.mockResolvedValue({ sid: "CA123" });
-    mocks.insertCallForWorkspace.mockResolvedValue({ sid: "CA123" });
+    mocks.dispatchReservedVoiceCall.mockImplementation(async (args: Parameters<typeof import("@/lib/voice-credit-dispatch.server").dispatchReservedVoiceCall>[0]) => {
+      const call = await args.create({ voiceUrl: args.voiceUrl, statusCallback: args.statusCallback });
+      return { ok: true, callSid: call.sid, replayed: false };
+    });
   });
 
   test("test calls use the saved voicemail policy and wait for the greeting end (#2774)", async () => {
@@ -94,13 +94,10 @@ describe("sendCampaignTestCall", () => {
         machineDetection: "Enable",
       }),
     );
-    expect(mocks.insertCallForWorkspace).toHaveBeenCalledWith(
-      "w1",
+    expect(mocks.dispatchReservedVoiceCall).toHaveBeenCalledWith(
       expect.objectContaining({
-        sid: "CA123",
-        campaign_id: 99,
-        contact_id: null,
-        outreach_attempt_id: null,
+        workspaceId: "w1", kind: "ivr", accountSid: "ACfixture",
+        campaignId: 99, contactId: null, outreachAttemptId: null,
       }),
     );
   });
@@ -111,9 +108,8 @@ describe("sendCampaignTestCall", () => {
     const { sendCampaignTestCall } = await import("@/lib/campaign-test-call.server");
     const result = await sendCampaignTestCall(baseArgs);
     expect(result).toMatchObject({ ok: true, usedContact: true });
-    expect(mocks.insertCallForWorkspace).toHaveBeenCalledWith(
-      "w1",
-      expect.objectContaining({ contact_id: 7, outreach_attempt_id: null }),
+    expect(mocks.dispatchReservedVoiceCall).toHaveBeenCalledWith(
+      expect.objectContaining({ contactId: 7, outreachAttemptId: null }),
     );
   });
 
@@ -141,10 +137,16 @@ describe("sendCampaignTestCall", () => {
     const { sendCampaignTestCall } = await import("@/lib/campaign-test-call.server");
     const result = await sendCampaignTestCall(baseArgs);
     expect(result).toMatchObject({ ok: false, reason: "call_failed" });
-    expect(mocks.insertCallForWorkspace).not.toHaveBeenCalled();
     expect(mocks.logger.error).toHaveBeenCalledWith(
       "campaign.test_call_failed",
       expect.objectContaining({ campaignId: "99" }),
     );
+  });
+
+  test("maps a failed atomic admission to the existing credit refusal", async () => {
+    mocks.dispatchReservedVoiceCall.mockResolvedValue({ ok: false, reason: "insufficient_credits", balance: 0 });
+    const { sendCampaignTestCall } = await import("@/lib/campaign-test-call.server");
+    expect(await sendCampaignTestCall(baseArgs)).toMatchObject({ ok: false, reason: "insufficient_credits" });
+    expect(mocks.callsCreate).not.toHaveBeenCalled();
   });
 });

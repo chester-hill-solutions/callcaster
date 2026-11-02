@@ -5,6 +5,10 @@ vi.hoisted(() => {
     process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
 });
 
+vi.mock("@/server/queue-advance-snapshot.server", async importOriginal => ({
+  ...(await importOriginal<typeof import("@/server/queue-advance-snapshot.server")>()),
+  withQueueAdvanceSnapshots: vi.fn(async rows => rows),
+}));
 vi.mock("@/server/db", () => ({
   db: {
     select: vi.fn(),

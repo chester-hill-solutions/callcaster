@@ -10,7 +10,6 @@ import {
 import { toast } from "sonner";
 import {
   handleCall,
-  handleConference,
   releaseCallSession,
 } from "@/lib/callscreenActions";
 import { useWorkspaceRealtime, useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
@@ -18,10 +17,16 @@ import useDebouncedSave from "@/hooks/utils/useDebouncedSave";
 import useCallRoom from "@/hooks/call/useCallRoom";
 import { useTwilioDevice } from "@/hooks/call/useTwilioDevice";
 import { useCallEndTone } from "@/hooks/call/useCallEndTone";
+import { useCallDuration } from "@/hooks/call/useCallDuration";
 import { useStartConferenceAndDial } from "@/hooks/call/useStartConferenceAndDial";
 import { useCallState } from "@/hooks/call/useCallState";
 import { useCallScreenDialogs } from "@/hooks/call/useCallScreenDialogs";
 import { usePhoneVerification } from "@/hooks/call/usePhoneVerification";
+import { useAgentAudioConnection, useAgentBrowserReadiness } from "@/hooks/call/useAgentAudioConnection";
+import { useManualAudioDial } from "@/hooks/call/useManualAudioDial";
+import { useCustomerCallControls } from "@/hooks/call/useCustomerCallControls";
+import { agentAudioStartReason, useCallScreenAudio } from "@/hooks/call/useCallScreenAudio";
+import type { StartCallArgs } from "@/lib/manual-dial-client";
 import { useCallAudioControls } from "@/hooks/call/useCallAudioControls";
 import { useAudioDeviceTest } from "@/hooks/call/useAudioDeviceTest";
 
@@ -61,6 +66,7 @@ import {
   useCampaignDialActions,
 } from "@/hooks/call/useCampaignDialActions";
 import { usePredictiveCallSync } from "@/hooks/call/usePredictiveCallSync";
+import { recoveredSubjectView, useRecoveredPredictiveSubject } from "@/hooks/call/useRecoveredPredictiveSubject";
 import { useNextRecipientSync } from "@/hooks/call/useNextRecipientSync";
 import { useDialFailureRecovery } from "@/hooks/call/useDialFailureRecovery";
 import { useCreditReconciliation } from "@/hooks/billing/useCreditReconciliation";
@@ -143,7 +149,7 @@ export function useCallScreen() {
     return () => clearInterval(interval);
   }, [revalidator]);
 
-  const [{ questionContact, update }, setQuestionnaire] = useState<{
+  const [{ questionContact: storedQuestionContact, update }, setQuestionnaire] = useState<{
     questionContact: QueueItem | null;
     update: Record<string, unknown> | null;
   }>({ questionContact: initialNextRecipient, update: null });
@@ -172,9 +178,17 @@ export function useCallScreen() {
   const [hasJoined, setHasJoined] = useState(!dialogs.isDialogOpen);
   const onJoin = useCallback(() => setHasJoined(true), []);
 
-  const phoneVerification = usePhoneVerification({
-    verifiedNumbers,
-  });
+  const phoneVerification = usePhoneVerification();
+  const agentAudio = useAgentAudioConnection(workspaceId, user.id);
+  const predictiveRecovery = campaign?.dial_type === "predictive" ? agentAudio.state.predictiveRecovery : null;
+  const selectedDevice = agentAudio.state.selectedDevice;
+  const { phoneSource, wantsBrowser } = agentAudio;
+  const manualAudioDial = useManualAudioDial(workspaceId, user.id, campaign?.id ?? 0);
+  const serverCustomerOwned = useRef(false);
+  const onServerCustomerOwned = useCallback((owned: boolean) => { serverCustomerOwned.current = owned; }, []);
+  const managesCustomerAudio = useCallback(() => serverCustomerOwned.current || agentAudio.resource.managesCustomerAudio(), [agentAudio.resource]);
+  const savedManual = agentAudio.state.manualRecovery;
+  const manualRecovery = savedManual?.workspace_id === workspaceId && savedManual.user_id === user.id && savedManual.campaign_id === campaign?.id ? savedManual : null;
 
   const { state, send } = useCallState();
   const navigate = useNavigate();
@@ -192,30 +206,23 @@ export function useCallScreen() {
     callDuration,
     setCallDuration,
     deviceIsBusy,
+    hasOwnedCalls,
+    hasHeldCalls,
     error: deviceError,
     reconnect: reconnectDevice,
   } = useTwilioDevice({
     token,
-    selectedDevice: phoneVerification.selectedDevice,
+    selectedDevice,
     workspaceId,
     send: send as unknown as (action: { type: string }) => void,
     onTokenWillExpire: handleTokenWillExpire,
-    enabled: hasJoined,
+    enabled: hasJoined && wantsBrowser,
+    managesCustomerAudio,
   });
 
-  // Wrap hangUp to drive lifecycle immediately before SDK teardown.
-  // This ensures the display transitions to ending/ended synchronously,
-  // even if the /api/hangup call or SDK disconnect is delayed.
-  const hangUp = useCallback(async () => {
-    send({ type: "HANG_UP" });
-    try {
-      await sdkHangUp();
-    } catch {
-      // SDK hangup failure is non-fatal; lifecycle already transitioned.
-    }
-  }, [sdkHangUp, send]);
-
+  const browserAudioEnabled = hasJoined && (wantsBrowser || hasOwnedCalls);
   const audioControls = useCallAudioControls({
+    enabled: browserAudioEnabled,
     device,
     activeCall,
     micCoordinator: { isMicMuted, setMicMuted },
@@ -224,7 +231,8 @@ export function useCallScreen() {
   // #1339: opt-in "test my mic / speaker" affordances for the settings
   // sheet. Keyed on the live mic stream from useCallAudioControls so the
   // meter reflects the same input the call will use.
-  const audioDeviceTest = useAudioDeviceTest({ stream: audioControls.stream });
+  const audioDeviceTest = useAudioDeviceTest({ stream: audioControls.stream, enabled: browserAudioEnabled });
+  useAgentBrowserReadiness(agentAudio.resource, agentAudio.state.preparingBrowser, deviceStatus === "Registered", audioControls.inputReady);
 
   const showStartError = useCallback((message: string, creditFailure: boolean) => {
     if (creditFailure) {
@@ -241,14 +249,20 @@ export function useCallScreen() {
     toast.error(message);
   }, [hasAccess, navigate, workspaceId]);
 
-  const { begin, conference, setConference, isLoading: isStartingConference, disabledReason: startDisabledReason } = useStartConferenceAndDial(
+  const { begin, conference, setConference, isLoading: isStartingConference, disabledReason: startDisabledReason,
+    awaitingReceipt: awaitingStartReceipt, pendingStartIntentId, stop: handleConferenceEnd,
+    stopPending: dialerStopPending, isStopping: isStoppingDialer, error: dialerError, hasSession: hasDialerSession } = useStartConferenceAndDial(
     {
       userId: user.id,
       campaignId: campaign?.id?.toString() || "",
       workspaceId,
       callerId: campaign?.caller_id || "",
-      selectedDevice: phoneVerification.selectedDevice,
+      selectedDevice,
+      audioSource: phoneSource,
       showError: showStartError,
+      recovery: predictiveRecovery,
+      dialerRecovery: campaign?.dial_type === "predictive" ? agentAudio.state.dialerRecovery : null,
+      currentVerified: agentAudio.state.currentVerified && !agentAudio.state.restoring,
     },
   );
 
@@ -256,11 +270,14 @@ export function useCallScreen() {
     status: liveStatus,
     users: onlineUsers,
     predictiveState,
+    customerCallSid: joinedCustomerSid,
+    recoveredCustomer,
   } = useCallRoom({
     workspace: workspaceId,
     campaign: campaign?.id,
     userId: user.id,
     conference,
+    recovery: predictiveRecovery,
   });
 
   const {
@@ -270,13 +287,13 @@ export function useCallScreen() {
     callsList,
     attemptList,
     recentCall,
-    recentAttempt,
+    recentAttempt: realtimeRecentAttempt,
     availableCredits,
     setRecentAttempt,
-    disposition,
+    disposition: realtimeDisposition,
     setDisposition,
     householdMap,
-    nextRecipient,
+    nextRecipient: realtimeNextRecipient,
     setNextRecipient,
     reconcileCredits,
   } = useWorkspaceRealtime({
@@ -299,25 +316,70 @@ export function useCallScreen() {
     workspace: workspaceId,
   } as UseWorkspaceRealtimeProps);
 
-  const callSid = getCallSid(activeCall) ?? recentCall?.sid ?? null;
+  const recoveredSubject = useRecoveredPredictiveSubject(recoveredCustomer ?? null, attemptList, realtimeRecentAttempt);
+  const predictiveView = recoveredSubjectView(recoveredSubject,
+    { nextRecipient: realtimeNextRecipient, questionContact: storedQuestionContact, recentAttempt: realtimeRecentAttempt,
+      disposition: realtimeDisposition, update });
 
   const agentLegSid = getCallSid(activeCall) ?? null;
 
-  const { displayState, displayColor, beginDial, terminalCallSid } = useCampaignCallFlow({
-    callSid,
-    agentLegSid,
+  const { displayState, displayColor, beginDial, terminalCallSid, customerCallSid, isCurrentCustomer, confirmCustomerEnded, recoveredManual, retireManualRecovery } = useCampaignCallFlow({
+    callSid: campaign?.dial_type === "predictive" ? joinedCustomerSid : managesCustomerAudio() ? null : agentLegSid,
+    confirmedCustomerSid: campaign?.dial_type === "predictive" ? joinedCustomerSid : null,
+    manualRecovery, allowManualRecovery: manualRecovery ? manualAudioDial.resource.ownsRecovery(manualRecovery) : false, onServerCustomerOwned,
+    agentLegSid: agentAudio.state.active?.callSid ?? agentLegSid,
     workspaceId,
     state,
-    activeCall,
-    recentAttemptDisposition: recentAttempt?.disposition,
+    activeCall: managesCustomerAudio() ? null : activeCall,
+    recentAttemptDisposition: predictiveView.recentAttempt?.disposition,
     predictiveState,
     isPredictive: campaign?.dial_type === "predictive",
     send: send as unknown as (action: { type: string }) => void,
+  });
+  const manualSubject = useRecoveredPredictiveSubject(recoveredManual, attemptList, realtimeRecentAttempt);
+  const { nextRecipient, questionContact, recentAttempt, disposition, update: ownedUpdate } = recoveredSubjectView(manualSubject, predictiveView);
+  const boundManualSubject = useRef("");
+  /**
+   * @effect Bind the confirmed manual questionnaire subject before accepting new edits.
+   * @effect-deps manualSubject.key, manualSubject.contact, manualSubject.attempt, setQuestionContact, setRecentAttempt, setUpdate (one confirmed attempt).
+   * @effect-side-effects Questionnaire state; no save or queue write.
+   * @effect-why-not-loader The saved call owner arrives after current discovery.
+   */
+  useEffect(() => {
+    if (!manualSubject.contact || !manualSubject.attempt || boundManualSubject.current === manualSubject.key) return;
+    boundManualSubject.current = manualSubject.key;
+    setQuestionContact(manualSubject.contact); setRecentAttempt(manualSubject.attempt); setUpdate(null);
+  }, [manualSubject.key, manualSubject.contact, manualSubject.attempt, setQuestionContact, setRecentAttempt, setUpdate]);
+  /**
+   * @effect Reconcile a lost manual POST reply only after its customer has been adopted.
+   * @effect-deps recoveredManual, isCurrentCustomer, manualAudioDial.resource (committed customer and saved request).
+   * @effect-side-effects Clear matching browser journal; no provider command.
+   * @effect-why-not-loader The request journal belongs to this browser page.
+   */
+  useEffect(() => {
+    if (recoveredManual && isCurrentCustomer()) manualAudioDial.resource.confirmRecovered(recoveredManual);
+  }, [recoveredManual, isCurrentCustomer, manualAudioDial.resource]);
+  const callSid = customerCallSid;
+  const logicalDuration = useCallDuration(displayState);
+  const liveCustomer = displayState === "dialing" || displayState === "connected";
+  const dialerNeedsStop = dialerStopPending || hasDialerSession && !conference && !awaitingStartReceipt;
+  const pendingCallRequest = Boolean(pendingStartIntentId) || dialerNeedsStop || manualAudioDial.state.pending;
+  const customerRecoveryPending = agentAudio.state.customerPending && !callSid && !conference && !pendingCallRequest;
+  const audioStartDisabledReason = agentAudioStartReason({ joined: hasJoined, ready: agentAudio.ready,
+    pendingCustomer: agentAudio.state.customerPending || pendingCallRequest || Boolean(manualAudioDial.state.error),
+    roomPending: Boolean(conference) && agentAudio.state.customerPending && !callSid,
+    selectedDevice, deviceStatus, hasPhoneSource: Boolean(phoneSource) });
+
+  const { hangUp, canControlCustomer } = useCustomerCallControls({
+    userId: user.id, workspaceId, campaignId: campaign?.id, callSid,
+    isPredictive: campaign?.dial_type === "predictive", activeCall, sdkHangUp, send,
+    isCurrentCustomer, confirmCustomerEnded, managesCustomerAudio, onHangUp: retireManualRecovery,
   });
 
   // Two short busy-style bursts when the call ends — either side hanging up —
   // so the agent gets audible confirmation, not just the status text (#1363).
   useCallEndTone({
+    enabled: selectedDevice === "computer",
     displayState,
     outputDeviceId: audioControls.output,
   });
@@ -336,7 +398,7 @@ export function useCallScreen() {
   useRemoteHangupReconcile({
     displayState,
     callState,
-    isPredictive: campaign?.dial_type === "predictive",
+    isPredictive: campaign?.dial_type === "predictive" || managesCustomerAudio(),
     terminalCallSid,
     hangUp,
   });
@@ -354,12 +416,19 @@ export function useCallScreen() {
     showError: (message) => toast.error(message),
   });
 
-  const { startCall } = handleCall({ submit });
-  const { handleConferenceEnd } = handleConference({ begin });
+  const { startCall: startLegacyCall } = handleCall({ submit });
+  const startCall = (args: StartCallArgs) => {
+    if (args.audioSource) void manualAudioDial.resource.begin(args);
+    else startLegacyCall(args);
+  };
 
   const queueFlow = useCampaignQueueFlow({
     campaign: campaign ?? null,
     workspaceId,
+    userId: user.id,
+    questionContact,
+    customerCallSid,
+    isCurrentCustomer,
     groupByHousehold,
     queue,
     householdMap,
@@ -375,7 +444,7 @@ export function useCallScreen() {
     setQueue,
   });
 
-  const currentUpdate = update ?? getSavedCallResult(
+  const currentUpdate = ownedUpdate ?? getSavedCallResult(
     recentAttempt, questionContact, campaign?.id, workspaceId,
   );
   const { saveData, isSaving } = useDebouncedSave({
@@ -404,17 +473,20 @@ export function useCallScreen() {
 
   const handleDialButton = useCampaignDialActions({
     campaign,
-    deviceIsBusy,
+    deviceIsBusy: queueFlow.pending || hasHeldCalls || (deviceIsBusy && !(agentAudio.state.active?.transport === "computer" && agentAudio.state.active.callSid === agentLegSid)),
     incomingCall,
     deviceStatus,
-    callState,
+    callState: displayState,
     begin,
     startCall,
     nextRecipient,
     user,
     workspaceId,
     recentAttempt,
-    selectedDevice: phoneVerification.selectedDevice,
+    selectedDevice,
+    audioSource: phoneSource,
+    audioReady: agentAudio.ready && !agentAudio.state.customerPending && !pendingCallRequest && !manualAudioDial.state.error &&
+      (selectedDevice === "computer" ? deviceStatus === "Registered" : Boolean(phoneSource)),
     send: send as unknown as (action: { type: string }) => void,
     beginDial,
   });
@@ -427,6 +499,7 @@ export function useCallScreen() {
     handleDialButton,
     saveData,
     dequeue: queueFlow.dequeue,
+    isCurrentQueue: queueFlow.isCurrentQueue,
     fetchMore: queueFlow.fetchMore,
     householdMap,
     handleNextNumber: queueFlow.handleNextNumber,
@@ -435,10 +508,9 @@ export function useCallScreen() {
   });
 
   const handleVoiceDrop = () => {
-    const sid = getCallSid(activeCall);
-    if (!sid) return;
+    if (!callSid || !canControlCustomer()) return;
     const formData = new FormData();
-    formData.append("callId", sid);
+    formData.append("callId", callSid);
     formData.append("workspaceId", workspaceId);
     formData.append("campaignId", campaign?.id?.toString() || "");
 
@@ -497,7 +569,7 @@ export function useCallScreen() {
     // beginDial reset displayState to idle). Predictive mode always advances —
     // the system pushing the next contact IS the flow there (#1458).
     holdAdvance:
-      campaign?.dial_type !== "predictive" && displayState !== "idle",
+      recoveredSubject.owns || manualSubject.owns || campaign?.dial_type !== "predictive" && displayState !== "idle",
     send: send as unknown as (action: { type: string }) => void,
     setQuestionContact,
     setCallDuration,
@@ -512,17 +584,16 @@ export function useCallScreen() {
     setUpdate,
     conference,
     setConference,
+    recoveredSubject,
+    setQuestionContact,
+    setRecentAttempt,
   });
 
-  const handleDeviceSelect = useCallback(
-    (device: string) => {
-      void phoneVerification.handlePhoneDeviceSelection(
-        device,
-        audioControls.requestMicrophoneAccess,
-      );
-    },
-    [phoneVerification, audioControls.requestMicrophoneAccess],
-  );
+  const screenAudio = useCallScreenAudio({ audio: agentAudio, hasJoined, workspaceId, verifiedNumbers,
+    customerSid: liveCustomer ? callSid : null, agentSid: agentLegSid,
+    customerPending: pendingCallRequest || (agentAudio.state.customerPending && !liveCustomer) || (liveCustomer && !callSid), browserEnabled: wantsBrowser,
+    browserError: audioControls.permissionError ?? audioControls.inputError ?? deviceError?.message ?? null,
+    requestMicrophone: audioControls.requestMicrophoneAccess, reconnect: () => { if (!hasOwnedCalls) reconnectDevice(); } });
 
   const currentState = {
     callState,
@@ -546,18 +617,32 @@ export function useCallScreen() {
   }, [hangUp, send, reconnectDevice]);
 
   const callControls = {
+    isAdvancingQueue: queueFlow.pending,
+    awaitingCustomerReceipt: (manualAudioDial.state.pending && !callSid) || Boolean(pendingStartIntentId) || customerRecoveryPending,
+    manualDialError: manualAudioDial.state.error ?? (dialerStopPending ? dialerError ?? "Stop is pending. Stay on this screen until it is confirmed."
+      : dialerError ?? (awaitingStartReceipt ? "The dialer request is not confirmed. Check this request before starting another session."
+      : customerRecoveryPending ? "An existing call needs confirmation. Check the call before dialing another contact." : manualSubject.error ?? recoveredSubject.error)),
+    dialerStopPending: dialerNeedsStop,
+    hasDialerSession,
+    isCheckingManualDial: manualAudioDial.state.sending || isStartingConference || isStoppingDialer,
+    onCheckManualDial: () => {
+      if (dialerNeedsStop) void handleConferenceEnd();
+      else if (manualAudioDial.state.pending) void manualAudioDial.resource.retry(beginDial);
+      else if (awaitingStartReceipt) void begin();
+      else void agentAudio.resource.refresh();
+    },
     hangUp,
     answer,
     holdAndAnswer,
     incomingCall,
     activeCall,
-    callState,
-    callDuration,
-    deviceIsBusy,
+    callState: displayState,
+    callDuration: logicalDuration.callDuration,
+    deviceIsBusy: deviceIsBusy || queueFlow.pending,
     isStartingConference,
-    startDisabledReason,
+    startDisabledReason: startDisabledReason ?? audioStartDisabledReason,
     handleDialButton,
-    handleDequeueNext,
+    handleDequeueNext: () => { if (!pendingCallRequest && !liveCustomer && !customerRecoveryPending) { retireManualRecovery(); handleDequeueNext(); } },
     handleVoiceDrop,
     handleConferenceEnd,
     displayState,
@@ -572,7 +657,7 @@ export function useCallScreen() {
     creditState,
     deviceError,
     reconnectDevice,
-    resetCall,
+    resetCall: managesCustomerAudio() ? undefined : resetCall,
   };
 
   const queueControls = {
@@ -645,7 +730,10 @@ export function useCallScreen() {
     audioControls: audioControlsGroup,
     phoneVerification: {
       ...phoneVerification,
-      setSelectedDevice: handleDeviceSelect,
+      selectedDevice,
+      phoneConnectionStatus: screenAudio.phoneConnectionStatus,
+      audioConnection: screenAudio.controls,
+      setSelectedDevice: screenAudio.onSelect,
     },
     featureFlags,
     callSid,

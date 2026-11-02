@@ -17,6 +17,8 @@ import {
 } from "@/lib/ivr-machine.server";
 import { defineAction } from "@/lib/handler.server";
 import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
+import { bindVerifiedVoiceReservationRequest } from "@/lib/voice-reservation-webhook.server";
+import { VOICE_RESERVATION_QUERY_PARAM } from "@/lib/voice-credit-dispatch.server";
 
 export interface CallEvent {
     Called: string;
@@ -63,6 +65,14 @@ export interface CallEvent {
     }
 };
 
+async function fetchStatusCampaign(campaignId: Call["campaign_id"], request: Request) {
+    if (campaignId != null) return fetchCampaignWithScript(campaignId);
+    if (!new URL(request.url).searchParams.get(VOICE_RESERVATION_QUERY_PARAM)) {
+        throw new Error("Call missing campaign_id");
+    }
+    return null;
+}
+
 /**
  * Records the machine-answer disposition, then the status callback continues.
  * The voicemail audio (or the hangup) is emitted by the flow entry route, which
@@ -83,10 +93,12 @@ export const action = defineAction({
             return { params, event, callSid };
         }
         const forbidden = await requireTwilioSignature(request, { callSid });
-        return forbidden ?? { params, event, callSid };
+        if (forbidden) return forbidden;
+        const bindingFailure = await bindVerifiedVoiceReservationRequest(request, params, "status");
+        return bindingFailure ?? { params, event, callSid };
     },
     sideEffects: ["db-write", "credit", "external"],
-    handler: async ({ auth }) => {
+    handler: async ({ auth, request }) => {
     const { params, event, callSid } = auth;
 
     try {
@@ -97,23 +109,22 @@ export const action = defineAction({
         const dbCall = await findCallBySid(callSid);
         if (!dbCall) throw new Error("Call not found");
         if (!dbCall.workspace) throw new Error("Call missing workspace");
-        if (dbCall.campaign_id == null) throw new Error("Call missing campaign_id");
-        const campaignData = await fetchCampaignWithScript(dbCall.campaign_id);
+        const campaignData = await fetchStatusCampaign(dbCall.campaign_id, request);
 
         const callStatus = event.callStatus;
 
-        if (isMachineAnswered(event.answeredBy, callStatus)) {
+        if (campaignData && isMachineAnswered(event.answeredBy, callStatus)) {
             await recordMachineAnswer(dbCall, campaignData);
         } else if (['failed', 'no-answer', 'completed', 'busy', 'canceled'].includes(callStatus)) {
             const updateData = buildCallUpsertFromTwilioParams(params);
             await processCallStatusWebhook(updateData, {
-                campaignType: campaignData.type ?? null,
+                campaignType: campaignData?.type ?? null,
                 workspaceId: String(dbCall.workspace),
                 campaignId: dbCall.campaign_id ?? null,
                 contactId: dbCall.contact_id ?? null,
                 outreachAttemptId: dbCall.outreach_attempt_id ?? null,
                 userId: dbCall.user_id ?? null,
-                note: `IVR Call ${callSid}, Campaign ${campaignData.title ?? "unknown"}`,
+                note: `IVR Call ${callSid}, Campaign ${campaignData?.title ?? "removed"}`,
             });
             // `processCallStatusWebhook` only persists the `call` row, so without
             // this the attempt keeps a NULL disposition and `get_campaign_stats`
@@ -133,7 +144,7 @@ export const action = defineAction({
             // is the last-settle trigger — the RPC itself re-checks the queue
             // and the call table, so an early callback (e.g. a failed dial
             // while others ring) is a no-op.
-            await recheckCampaignCompletion({
+            if (dbCall.campaign_id != null) await recheckCampaignCompletion({
               workspaceId: String(dbCall.workspace),
               campaignId: dbCall.campaign_id,
               reason: `ivr_status:${callStatus}`,

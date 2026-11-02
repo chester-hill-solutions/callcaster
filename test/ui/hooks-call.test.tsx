@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createMockTwilioCall } from "./hooks-test-helpers";
 
@@ -12,13 +12,15 @@ vi.mock("@twilio/voice-sdk", async () => {
 
 import { mockTwilioDevice, resetTwilioVoiceSdkMock } from "../mocks/twilio-voice-sdk";
 
-vi.mock("@/lib/services/hooks-api", () => ({
+vi.mock("@/lib/services/hooks-api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/services/hooks-api")>()),
   hangupCall: vi.fn().mockResolvedValue(undefined),
   startConferenceAndDial: vi.fn(),
 }));
 
 describe("call hooks", () => {
   beforeEach(() => {
+    localStorage.clear();
     vi.clearAllMocks();
     resetTwilioVoiceSdkMock();
     vi.stubGlobal(
@@ -29,7 +31,9 @@ describe("call hooks", () => {
     );
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    cleanup();
+    await act(async () => {});
     vi.unstubAllGlobals();
     // Restore real timers here rather than at the end of each fake-timer
     // test body: a mid-test assertion failure would otherwise skip the
@@ -111,27 +115,19 @@ describe("call hooks", () => {
       conferenceName: "conf",
     } as any);
 
-    const ok = renderHook(() =>
-      useStartConferenceAndDial({
-        userId: "u",
-        campaignId: "c",
-        workspaceId: "w",
-        callerId: "cid",
-        selectedDevice: "d",
-      }),
-    );
-    await act(async () => {
-      await ok.result.current.begin();
-    });
+    const options = { currentVerified: true, userId: "u", campaignId: "42", workspaceId: "10000000-0000-4000-8000-000000000001",
+      callerId: "+16135550101", selectedDevice: "computer" };
+    const ok = renderHook(() => useStartConferenceAndDial(options));
+    await act(async () => { await ok.result.current.begin(); });
     expect(ok.result.current.conference).toBe("conf");
+    // An accepted session cannot send another Start before its captured Stop.
+    await act(async () => { await ok.result.current.begin(); });
+    expect(api.startConferenceAndDial).toHaveBeenCalledTimes(1);
 
-    vi.mocked(api.startConferenceAndDial).mockResolvedValueOnce({
-      creditsError: true,
-    } as any);
-    await act(async () => {
-      await ok.result.current.begin();
-    });
-    expect(ok.result.current.creditsError).toBe(true);
+    vi.mocked(api.startConferenceAndDial).mockResolvedValueOnce({ success: false, creditsError: true });
+    const credit = renderHook(() => useStartConferenceAndDial({ ...options, userId: "credit-agent" }));
+    await act(async () => { await credit.result.current.begin(); });
+    expect(credit.result.current.creditsError).toBe(true);
 
     const bad = renderHook(() =>
       useStartConferenceAndDial({
@@ -552,5 +548,23 @@ describe("call hooks", () => {
     // customer-leg in-progress callback is the only signal that advances
     // the FSM from dialing to connected.
     expect(send).not.toHaveBeenCalledWith({ type: "CONNECT" });
+  });
+
+  test.each([false, true])("agent resource close keeps its customer owner independent (%s)", async separateAudio => {
+    const { useTwilioDevice } = await import("@/hooks/call/useTwilioDevice");
+    const send = vi.fn(), call = createMockTwilioCall({ parameters: { CallSid: "CA-agent-audio", To: "client:agent" } });
+    const { result, rerender } = renderHook(({ enabled }) => useTwilioDevice({ token: "tok", selectedDevice: "computer", workspaceId: "ws", send,
+      enabled, managesCustomerAudio: () => separateAudio }), { initialProps: { enabled: true } });
+    await act(async () => { await mockTwilioDevice.register(); });
+    act(() => mockTwilioDevice.emit("incoming", call));
+    expect(result.current.activeCall).toBe(call);
+    mockTwilioDevice.destroy.mockClear(); send.mockClear();
+    rerender({ enabled: false });
+    expect(mockTwilioDevice.destroy).not.toHaveBeenCalled();
+    expect(call.disconnect).not.toHaveBeenCalled();
+    act(() => call.emit("disconnect"));
+    expect(result.current.activeCall).toBeNull();
+    expect(mockTwilioDevice.destroy).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls.some(([action]) => action.type === "HANG_UP")).toBe(!separateAudio);
   });
 });

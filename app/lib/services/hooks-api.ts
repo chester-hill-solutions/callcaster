@@ -2,6 +2,7 @@
  * Hooks API Service Layer
  * Centralized API calls specifically for React hooks
  */
+import type { VoiceAudioSourceIdentity } from "@/lib/voice-audio-connection";
 
 interface HangupCallParams {
   callSid: string;
@@ -13,18 +14,43 @@ interface HangupCallResponse {
   message?: string;
 }
 
-interface StartConferenceParams {
+export interface StartConferenceParams {
   caller_id: string;
   workspace_id: string;
   campaign_id: string;
   selected_device: string;
+  dial_intent_id?: string;
+  actor_id?: string;
+  audioSource?: VoiceAudioSourceIdentity;
 }
 
 interface StartConferenceResponse {
   success: boolean;
   conferenceName?: string;
+  callSid?: string;
   creditsError?: boolean;
   error?: string;
+}
+
+export async function prepareHandsetDial(params: {
+  workspaceId: string; clientIdentity: string; to: string; intentId: string;
+}): Promise<string> {
+  const fallback = "We could not prepare this call. Please try again.";
+  let response: Response;
+  try {
+    response = await fetch(`/api/workspaces/${encodeURIComponent(params.workspaceId)}/handset/session`, {
+      method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to_number: params.to, client_identity: params.clientIdentity, dial_intent_id: params.intentId }),
+    });
+  } catch { throw new Error(fallback); }
+  const body: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = body && typeof body === "object" && "error" in body && typeof body.error === "string" ? body.error : fallback;
+    throw new Error(message);
+  }
+  if (!body || typeof body !== "object" || !("reservation_id" in body) ||
+      typeof body.reservation_id !== "string" || !body.reservation_id.trim()) throw new Error(fallback);
+  return body.reservation_id;
 }
 
 /**
@@ -66,6 +92,11 @@ export async function hangupCall(params: HangupCallParams): Promise<HangupCallRe
 }
 
 const CONFERENCE_START_FAILURE = "Could not start dialing. Try again.";
+const DEFINITE_START_REFUSALS = new Set([400, 401, 403, 404, 429]);
+
+export class ConferenceStartRefusedError extends Error {
+  constructor(message: string) { super(message); this.name = "ConferenceStartRefusedError"; }
+}
 const CONFERENCE_START_MESSAGES = new Map([
   ["Campaign is paused.", "Campaign is paused."],
   ["Campaign is not live yet. Start it from the Launch page.", "Campaign is not live yet. Start it from the Launch page."],
@@ -75,6 +106,10 @@ const CONFERENCE_START_MESSAGES = new Map([
   ["Unauthorized", "Sign in, then try again."],
   ["Workspace not found", "This campaign is unavailable. Reload the page."],
   ["Campaign not found", "This campaign is unavailable. Reload the page."],
+  ["Call creation needs provider verification", "Call start is pending provider verification. Please wait."],
+  ["A call is awaiting completion or recovery", "A call is awaiting completion or recovery. Please wait."],
+  ["No queued contacts", "No queued contacts."],
+  ["No contacts within recipient calling hours", "No contacts within recipient calling hours."],
 ]);
 
 function conferenceStartError(data: unknown): string {
@@ -87,7 +122,14 @@ function conferenceStartError(data: unknown): string {
     : CONFERENCE_START_FAILURE;
 }
 
-function conferenceStartResult(data: unknown): StartConferenceResponse {
+function conferenceCustomerSid(data: object, required: boolean) {
+  const sid = "callSid" in data ? data.callSid : undefined;
+  if (sid === undefined && !required) return undefined;
+  if (typeof sid !== "string" || !/^CA[0-9a-fA-F]{32}$/.test(sid)) throw new Error(CONFERENCE_START_FAILURE);
+  return sid;
+}
+
+function conferenceStartResult(data: unknown, requireCustomer: boolean): StartConferenceResponse {
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
     throw new Error(CONFERENCE_START_FAILURE);
   }
@@ -104,7 +146,8 @@ function conferenceStartResult(data: unknown): StartConferenceResponse {
     if (!("conferenceName" in data) || typeof data.conferenceName !== "string" || !data.conferenceName.trim()) {
       throw new Error(CONFERENCE_START_FAILURE);
     }
-    return { success: true, conferenceName: data.conferenceName };
+    const callSid = conferenceCustomerSid(data, requireCustomer);
+    return { success: true, conferenceName: data.conferenceName, ...(callSid ? { callSid } : {}) };
   }
   return { success: false, error: conferenceStartError(data) };
 }
@@ -127,16 +170,21 @@ export async function startConferenceAndDial(params: StartConferenceParams): Pro
   if (missingParams.length > 0) {
     throw new Error(`Missing required parameters: ${missingParams.join(', ')}`);
   }
+  if (params.audioSource && (!params.dial_intent_id || selected_device === "computer")) {
+    throw new ConferenceStartRefusedError(CONFERENCE_START_FAILURE);
+  }
 
   try {
     const response = await fetch(
       `/api/workspaces/${encodeURIComponent(workspace_id)}/campaigns/${encodeURIComponent(campaign_id)}/dialer/start`,
       {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(params.actor_id ? { 'X-Callcaster-Audio-Actor': params.actor_id } : {}) },
       body: JSON.stringify({
         caller_id,
         selected_device,
+        dial_intent_id: params.dial_intent_id,
+        ...(params.audioSource ? { audio_connection_id: params.audioSource.connectionId, audio_generation: params.audioSource.generation } : {}),
       }),
     },
     ).catch(() => {
@@ -156,11 +204,12 @@ export async function startConferenceAndDial(params: StartConferenceParams): Pro
 
     if (!response.ok) {
       const errorData: unknown = await response.json().catch(() => null);
-      throw new Error(response.status < 500 ? conferenceStartError(errorData) : CONFERENCE_START_FAILURE);
+      const message = response.status < 500 ? conferenceStartError(errorData) : CONFERENCE_START_FAILURE;
+      throw DEFINITE_START_REFUSALS.has(response.status) ? new ConferenceStartRefusedError(message) : new Error(message);
     }
 
     const data: unknown = await response.json().catch(() => null);
-    return conferenceStartResult(data);
+    return conferenceStartResult(data, Boolean(params.audioSource));
   } catch (error) {
     if (error instanceof Error) {
       throw error;

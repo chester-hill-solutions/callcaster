@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { EventEmitter } from "node:events";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { startTransition, Suspense, type ReactNode } from "react";
 import { createCallAudioInput } from "@/lib/twilio/call-audio-input.client";
 import { useCallAudioControls } from "@/hooks/call/useCallAudioControls";
 import { useSoftphoneAudioDevices } from "@/hooks/call/useSoftphoneAudioDevices";
@@ -421,5 +422,104 @@ describe("audio device lifecycle", () => {
     await act(async () => resolveMicrophoneStream(stream));
 
     expect(stopMicrophoneTrack).toHaveBeenCalledTimes(1);
+  });
+
+  test("disabled browser audio does not acquire or route hardware", async () => {
+    const openContext = vi.fn();
+    class AudioContext {
+      constructor() { openContext(); }
+      close = vi.fn();
+    }
+    vi.stubGlobal("AudioContext", AudioContext);
+    const device = { audio: { setInputDevice, unsetInputDevice: vi.fn(async () => {}),
+      speakerDevices: { set: setSpeakerDevice } } };
+    const hook = renderHook(() => useCallAudioControls({ enabled: false, device: device as never,
+      activeCall: null, micCoordinator: { isMicMuted: false, setMicMuted } }));
+    await act(async () => { await hook.result.current.requestMicrophoneAccess(); });
+    act(() => {
+      hook.result.current.handleMicrophoneChange({ target: { value: "usb-mic" } } as React.ChangeEvent<HTMLSelectElement>);
+      hook.result.current.handleSpeakerChange({ target: { value: "default" } } as React.ChangeEvent<HTMLSelectElement>);
+      hook.result.current.handleDTMF("1");
+    });
+    await act(async () => { await Promise.resolve(); });
+    expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
+    expect(navigator.mediaDevices.enumerateDevices).not.toHaveBeenCalled();
+    expect(setInputDevice).not.toHaveBeenCalled();
+    expect(setSpeakerDevice).not.toHaveBeenCalled();
+    expect(openContext).not.toHaveBeenCalled();
+  });
+
+  test("suspension releases capture and browser audio can later acquire a fresh stream", async () => {
+    const closeContext = vi.fn();
+    class AudioContext { close = closeContext; }
+    vi.stubGlobal("AudioContext", AudioContext);
+    const hook = renderHook(({ enabled }) => useCallAudioControls({ enabled, device: null,
+      activeCall: null, micCoordinator: { isMicMuted: false, setMicMuted } }), { initialProps: { enabled: true } });
+    await waitFor(() => expect(hook.result.current.stream).toBeTruthy());
+    hook.rerender({ enabled: false });
+    expect(stopMicrophoneTrack).toHaveBeenCalledTimes(1);
+    expect(closeContext).toHaveBeenCalledTimes(1);
+    expect(hook.result.current.stream).toBeNull();
+    expect(hook.result.current.audioContextRef.current).toBeNull();
+    hook.rerender({ enabled: true });
+    await waitFor(() => expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(hook.result.current.stream).toBeTruthy());
+  });
+
+  test.each(["resolve", "reject"])("a delayed microphone request cannot %s into suspended audio", async (outcome) => {
+    let resolve!: (stream: MediaStream) => void, reject!: (error: Error) => void;
+    const pending = new Promise<MediaStream>((complete, fail) => { resolve = complete; reject = fail; });
+    vi.mocked(navigator.mediaDevices.getUserMedia).mockReturnValueOnce(pending);
+    const alert = vi.fn(); vi.stubGlobal("alert", alert);
+    const hook = renderHook(({ enabled }) => useCallAudioControls({ enabled, device: null,
+      activeCall: null, micCoordinator: { isMicMuted: false, setMicMuted } }), { initialProps: { enabled: true } });
+    await waitFor(() => expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1));
+    hook.rerender({ enabled: false });
+    await act(async () => {
+      if (outcome === "resolve") resolve({ getTracks: () => [{ stop: stopMicrophoneTrack }] } as never);
+      else reject(Object.assign(new Error("Late permission refusal"), { name: "NotAllowedError" }));
+    });
+    expect(hook.result.current.stream).toBeNull();
+    expect(hook.result.current.permissionError).toBeNull();
+    expect(alert).not.toHaveBeenCalled();
+    expect(stopMicrophoneTrack).toHaveBeenCalledTimes(outcome === "resolve" ? 1 : 0);
+  });
+
+  test("a pending SDK input selection releases its late capture after suspension", async () => {
+    let finish!: () => void, selected: string | null = null;
+    const acquired = new Promise<void>((resolve) => { finish = resolve; });
+    const device = { audio: {
+      setInputDevice: vi.fn(async (id: string) => { await acquired; selected = id; }),
+      unsetInputDevice: vi.fn(async () => { selected = null; }),
+      speakerDevices: { set: setSpeakerDevice },
+    } };
+    const hook = renderHook(({ enabled }) => useCallAudioControls({ enabled, device: device as never,
+      activeCall: null, micCoordinator: { isMicMuted: false, setMicMuted } }), { initialProps: { enabled: true } });
+    await waitFor(() => expect(device.audio.setInputDevice).toHaveBeenCalledTimes(1));
+    hook.rerender({ enabled: false });
+    await act(async () => finish());
+    await waitFor(() => expect(device.audio.unsetInputDevice).toHaveBeenCalled());
+    expect(selected).toBeNull();
+  });
+
+  test("an uncommitted suspension cannot cancel the current microphone request", async () => {
+    let resolve!: (stream: MediaStream) => void;
+    const pendingCapture = new Promise<MediaStream>((complete) => { resolve = complete; });
+    vi.mocked(navigator.mediaDevices.getUserMedia).mockReturnValueOnce(pendingCapture);
+    const pendingRender = new Promise<void>(() => {});
+    const hook = renderHook(({ enabled, suspend }) => {
+      const controls = useCallAudioControls({ enabled, device: null, activeCall: null,
+        micCoordinator: { isMicMuted: false, setMicMuted } });
+      if (suspend) throw pendingRender;
+      return controls;
+    }, { initialProps: { enabled: true, suspend: false },
+      wrapper: ({ children }: { children: ReactNode }) => <Suspense fallback={null}>{children}</Suspense> });
+    await waitFor(() => expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledOnce());
+    act(() => startTransition(() => hook.rerender({ enabled: false, suspend: true })));
+    const stream = { getTracks: () => [{ stop: stopMicrophoneTrack }] } as never;
+    await act(async () => resolve(stream));
+    await waitFor(() => expect(hook.result.current.stream).toBe(stream));
+    expect(stopMicrophoneTrack).not.toHaveBeenCalled();
+    hook.rerender({ enabled: true, suspend: false });
   });
 });

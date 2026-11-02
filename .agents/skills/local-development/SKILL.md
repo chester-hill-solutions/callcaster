@@ -16,6 +16,8 @@ libraries or using a different Node major.
 
 ## Check cadence
 
+Before reading source, find the exact path with `rg --files` and use the returned path. Do not infer file names from a hook or feature name. Quote shell search patterns and pass them with `rg --glob`; an unquoted pattern can fail in zsh before the search runs.
+
 For outbound estimates, trace the current batch size, successor schedule and
 worker polling cadence together. A configured provider rate alone does not
 describe queue progress. Confirm when rows dequeue before calling an estimate
@@ -77,6 +79,8 @@ Inspect warning counts in focused lint results. ESLint can exit zero while a
 ratchet still rejects new warnings. For nested fields, use the canonical
 `FormFieldControl` contract instead of overriding spacing owned by `FormField`.
 Keep layout-only wrappers outside the control association.
+Compare warnings in each changed file with the tested base as well. Aggregate
+ratchet headroom can hide a new warning in the changed implementation.
 
 Before a push or pull request, run `npm run ci:local` and the focused tests
 for changed behavior. CI owns the complete Node, UI and Bun suites, production
@@ -119,6 +123,23 @@ When a service gains a scoped tenant-client read, update its orchestration
 fixtures at that boundary. Prove cross-workspace denials against the real
 database; a permissive query mock is not authorization evidence.
 
+For a new tenant table, export its schema, register it in
+`workspace-scoped-tables.ts`, and update the explicit table inventory in
+`test/tenant-db.test.ts`. Keep actor isolation in the real-database tests;
+registry completeness alone does not prove row ownership.
+Route a new domain-table re-export through its existing schema module. Keep
+the central schema barrel within its current file-size limit; do not raise it.
+
+The route-membership guard follows local imports one hop. Keep the canonical
+workspace check visible at the HTTP boundary when transaction services place
+their membership recheck deeper. Preserve the locked service check as well;
+do not add a public-route exception or deepen the crawl to clear the guard.
+
+Keep membership checks outside a catch block that turns provider errors into a
+normal result. `requireWorkspaceAccess` throws a typed AppError; preserving only
+Response exceptions still hides its 404. Verify a non-member through the real
+route and database, including the HTTP status and absence of provider commands.
+
 When a pipeline gains caller-dependent authorization, inventory HTTP and worker
 callers. Pass the authenticated user for requests and explicit system authority
 for trusted jobs without a user. Test identity forwarding separately from SQL
@@ -131,17 +152,89 @@ companion record can hide a broken unit or identity check. Remove the specific
 guard in an isolated source copy and require an executed failure; keep the
 working branch unchanged while other reviews or gates read it.
 
+Reset queued mock replies between tests when a negative path can leave them
+unused. `vi.clearAllMocks()` clears call history but retains queued one-time
+replies. Set a fresh default after `mockReset()`, and assert the pending API
+call before resolving its deferred reply. Otherwise a later case can consume
+the previous case's refusal and give false ownership evidence.
+
 Before another isolated install or full gate in a long audit, check available
 disk space. Remove only reproducible dependencies/build output in owned
 temporary worktrees whose readers have stopped; keep source, proof artifacts
 and user files. A disk-space failure is not a green gate: rerun the full gate
 after recovery.
 
-Scope an isolated integration-test DATABASE_URL to the bootstrap and database test
-commands. The reset compose fixture deliberately has no deployment ledger. Do not
+Scope an isolated integration fixture's DATABASE_URL, DATABASE_DIRECT_URL and
+INTEGRATION_DB_URL to its bootstrap and database test commands. Set all three to
+the owned fixture so lazy direct connections cannot use another environment. The reset compose fixture deliberately has no deployment ledger. Do not
 carry that test URL into ci:local and then claim its ledger failure is code drift.
 Keep the full normal-environment CI result and the real database proof separate;
 never mark missing migrations as applied merely to pass the ledger guard.
+
+Give each real-database provider fixture a unique account SID. Delete its queued
+jobs before its workspace, including after deliberate faults: a fault can enqueue
+work that a passing control never creates. A mutation proof requires the expected
+failed assertions, passing controls, and no suite or cleanup-hook failure.
+Vitest promise assertions can be reported as `Error` rather than `AssertionError`.
+Require the named test and an executed `__VITEST_RESOLVES__` or
+`__VITEST_REJECTS__` assertion frame when accepting that form. A raw product or
+hook exception alone does not prove the intended assertion failed.
+
+When extracting shared Vitest fixtures, keep `vi.hoisted` declarations private
+and export their bindings with a separate `export { ... }` statement. A direct
+`export const value = vi.hoisted(...)` fails before test collection. Import the
+fixture before product modules so its mocks are installed first. Compare the
+combined executed case names and count with the original suite after splitting.
+
+Keep funded settlement in admission's workspace-before-reservation lock order;
+continuation and source-generation checks need that same workspace fence.
+Predictive join writes must match both the queue generation and reservation ID,
+plus workspace, campaign and contact. Keep Call, answer and queue writes in one
+transaction, then publish events after commit. A saved answer timestamp must
+not prevent a queue retry. An unfunded historical Call cannot prove queue
+ownership; retain its call facts without changing a matching contact's queue.
+Re-read terminal Call and reservation state under their locks before writing.
+Recording nonce preparation needs only the reservation lock. Prove
+cross-service races at the real ledger boundary and wait for `pg_blocking_pids`
+before releasing the barrier; a timing-only overlap can miss a deadlock.
+
+Predictive human admission must commit before returning customer Conference
+TwiML. Serialize it through the workspace fence and keep one pending or joined
+human per agent. An extra answered call gets Hangup, while only its exact queue
+generation and reservation can be restored with a new generation. Keep its
+credit hold until a real terminal receipt arrives. Give a later queue generation
+its own send key; a saved phone source must not collapse that retry into the old
+send. Test pending, joined and simultaneous answers, late events, refusal replay,
+queue-write rollback, busy dispatch and billing through the real database.
+
+For each new client migration, wire both `scripts/db/bootstrap-fresh-db.mjs`
+and `scripts/e2e/bootstrap-compose-db.mjs`. Run `npm run db:bootstrap:check`;
+its read-only checks must pass for both lists before any push. Startup upgrade
+proof on an existing owned database does not verify compose bootstrap wiring.
+For a new tenant registry entry, also run the real
+`test/integration-db/workspace-foreign-keys.test.ts` contract. Each tenant column
+needs its own validated workspace cascade; a composite link through another
+tenant table does not replace that reference.
+
+Twilio inbound and outbound media share one timestamp clock. Test simultaneous
+tracks against fixed G.711 vectors and one mono duration; byte concatenation
+doubles elapsed audio. Keep startup and jitter buffers bounded, own every timer
+through stop/close, and flush before closing STT. Delay upstream open and coaching
+cleanup separately: early media must survive, a late open must stay retired, and
+cleanup time must not extend the completed transcription debit.
+
+For recording assembly, snapshot source IDs and their input order before any
+await. Use that same snapshot for staging and filter indexes; a readonly view
+does not prevent the caller from changing its array. Test equal-length distinct
+tones while the caller changes source order during staging. Verify decoded
+samples from a seekable MP3, including short slices and encoder delay/padding;
+a successful encoder exit or container duration does not prove complete audio.
+Keep all staged inputs and output in the existing process cleanup scope.
+Real codec tests require both ffmpeg and ffprobe on PATH. Verify the CI job
+installs them; hosted runner images do not guarantee their presence. Keep
+the actual codec cases required rather than skipping or replacing them with mocks.
+Trace every workflow caller of the Node test configuration, including scheduled
+and manual coverage jobs, before adding a required executable dependency.
 
 Bun checks must run where Bun can write its temporary files. A permission
 failure is not lockfile drift: retain the dependency files and rerun the full
@@ -177,6 +270,12 @@ boundary line locations only when the source file, expression and callsite count
 are unchanged; keep their approval metadata. Regenerate the reports from source
 instead of selecting one side of a generated-file conflict.
 
+After a rebase combines API contracts, regenerate every checked-in API view
+with `npm run tools:api:codegen` and `npm run tools:api:surface:report`.
+A public-view merge can be clean while the complete view retains old fields.
+Inspect all generated changes, commit them, then require `npm run ci:codegen:verify`
+to leave the generated files unchanged.
+
 The compose migration fixture grants its public schema to the `callcaster`
 role. Create disposable Postgres with that role, or create it inside the owned
 database before bootstrapping. Keep both database URLs command-scoped to that
@@ -188,11 +287,110 @@ exact development-tool peer. Verify both lockfiles and a clean `npm ci`, then
 require `npm ls` to accept both versions. For async React owners, test a
 suspended identity transition: changing an owner ref during render can cancel
 work that still belongs to the committed screen.
+For lazy SDK and media tests, wait for observable registration or capture
+readiness. A fixed number of Promise.resolve turns does not prove that an
+import or a microphone request has completed. Keep cancellation tests separate
+so late setup must still be rejected after the owner is suspended or removed.
+
+Keep pure resources used during render in ordinary `.ts` modules. React Router
+replaces `.client` module exports with `undefined` during server rendering,
+including classes constructed by `useMemo`. Defer browser storage, media and
+network access until mount or explicit actions. Test the real hooks through the
+installed Router client-boundary transform and a server renderer; JSDOM tests
+and a successful production build do not prove that the route can render.
+
+For current-resource recovery, an empty server read cannot discard a saved
+request whose POST is still unknown. Retain that nonce for explicit Check or
+Cancel. A retry refusal does not resolve an earlier unknown POST. Keep its
+original nonce and Stop path, including after an auth or rate-limit refusal.
+Only a definite refusal without earlier uncertainty can retire that request. Keep cancellation and browser-readiness continuations tied to their
+captured owner; discovery must not transfer them to a newer control intent.
+Validate the full recovered snapshot before changing either audio role, and
+retain known terminal intents so a later read cannot revive them.
+Admission fences block new operations. Keep an explicit Check for an already
+submitted Start on its captured request even when the server reports busy.
+
+For provider Stop cleanup, persist observed closure through the canonical
+surviving Call context. Original reservation campaign, queue and outreach IDs
+can point at deleted data; copying them into an upsert can restore invalid
+foreign keys. Keep final duration and debit ownership in normal billing.
+Bound cleanup batches and retain pending work after a partial provider failure.
+Test a nonterminal callback with missing or zero duration before Stop, then run
+recovery before the final receipt. Clear unproved Call duration fields when
+recording Stop closure; retain the reservation's confirmed final duration.
+An empty browser journal is not proof of idle before current discovery finishes.
+Keep in-flight Stop requests alive on unload and retire refused nonces after acceptance.
+
+For manual customer recovery, retire automatic discovery in the local command
+itself. Next can run while the FSM is already idle, so an effect that waits for
+a state change is not a command fence. Restore the exact editable outreach
+attempt as well as the visible contact; prove that new disposition and answer
+edits save to that attempt when the loader points at another contact.
+
+Customer controls also need their committed page lifetime. Reuse the canonical
+customer owner, and check it before a provider command or Voice Drop submit,
+after an awaited reply, and before a global failure toast or SDK cleanup. Retire
+captured controls on actor, workspace or campaign changes and route disposal.
+Test retained callbacks and delayed success/refusal/rejection after unmount or
+customer replacement, plus matching current controls. An audio-resource fence
+alone does not retire every page callback. Disposing a customer-command adapter
+must not send a new Hang Up. SDK resource teardown remains with its owner.
+Keep wrapper method types tied to the underlying handler so an asynchronous
+acknowledgement cannot be erased by a `void` interface.
+
+For SDK Hang Up, retain the workspace lifetime, request generation and physical
+active-call identity through the provider reply. Retire old callbacks before
+send and ignore late feedback or cleanup after a new active call, scope change
+or unmount. Read the current held and incoming calls after the reply. A saved
+held-call list can revive a closed call; `disconnectAll` can end a new incoming
+call. Preserve matching current cleanup and the original SDK resource owner.
+Keep the physical call's original workspace with resource cleanup. A workspace
+change cannot rebind that call or send its cleanup through the new workspace.
+Provider teardown by the resource owner has no page or customer continuation.
+For explicit held-call commands, check live ownership before consuming a request
+generation and again after the reply. A closed-held callback cannot retire a
+valid active Hang Up. If the original held target becomes active, end that same
+physical call and restore the current held successor. Default active-call
+commands retain their render's physical target instead of reading a newer one.
+
+Check available disk space before long test runs and generated-inventory writes
+on a nearly full host. Keep several GB of working headroom. Preserve an ENOSPC
+run as an infrastructure failure, not an executed behavior baseline. Reclaim
+only proven task-owned disposable files or verified redundant evidence. Check
+affected generated files and regenerate them after space is available before
+starting source-hashed readers again.
 
 Discover uncertain module paths with `rg --files` before reading them. An ADR's
 planned layout can differ from the active source. A referenced skill can also
 exist only as a user file in the shared checkout; read it there without copying
 it into a worktree or replacing the user's file.
+
+For API work, check the current codegen configuration before using older API
+guidance. `openapi-ts.config.ts` generates the integrator subset into
+`app/lib/api-generated`; session-only dialer controls use their documented
+OpenAPI override and a client-safe response schema. Infer internal client types
+from that schema. Do not broaden route authentication to fit an old example.
+Run the matching OpenAPI contract tests with focused route/client checks when
+parameters or response variants change. Check each HTTP method separately;
+a new GET discovery mode must not broaden DELETE controls or its documentation.
+For call-control changes, include the shared CallArea tests with hook tests.
+For a new recovery stage, include the worker scheduling adapter tests and stub
+each service boundary so the test cannot enter real database I/O.
+
+Quote literal route paths containing `$` or shell glob characters; otherwise
+the shell can remove a route segment before the command runs. Read script names
+from `package.json` and discover helper files before reading them. Do not guess
+filenames from an exported function or an npm script's display name.
+When a route gains a reservation ownership lookup, legacy unit fixtures must
+declare their unfunded state at that lookup. Spreading `importOriginal` preserves
+exports but still runs the real database lookup unless it is replaced. Keep
+funded identity and security proof in the real-database suite; do not replace
+its binder with a fixed successful result.
+
+When extracting a legacy tenant-data helper, use `createTenantDb` in its new
+module. Moving an old unscoped database import creates new guard debt even
+when the query already has a workspace predicate. Verify the scoped read
+against the existing real-database controls.
 
 After changing a local file package's test dependencies, verify its lock metadata
 and every installed consumer. Bun can retain the old local metadata after a
@@ -272,6 +470,23 @@ For a focused Node test, run `npx --no-install vitest run -c vitest.node.config.
 with the file paths. `npm run test:node -- <file>` appends that path to the final
 Bun command and still runs the entire Node suite.
 
+If a read-only `tsx` check fails because the sandbox denies its IPC socket,
+run the same script with Node 22 and `node --import tsx <script>` from the
+worktree. Confirm that its normal result completes. A socket failure is not an
+API or source failure.
+
+Vite `mergeConfig` concatenates `test.include` arrays. For an isolated database
+probe, assign its final `include` after merging and pass the exact fixture path
+to Vitest. Check reported file and case counts before claiming focused proof.
+
+For a new owned Postgres container, verify readiness over TCP before bootstrap.
+The image can accept socket connections on its temporary initialization server,
+then stop that server. A successful socket `pg_isready` is not final readiness.
+
+Raw postgres.js fixture reads keep PostgreSQL bigint values as strings. Decode
+queue counters explicitly, or cast bounded test counters to integer in SQL
+before comparing them with numeric expectations.
+
 The UI test config aliases `@twilio/voice-sdk` to a mock. For SDK resource
 lifetime changes, exercise the installed SDK at that boundary as well. Use
 `createRequire` to resolve its actual entry where the alias would hide it.
@@ -298,6 +513,17 @@ an owned fresh database and a tracked partial baseline. A green compose
 bootstrap does not prove runtime session state or per-file recovery.
 
 ## Call teardown regressions
+
+Session End must own its committed actor, workspace, device and captured call
+set before send and after each reply. Check raw `Device.calls` as well as React
+incoming state: the SDK can receive a call before its event commits. Keep one
+pending end operation, and release a retired end's outbound block only while
+that same session still owns it. Cancel the canonical SDK request generation
+even when no Call object exists yet. Do not use a missing-call Hang Up error
+as cancellation. Test normal held/active closure and delayed SDK completion,
+plus commands and replies after scope exit, device replacement, new calls,
+pending preparation and an uncommitted render. Verify navigation ownership
+again after the session callback.
 
 SDK call and device teardown can throw before local session cleanup runs. Test
 the real session hook and call controls together: a provider terminal event
@@ -432,6 +658,11 @@ loading the base config. `mergeConfig` appends arrays, which can run the full
 suite alongside the intended fixture. Check the collected test count before
 accepting a focused regression report.
 
+For an external ESM Vitest config, resolve `vitest/config` with
+`import.meta.resolve` from the repository. `require.resolve` selects its CommonJS
+entry; bundling that entry into `.mjs` can fail on dynamic `node:os` requires
+before tests collect. Verify the ESM export and require a completed report.
+
 Read the component export and prop contract before building a UI fixture.
 Tests are excluded from the app TypeScript program, so a green typecheck does
 not detect a wrong default/named import or a wrong event field in a test.
@@ -490,9 +721,70 @@ Raw `execute` results do not use Drizzle column decoders. Timestamp values
 can be strings even when a cast says Date. Prefer scoped relational reads, or
 decode each selected timestamp and prove it against the installed driver.
 
+Do not overlap source-hash test proofs with `npm run ci:local`. Its vendor
+validation can rebuild declaration files. Finish that gate first, then capture
+a stable source snapshot and run independent focused proofs in parallel.
+
+Do not put raw correlated table-column SQL inside a scoped relational `where`.
+Drizzle can remap the inner columns to the outer table alias. Use transaction-
+bound select subqueries or separate tenant-scoped reads, and verify the query
+against an owned database with both positive and refusal cases.
+
+When a terminal route moves inline work into the result worker, find all route
+adapter tests for that path, including participant-leave tests. Mock the new
+outbox/result boundaries there and retain the participant-versus-terminal claim
+assertions. Keep billing, queue ownership and retry proof on the real worker
+and owned database.
+
+Funded queue completion must use the saved reservation actor, never today's
+assignee. Prove assignment release and a canonical claim by another actor,
+including a real workspace-lock wait. Exclude only saved provider/setup/audio
+legs when checking live customers; a later outreach still owns newer work.
+Legacy Call persistence must join the workspace fence used by its eligibility
+readers. Prove the gap with an owned write barrier and a real parent-derived
+callback. Keep that transaction short; events, billing and provider work follow
+commit, and existing transaction-bound tenant helpers own the row writes.
+
+For queue generation tests, use explicit requeue through
+`enqueueContactsForCampaign(..., { requeue: true })`. Assignment release keeps
+the current intent. Inspect foreign-key delete actions before rebuilding a
+fixture row: deleting a bound queue can also delete its saved Call. Preserve an
+unbound legacy Call explicitly when that is the case under test, and require
+failures at the queue assertion, not a missing-Call setup error.
+
 For real RPC fixtures, inspect and seed each required foreign-key actor.
 Membership or an auth identity may not supply the legacy user-profile row.
 A fixture or constraint error before the target assertion is not defect proof.
+Assert PostgreSQL constraint codes at the actual driver boundary: raw
+postgres.js errors expose `code`, while Drizzle query errors expose
+`cause.code`. Require the owned row to remain unchanged after rejection.
+After direct fixture SQL changes `workspace.twilio_data`, call
+`invalidateWorkspaceTwilioData` before callback checks. Keep a valid callback
+for the replacement account as a control. A stale cached token can otherwise
+make a missing original-account guard appear to work.
+For funding and queue metadata updates that preserve referenced keys, use
+`FOR NO KEY UPDATE` to serialize writers while permitting foreign-key checks.
+Prove that a real call insert can reference the locked workspace and queue,
+and that a concurrent requeue still cannot change the intent. `FOR UPDATE`
+can block the key-share locks from those inserts and create a lock cycle.
+See [PostgreSQL row lock modes](https://www.postgresql.org/docs/18/explicit-locking.html#LOCKING-ROWS).
+
+For durable provider recovery, remove referenced product data both before the
+create reply and after call persistence. A saved SID does not prove its call row
+survived a cascading delete. Restore only verified provider records, keep missing
+links null, scope surviving links to the tenant and lock them through insertion.
+Prove signed callbacks, lost replies, known-SID recovery and repeated settlement;
+do not infer a rejection or send another call because a local link disappeared.
+
+For a new-operation fixture, generate a fresh intent UUID and assert a new ID
+and prepared state before testing its send. Reusing an earlier intent exercises
+accepted replay, even when the target call is the same.
+
+Use command-scoped `VITEST_MAX_WORKERS=1` for shared real-database suites.
+Vitest applies this environment override after `fileParallelism: false`, so a
+broader gate's two-worker setting can let a global recovery scan claim another
+file's dummy holds. Keep exact recovery assertions; serialize the fixtures.
+
 Read current enum values before seeding companion rows. Script and campaign
 types can use different vocabularies; a script type does not prove a valid
 campaign enum.
@@ -524,6 +816,28 @@ can produce skipped tests and startup failures. Require the full count and zero
 skips before treating the run as proof.
 
 JavaScript fake timers do not change Postgres `now()` or column defaults.
+Postgres `now()` is the transaction start time. An insertion-order ownership
+cutoff needs `clock_timestamp()` on both compared insert events. Test an older
+transaction that inserts a replacement later, and an older transaction that
+inserts the original outreach after its queue. Keep applied migrations intact.
+A new default does not repair historical values. Preserve unknown intent
+timestamps and require saved ownership before old rows can advance. Test a
+delayed callback across a real upgrade after the replacement was already made.
+Keep insertion proof separate from explicit-redial timestamps used by phone
+deduplication. Test a new duplicate contact added after the first call ends.
+Keep real database I/O on real timers when testing a provider deadline. Signal
+that the provider read has started, await its bounded rejection, then release
+the late response. Faking all timers can stall the SQL client's socket work and
+the test teardown. Seed negative fixtures that satisfy the other SQL constraints;
+an insert/update constraint error is not evidence that the product rejected them.
+After stopping an owned integration worker, check its exact fixture IDs before
+running global recovery-count assertions. A skipped teardown can leave an expired
+operation for the next worker. Remove only verified dummy rows in the owned
+database, require no unexpected customer or ledger data, and read back cleanup.
+Use a block body when a Vitest setup hook configures a mock. Returning the mock
+function registers it as hook cleanup, so Vitest calls it later without arguments.
+Count provider reads after fixture readiness checks, or capture a baseline; the
+fixture's own physical verification is not a callback-authentication side effect.
 When a test freezes the app's captured timestamp, set owned SQL fixture timestamps
 explicitly after real billing writes. Keep the credit and cycle assertions and
 include a real future-row exclusion control. Do not widen a production timestamp
@@ -748,6 +1062,9 @@ success is `{ data: { id }, error: null }`; a top-level `{ id }` does not prove
 a delivery receipt. Keep rejected-result and missing-receipt controls when a
 write depends on provider success. A retry test must compare the actual repeated
 payload and key, including generated dates and signed links.
+Twilio's `RequestClient` receives lower-case method names. Normalize their case
+for read-only assertions. Give every SDK fixture, including replacement-account
+clients, the owned mock HTTP transport so a removed guard cannot reach the network.
 
 When an SDK method changes, inventory its caller fixtures in every test tier.
 `ci:local` omits the real database tier. Run the affected database cases before
@@ -801,6 +1118,17 @@ Database fault controls can leave deliberately broken rows. Clean only the owned
 fixture rows after each case, before the next control runs. A passing control
 must not inherit orphan rows or missing receipts from the preceding mutation.
 
+For non-fatal event callbacks, collect database observations in the callback and
+assert them after the worker returns. An assertion inside a swallowed callback
+can leave the test green. Reuse a shared fixture's existing mocked export rather
+than registering another factory for that module. For lock proofs, pg_stat_activity
+query text can be truncated; use pg_blocking_pids with pg_locks relation and mode
+to identify the expected reservation wait instead of matching a query suffix.
+Follow the full blocker chain when several writers wait for one row. A later
+writer can wait behind the first waiter rather than directly behind the barrier.
+Prove both writers are queued before releasing it; counting only direct blockers
+does not establish that ordering.
+
 For a Drizzle rollback test with postgres.js, use `drizzle(client).transaction()`
 and pass its transaction executor to the app. Do not construct `drizzle(tx)`
 from a raw `postgres.begin()` callback; that client lacks driver options.
@@ -808,6 +1136,8 @@ from a raw `postgres.begin()` callback; that client lacks driver options.
 Run source faults only when no other test reads that worktree. Restore each
 fault before starting the next reader, then rerun the fixed source. A passing
 report from overlapping runs does not identify which source it tested.
+`check:effects` rewrites the tracked inventory even in check mode. Run it before
+source-hashed test readers; do not batch that writer with those readers.
 
 Use checked subprocesses or `set -e` when a shell step contains a required check
 followed by another command. A later successful command can hide the failed
@@ -829,6 +1159,9 @@ saved candidate in `finally`, then verify its committed and live file hashes.
 Before running an adapted proof or publication helper, verify its issue number,
 branch, worktree, source identity and expected test counts. Derive these from one
 explicit task configuration. Reject stale identity before any publication.
+Resolve each explicit test path before a run. Vitest can ignore a nonexistent
+filter when other filters match, so require the expected file inventory and case
+counts before reporting the intended coverage.
 
 Pass the current tab handle into browser measurement helpers in a persistent
 REPL. A closure can retain a closed tab after the outer binding changes. Check
@@ -843,6 +1176,9 @@ invalid-target controls, plus a valid indexed-loader control that proves discove
 Ignore imported assets; keep CSS and image controls beside the script controls.
 
 For SQL write guards, cover raw SQL, conflict updates and tuple assignments.
+For in-memory text faults, match a complete expression and require one match.
+A property suffix can also occur in a longer ref expression. A match-count
+failure is fixture setup failure, not an executed behavior counterexample.
 Keep reads, non-order writes, quoted values and unrelated-statement controls.
 Verify rejection through the actual CLI as well as the parser.
 Include canonical lower-level writers in the bypass inventory. A public API
@@ -857,6 +1193,12 @@ lines that start with `import` leaves names from multiline imports as false
 proof. Parse whole statements and retain valid called-service/auth controls.
 
 ## Generated API files
+
+Before changing a session-only API, check both exported specifications.
+Session-only queue controls can still appear in public and complete views.
+Update their hand-authored override and matching contract tests before codegen.
+If a referenced `.cursor` skill is missing in a worktree, also check the
+verified main checkout. Current ADRs and scripts govern stale bootstrap examples.
 
 For API surface changes, generate with `npm run tools:api:codegen` and
 `npm run tools:api:surface:report` before full CI. **Declaring or changing a

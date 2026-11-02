@@ -20,6 +20,8 @@ import { relations, sql } from "drizzle-orm";
 export { contact_merge_receipt } from "./schema-contact-merge";
 export { audience_import_run, audience_import_row } from "./schema-audience-import";
 export { workspace_number_release } from "./schema-number-release";
+export { workspace_number_purchase } from "./schema-number-purchase";
+export { workspace_voice_reservation, workspace_voice_audio_connection, workspace_voice_audio_intent, workspace_voice_dialer_intent, workspace_voice_recording_operation, workspace_voice_recording_customer_event, workspace_voice_customer_phase, workspace_voice_customer_phase_event } from "./schema-voice";
 export { predictive_machine_operation } from "./schema-predictive-machine";
 export { inbound_voicemail_recipient, inbound_voicemail_delivery } from "./schema-inbound-voicemail";
 import type { CoachingConfig } from "@/lib/coaching-schemas";
@@ -283,22 +285,6 @@ export const workspace_number = pgTable("workspace_number", {
     .on(table.workspace, table.phone_number).where(sql`${table.status} = 'active'`),
 ]);
 
-export const workspace_number_purchase = pgTable("workspace_number_purchase", {
-  id: uuid().primaryKey(),
-  workspace: uuid().notNull(),
-  actor_user_id: text().notNull(),
-  phone_number: text().notNull(),
-  account_sid: text().notNull(),
-  credits: integer().notNull(),
-  state: text().$type<"reserved" | "creating" | "provisioned" | "completed" | "cancelled">().notNull().default("reserved"),
-  provider_sid: text(),
-  last_error: text(),
-  lease_token: uuid().notNull(),
-  lease_expires_at: timestamp({ withTimezone: true, mode: "date" }).notNull(),
-  created_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
-  updated_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
-});
-
 // ─── Script ───────────────────────────────────────
 
 export const script = pgTable(
@@ -452,7 +438,7 @@ export const outreach_attempt = pgTable("outreach_attempt", {
   campaign_id: bigint({ mode: "number" }).notNull(),
   callback_audit: boolean(),
   contact_id: bigint({ mode: "number" }).notNull(),
-  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`clock_timestamp()`),
   current_step: text(),
   disposition: text(),
   ended_at: timestamp({ withTimezone: true, mode: "string" }),
