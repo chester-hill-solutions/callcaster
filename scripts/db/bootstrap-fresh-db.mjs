@@ -167,6 +167,7 @@ const steps = [
   "client/migrations/20261101000012_voice_recording_room_event_coverage.sql",
   "client/migrations/20261101000013_voice_customer_media_boundaries.sql",
   "client/migrations/20261102000000_voice_customer_instruction_phases.sql",
+  "client/migrations/20261102000001_voice_customer_phase_workspace_fk.sql",
 ];
 
 /**

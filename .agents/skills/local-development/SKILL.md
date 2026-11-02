@@ -211,6 +211,10 @@ For each new client migration, wire both `scripts/db/bootstrap-fresh-db.mjs`
 and `scripts/e2e/bootstrap-compose-db.mjs`. Run `npm run db:bootstrap:check`;
 its read-only checks must pass for both lists before any push. Startup upgrade
 proof on an existing owned database does not verify compose bootstrap wiring.
+For a new tenant registry entry, also run the real
+`test/integration-db/workspace-foreign-keys.test.ts` contract. Each tenant column
+needs its own validated workspace cascade; a composite link through another
+tenant table does not replace that reference.
 
 Twilio inbound and outbound media share one timestamp clock. Test simultaneous
 tracks against fixed G.711 vectors and one mono duration; byte concatenation
