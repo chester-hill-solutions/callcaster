@@ -266,6 +266,14 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
     ).toMatchObject({ sid: "CA1", twilioParams: { CallStatus: "completed" } });
   });
 
+  test("recording preparation accepts its versioned connection reference and rejects unknown versions", () => {
+    const params = requireRegistration("recording_side_effects").params;
+    const parentCaptureConnectionId = "6344c174-2b31-49e7-a06e-518110bb2cf4";
+    expect(params.parse({ parentCaptureConnectionId, version: 1 })).toEqual({ parentCaptureConnectionId, version: 1 });
+    for (const version of [0, 2, "1", null]) expect(() => params.parse({ parentCaptureConnectionId, version })).toThrow();
+    expect(() => params.parse({ parentCaptureConnectionId: "invalid", version: 1 })).toThrow();
+  });
+
   /**
    * #1243 E1 added a parsed `event` to the two VOICE side-effect job payloads.
    * Rows queued before it exist in `job` right now and must still run — the

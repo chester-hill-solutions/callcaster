@@ -213,6 +213,14 @@ original logical customer call. Completed parts use distinct storage keys and
 cannot replace the initial playback pointer. Provider GET `processing` proves
 identity, not active capture. Idle phone connection alone starts no recording.
 
+A confirmed direct replacement join retains parent-capture preparation in the
+same transaction as its joined state. The existing recording worker receives a
+versioned connection reference and rechecks the current funded bridge before
+creating capture through the original account. Replayed joins and jobs keep one
+create checkpoint. Preparation alone does not redirect the customer, commit phone
+audio or retire the working source. Idle and existing-room joins do not start a
+new parent capture.
+
 Direct manual customer joins and leaves also retain the provider's sequence
 number and timestamp under the original funded owner and physical room. These
 receipts survive delayed delivery and the first phone ending. A retry cannot

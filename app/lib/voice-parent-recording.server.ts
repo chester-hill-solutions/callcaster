@@ -6,7 +6,7 @@ import { voiceWebhookDeliveryUrl } from "@/lib/twilio-webhook-delivery";
 import { VoiceRecordingBindingError } from "@/lib/voice-recording";
 import { logger } from "@/lib/logger.server";
 import { claimVoiceParentRecordingSend, failUnacceptedVoiceParentRecording, findVoiceParentRecording,
-  prepareVoiceParentRecording, readVoiceParentRecordingTarget } from "@/server/voice-parent-recording.server";
+  findVoiceParentRecordingWork, prepareVoiceParentRecording, readVoiceParentRecordingTarget } from "@/server/voice-parent-recording.server";
 import { deferVoiceRecordingWork, findVoiceRecordingOperation, type VoiceRecordingOperation } from "@/server/voice-recording-operation.server";
 import { recordVoiceRecordingProvider } from "@/server/voice-recording-receipt.server";
 import type { VoiceAudioConnection } from "@/server/voice-audio-connection.server";
@@ -15,6 +15,13 @@ export class VoiceParentRecordingPendingError extends Error {
   constructor(readonly operationId: string, cause: unknown) {
     super("Parent recording needs provider verification", { cause }); this.name = "VoiceParentRecordingPendingError";
   }
+}
+
+export async function runVoiceParentRecordingPreparation(workspaceId: string, connectionId: string) {
+  const connection = await findVoiceParentRecordingWork(workspaceId, connectionId);
+  if (!connection) return { skipped: true };
+  const result = await ensureVoiceParentRecording(connection);
+  return { operationId: result.operation.id, replayed: result.replayed };
 }
 
 function acknowledgement(owner: VoiceRecordingOperation, recording: RecordingInstance) {

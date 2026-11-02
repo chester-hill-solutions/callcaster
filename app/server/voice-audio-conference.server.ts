@@ -10,6 +10,7 @@ import { voiceAudioSavedInput, withVoiceAudioConnection, type VoiceAudioConnecti
 import { getOutboundHeldCredits, type CreditTransaction } from "./outbound-credit-reservations.server";
 import { bindVoiceConferenceRecording, issueVoiceConferenceRecording } from "./voice-conference-recording.server";
 import { recordVoiceCustomerConferenceEvent } from "./voice-recording-customer-events.server";
+import { retainVoiceParentRecordingWork } from "./voice-parent-recording.server";
 
 async function refuseInstruction(tx: CreditTransaction, row: VoiceAudioConnection, reason: VoiceAudioFailureReason) {
   await tx.update(connections).set({ cancel_requested_at: row.cancel_requested_at ?? new Date(), lease_expires_at: new Date(), updated_at: new Date() })
@@ -112,8 +113,9 @@ export async function observeVoiceAudioConferenceEvent(input: VoiceAudioConferen
       return left ?? current;
     }
     await bindVoiceConferenceRecording(tx, current, input.conferenceSid);
-    if (current.state === "active" || current.joined_at) return current;
-    return observeAudioJoin(tx, current, input);
+    const joined = current.state === "active" || current.joined_at ? current : await observeAudioJoin(tx, current, input);
+    await retainVoiceParentRecordingWork(tx, joined);
+    return joined;
   });
 }
 

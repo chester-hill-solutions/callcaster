@@ -228,6 +228,7 @@ export const smsStatusSideEffectsParams = sidAndTwilioParamsSchema(
   "sms_status_side_effects",
 );
 export const recordingSideEffectsParams = z.union([
+  z.strictObject({ parentCaptureConnectionId: z.uuid(), version: z.literal(1) }),
   z.strictObject({ recordingOperationId: z.uuid(), leaseToken: z.uuid() }),
   voiceSideEffectsParamsSchema("recording_side_effects"),
 ]);

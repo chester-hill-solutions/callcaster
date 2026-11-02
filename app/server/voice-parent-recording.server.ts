@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
-import { call, workspace_voice_recording_operation as recordings, workspace_voice_reservation as reservations } from "@/db/schema";
+import { call, job, workspace_voice_audio_connection as connections, workspace_voice_recording_operation as recordings, workspace_voice_reservation as reservations } from "@/db/schema";
+import { recordingSideEffectsParams } from "@/lib/worker/job-params.server";
+import { RECORDING_SIDE_EFFECTS_JOB_TYPE } from "@/lib/worker/job-types.server";
 import { matchesVoiceSetupRoot, voiceCallLegIdentity, type VoiceSetupRoot } from "@/lib/voice-bridge-identity";
 import { normalizeProviderStatus } from "@/lib/call-status";
 import { VoiceRecordingBindingError, voiceRecordingCallbackUrl } from "@/lib/voice-recording";
@@ -50,6 +52,21 @@ function isOriginalManualSource(row: VoiceAudioConnection): row is OriginalManua
     row.original_agent_sid !== null && row.customer_sid !== null && row.provider_sid !== null &&
     row.source_connection_id === null && row.source_agent_sid === row.original_agent_sid &&
     row.committed_at === null && row.promotion_result === null;
+}
+
+/** The join transaction retains preparation before acknowledging the callback. */
+export async function retainVoiceParentRecordingWork(tx: CreditTransaction, row: VoiceAudioConnection) {
+  if (!isOriginalManualSource(row)) return;
+  await tx.insert(job).values({ type: RECORDING_SIDE_EFFECTS_JOB_TYPE, workspace_id: row.workspace, user_id: row.user_id,
+    params: recordingSideEffectsParams.parse({ parentCaptureConnectionId: row.id, version: 1 }),
+    idempotency_key: `voice_parent_capture:${row.id}`, status: "queued",
+  }).onConflictDoNothing();
+}
+
+/** Old or foreign deliveries cannot acquire another connection's capture owner. */
+export async function findVoiceParentRecordingWork(workspaceId: string, connectionId: string) {
+  const row = await createTenantDb(workspaceId).workspace_voice_audio_connection.findFirst({ where: eq(connections.id, connectionId) });
+  return row && isOriginalManualSource(row) ? row : null;
 }
 
 function isCurrentReservation(row: VoiceReservation | undefined, connection: OriginalManualSource): row is VoiceReservation {

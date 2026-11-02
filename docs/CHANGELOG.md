@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Changed: A confirmed phone replacement now retains parent-recording preparation through the existing worker. Repeated callbacks and lost provider replies keep one capture request. The current audio stays in place while handoff and media checks remain in development ([PR #3081](https://github.com/chester-hill-solutions/callcaster/pull/3081), [#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
+
 - Changed: New phone customer calls save their Conference instruction phase with the single joining grant. Batch publication waits for matching signed visits and actual customer Call timing. Late facts retain recovery work after settlement without a second charge. Recording assembly and live handoff remain in development ([PR #3081](https://github.com/chester-hill-solutions/callcaster/pull/3081), [#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
 
 - Fixed: Batch transcript publication now saves the transcript, Call link and one charge in one transaction after checking the recording again. Failed writes can retry, changed media stays pending, and duplicate jobs keep one result. Recording assembly and live handoff remain in development ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).

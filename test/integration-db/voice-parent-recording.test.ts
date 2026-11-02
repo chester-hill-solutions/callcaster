@@ -5,6 +5,7 @@ import RequestClient from "twilio/lib/base/RequestClient";
 import TwilioResponse from "twilio/lib/http/response";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse, routeArgs } from "../helpers/route-result";
+import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
 
 vi.hoisted(() => {
   process.env.TZ = "UTC"; process.env.BASE_URL = "https://parent-capture.example.test"; process.env.TWILIO_VALIDATE_WEBHOOKS = "true";
@@ -72,6 +73,8 @@ describe("owned parent bridge capture (#2879)", () => {
   }
   async function clearFault() {
     await sql.unsafe(`drop trigger if exists ${fault} on public.workspace_voice_recording_operation`);
+    await sql.unsafe(`drop trigger if exists ${fault} on public.job`);
+    await sql.unsafe(`drop trigger if exists ${fault} on public.workspace_voice_audio_connection`);
     await sql.unsafe(`drop function if exists public.${fault}()`);
   }
   async function rejectWriteWhen(condition: string) {
@@ -167,6 +170,107 @@ describe("owned parent bridge capture (#2879)", () => {
       "Content-Type": "application/x-www-form-urlencoded", "X-Twilio-Signature": twilio.getExpectedTwilioSignature(token, owner.callback_url, params),
     }, body: new URLSearchParams(params) }))));
   }
+
+  async function signedJoin(connection: Connection, valid = true) {
+    const params = { AccountSid: accountSid, CallSid: connection.provider_sid ?? "", ConferenceSid: connection.conference_sid ?? "",
+      FriendlyName: connection.conference_id, ParticipantLabel: `audio:${connection.id}:${connection.generation}`,
+      Muted: "true", StatusCallbackEvent: "participant-join" };
+    const { action } = await import("../../app/routes/api+/voice-audio.action.server");
+    return asRouteResponse(action(routeArgs(new Request(connection.conference_callback, { method: "POST", headers: {
+      "Content-Type": "application/x-www-form-urlencoded", "X-Twilio-Signature": valid ?
+        twilio.getExpectedTwilioSignature(token, connection.conference_callback, params) : "invalid",
+    }, body: new URLSearchParams(params) }))));
+  }
+
+  async function runPreparation(workspace = workspaceId) {
+    const rows = await sql`select id, type, params, max_attempts from public.job
+      where workspace_id = ${workspaceId}::uuid and idempotency_key like 'voice_parent_capture:%'`;
+    expect(rows).toHaveLength(1);
+    const row = rows[0], { jobHandlers } = await import("@/lib/worker/handlers.server");
+    const job: ClaimedJobRow = { id: Number(row.id), type: row.type, params: row.params, workspace_id: workspace,
+      user_id: actor, attempt_count: 1, max_attempts: row.max_attempts };
+    return jobHandlers.recording_side_effects(job);
+  }
+
+  test("a signed replacement join durably starts one parent capture through the registered worker", async () => {
+    const f = await fixture();
+    expect((await signedJoin(f.connection)).status).toBe(204);
+    expect((await signedJoin(f.connection)).status).toBe(204);
+    expect(io.requests).toHaveLength(0);
+    expect(await sql`select params from public.job where workspace_id = ${workspaceId}::uuid and idempotency_key like 'voice_parent_capture:%'`)
+      .toEqual([{ params: { parentCaptureConnectionId: f.connection.id, version: 1 } }]);
+    await runPreparation(); await runPreparation();
+    expect(posts()).toHaveLength(1);
+    expect(posts()[0].uri).toContain(`/Calls/${f.root}/Recordings.json`);
+    expect(await stored()).toHaveLength(1);
+    expect(await audio.findVoiceAudioConnection(f.connection.id)).toMatchObject({ state: "ready", committed_at: null, promotion_requested_at: null });
+    expect((await sql`select status from public.call where sid = ${f.child}`)[0].status).toBe("in-progress");
+  });
+
+  test("concurrent parent preparation deliveries retain one provider create", async () => {
+    const f = await fixture(); await signedJoin(f.connection);
+    await Promise.all(Array.from({ length: 8 }, () => runPreparation()));
+    expect(posts()).toHaveLength(1); expect(await stored()).toHaveLength(1);
+  });
+
+  test("a failed preparation enqueue rolls back the first join and retries both together", async () => {
+    const f = await fixture();
+    await sql`update public.workspace_voice_audio_connection set state = 'joining', joined_at = null where id = ${f.connection.id}::uuid`;
+    await sql.unsafe(`create function public.${fault}() returns trigger language plpgsql as $$ begin
+      if new.idempotency_key like 'voice_parent_capture:%' then raise exception 'Owned parent preparation enqueue fault'; end if;
+      return new; end $$`);
+    await sql.unsafe(`create trigger ${fault} before insert on public.job for each row execute function public.${fault}()`);
+    expect((await signedJoin(f.connection)).status).toBe(500);
+    expect(await audio.findVoiceAudioConnection(f.connection.id)).toMatchObject({ state: "joining", joined_at: null });
+    expect(await sql`select id from public.job where workspace_id = ${workspaceId}::uuid`).toHaveLength(0);
+    await clearFault();
+    expect((await signedJoin(f.connection)).status).toBe(204);
+    await runPreparation(); expect(posts()).toHaveLength(1);
+  });
+
+  test("an invalid join signature cannot retain capture work", async () => {
+    const f = await fixture();
+    expect((await signedJoin(f.connection, false)).status).toBe(403);
+    expect(await sql`select id from public.job where workspace_id = ${workspaceId}::uuid`).toHaveLength(0);
+    expect(io.requests).toHaveLength(0); expect(await stored()).toHaveLength(0);
+  });
+
+  test("a deferred join failure rolls back already inserted preparation work", async () => {
+    const f = await fixture();
+    await sql`update public.workspace_voice_audio_connection set state = 'joining', joined_at = null where id = ${f.connection.id}::uuid`;
+    await sql.unsafe(`create function public.${fault}() returns trigger language plpgsql as $$ begin
+      raise exception 'Owned join commit fault'; end $$`);
+    await sql.unsafe(`create constraint trigger ${fault} after update on public.workspace_voice_audio_connection
+      deferrable initially deferred for each row execute function public.${fault}()`);
+    expect((await signedJoin(f.connection)).status).toBe(500);
+    expect(await audio.findVoiceAudioConnection(f.connection.id)).toMatchObject({ state: "joining", joined_at: null });
+    expect(await sql`select id from public.job where workspace_id = ${workspaceId}::uuid`).toHaveLength(0);
+    await clearFault();
+    expect((await signedJoin(f.connection)).status).toBe(204);
+    await runPreparation(); expect(posts()).toHaveLength(1);
+  });
+
+  test("foreign preparation delivery cannot read or record the owned bridge", async () => {
+    const f = await fixture(); await signedJoin(f.connection);
+    expect(await runPreparation(foreignId)).toEqual({ skipped: true });
+    expect(io.requests).toHaveLength(0); expect(await stored()).toHaveLength(0);
+  });
+
+  test("cancellation before preparation preserves the original live customer without a recording POST", async () => {
+    const f = await fixture(); await signedJoin(f.connection);
+    await sql`update public.workspace_voice_audio_connection set cancel_requested_at = now() where id = ${f.connection.id}::uuid`;
+    expect(await runPreparation()).toEqual({ skipped: true });
+    expect(io.requests).toHaveLength(0); expect(await stored()).toHaveLength(0);
+    expect((await sql`select status from public.call where sid = ${f.child}`)[0].status).toBe("in-progress");
+  });
+
+  test("a lost create reply keeps the capture checkpoint and a repeated job cannot create again", async () => {
+    const f = await fixture(); await signedJoin(f.connection); io.error = new Error("Owned parent create timeout");
+    await expect(runPreparation()).rejects.toThrow("Parent recording needs provider verification");
+    await runPreparation();
+    expect(posts()).toHaveLength(1);
+    expect(await stored()).toMatchObject([{ state: "creating", provider_sid: null, source_call_sid: f.root, account_sid: accountSid }]);
+  });
 
   test.each([false, true])("records the real original root with one saved nonce (SDK=%s)", async sdk => {
     const f = await fixture(sdk), result = await dispatch.ensureVoiceParentRecording(f.connection), row = result.operation;
