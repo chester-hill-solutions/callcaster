@@ -219,6 +219,14 @@ through stop/close, and flush before closing STT. Delay upstream open and coachi
 cleanup separately: early media must survive, a late open must stay retired, and
 cleanup time must not extend the completed transcription debit.
 
+For recording assembly, snapshot source IDs and their input order before any
+await. Use that same snapshot for staging and filter indexes; a readonly view
+does not prevent the caller from changing its array. Test equal-length distinct
+tones while the caller changes source order during staging. Verify decoded
+samples from a seekable MP3, including short slices and encoder delay/padding;
+a successful encoder exit or container duration does not prove complete audio.
+Keep all staged inputs and output in the existing process cleanup scope.
+
 Bun checks must run where Bun can write its temporary files. A permission
 failure is not lockfile drift: retain the dependency files and rerun the full
 gate with the required permissions. The vendor guard leaves rebuilt output for
