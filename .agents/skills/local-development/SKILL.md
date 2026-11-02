@@ -226,6 +226,11 @@ tones while the caller changes source order during staging. Verify decoded
 samples from a seekable MP3, including short slices and encoder delay/padding;
 a successful encoder exit or container duration does not prove complete audio.
 Keep all staged inputs and output in the existing process cleanup scope.
+Real codec tests require both ffmpeg and ffprobe on PATH. Verify the CI job
+installs them; hosted runner images do not guarantee their presence. Keep
+the actual codec cases required rather than skipping or replacing them with mocks.
+Trace every workflow caller of the Node test configuration, including scheduled
+and manual coverage jobs, before adding a required executable dependency.
 
 Bun checks must run where Bun can write its temporary files. A permission
 failure is not lockfile drift: retain the dependency files and rerun the full

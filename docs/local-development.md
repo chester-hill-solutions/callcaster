@@ -64,6 +64,10 @@ local and Railway for deployed environments. GitHub is reserved for CI.
 
 ## Local checks during development
 
+The Node recording-render tests use real `ffmpeg` and `ffprobe` executables.
+Both must be on `PATH`. The Node CI jobs install these tools explicitly.
+Do not skip codec tests when a tool is missing.
+
 Use a focused test or watch command after each edit. Use the fast gate for
 type, lint and guard feedback during development and before a push or PR.
 CI runs the full suites and production checks before merge.
