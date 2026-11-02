@@ -1,4 +1,4 @@
-import { accountSid, actor, baseUrl, callerId, customer, issued, joined, phone, rooms, web, workspaceId } from "./voice-audio-fixture";
+import { accountSid, actor, baseUrl, callerId, customer, issued, joined, phone, rooms, sql, web, workspaceId } from "./voice-audio-fixture";
 import { randomUUID } from "node:crypto";
 import twilio from "twilio";
 import { asRouteResponse, routeArgs } from "./route-result";
@@ -7,10 +7,32 @@ import { verifyVoiceAudioCustomerSource } from "@/lib/voice-audio-customer-sourc
 import type { VoiceAudioCustomerSourceInput } from "@/server/voice-audio-customer-source.server";
 import { reserveVoiceCredits, type VoiceReservationInput } from "@/server/voice-credit-reservation.server";
 
-export function customerUrls() {
+export function customerUrls(reservationId?: string) {
   const id = randomUUID();
-  return { voiceUrl: `${baseUrl}/api/dial/${encodeURIComponent(customer)}`, statusCallback: `${baseUrl}/api/call-status/`,
+  const voice = new URL(`${baseUrl}/api/dial/${encodeURIComponent(customer)}`), status = new URL(`${baseUrl}/api/call-status/`);
+  if (reservationId) { voice.searchParams.set("credit_reservation", reservationId); voice.searchParams.set("credit_leg", "recipient");
+    status.searchParams.set("credit_reservation", reservationId); }
+  return { voiceUrl: voice.toString(), statusCallback: status.toString(),
     customerRecording: { id, callbackUrl: `${baseUrl}/api/voice-recording?recording=${id}` } };
+}
+
+/** Positive callbacks must use a real saved grant, never an old-label fallback. */
+export async function customerPhaseLabel(reservationId: string) {
+  const [row] = await sql`select p.participant_label from public.workspace_voice_customer_phase p
+    join public.workspace_voice_reservation r on r.customer_phase_id = p.id and r.id = p.reservation_id and r.workspace = p.workspace
+    where r.workspace = ${workspaceId}::uuid and r.id = ${reservationId}::uuid`;
+  if (!row?.participant_label) throw new Error("Customer phase instruction must be granted first");
+  return String(row.participant_label);
+}
+
+export async function signedPhoneCustomerVoice(url: string, callSid: string, overrides: Record<string, string> = {}, valid = true) {
+  const { action } = await import("../../app/routes/api+/dial/$number.action.server");
+  const params = { AccountSid: accountSid, CallSid: callSid, To: web.records.get(callSid)?.to ?? customer, From: callerId,
+    Direction: "outbound-api", CallStatus: "in-progress", ...overrides };
+  return asRouteResponse(action(routeArgs(new Request(url, { method: "POST", headers: {
+    "Content-Type": "application/x-www-form-urlencoded",
+    "X-Twilio-Signature": valid ? twilio.getExpectedTwilioSignature("owned-audio-token", url, params) : "invalid",
+  }, body: new URLSearchParams(params) }))));
 }
 
 export async function confirmed() {

@@ -39,6 +39,7 @@ export async function settleVoiceReservation(args: {
     }) : null;
     await tx.update(reservations).set({ state: "settled", terminal_status: status, terminal_duration: String(duration),
       human_state: reservation.human_state && reservation.human_state !== "refused" ? "ended" : reservation.human_state,
+      lease_expires_at: reservation.customer_phase_id && !reservation.media_call_started_at ? new Date() : reservation.lease_expires_at,
       updated_at: new Date(), last_error: null })
       .where(eq(reservations.id, reservation.id));
     return { handled: true as const, billingResult, amount };

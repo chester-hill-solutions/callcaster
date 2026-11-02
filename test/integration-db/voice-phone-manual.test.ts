@@ -1,6 +1,6 @@
 import { accountSid, actor, baseUrl, callerId, customer, foreignId, journal, otherActor, otherPhone, phone, rooms,
   signedAudio, sql, state, useOwnedAudioFixture, web, workspaceId } from "../helpers/voice-audio-fixture";
-import { confirmed } from "../helpers/voice-audio-customer-fixture";
+import { confirmed, customerPhaseLabel } from "../helpers/voice-audio-customer-fixture";
 import { randomUUID } from "node:crypto";
 import twilio from "twilio";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -282,7 +282,7 @@ describe("manual Start reuses confirmed phone audio", () => {
     const voice = await customerVoice(url, callSid); expect(voice.status).toBe(200); const xml = await voice.text();
     expect(xml).toContain("<Conference"); expect(xml).toContain(f.row.conference_id); expect(xml).not.toContain("<Number");
     const [reservation] = await sql`select id, recipient_instruction_issued_at from public.workspace_voice_reservation where provider_sid = ${callSid}`;
-    expect(xml).toContain(`participantLabel="customer:${reservation.id}"`);
+    expect(xml).toContain(`participantLabel="customer:v1:${reservation.id}:`);
     expect(xml).toContain(f.row.conference_callback.replaceAll("&", "&amp;")); expect(reservation.recipient_instruction_issued_at).not.toBeNull();
     expect((await (await customerVoice(url, callSid)).text())).not.toContain("<Conference");
     expect(web.create).toHaveBeenCalledTimes(1);
@@ -400,7 +400,7 @@ describe("manual Start reuses confirmed phone audio", () => {
       FriendlyName: f.row.conference_id, StatusCallbackEvent: "participant-join", ParticipantLabel: `customer:${reservation.id}`, Muted: "false" };
     expect((await signedAudio(f.row.conference_callback, payload)).status).toBe(403);
     expect(await (await customerVoice(url, callSid)).text()).toContain("<Conference");
-    expect((await signedAudio(f.row.conference_callback, payload)).status).toBe(204);
+    expect((await signedAudio(f.row.conference_callback, { ...payload, ParticipantLabel: await customerPhaseLabel(reservation.id) })).status).toBe(204);
     expect(rooms.update).not.toHaveBeenCalled(); expect(web.create).toHaveBeenCalledTimes(1);
   });
 
@@ -421,7 +421,7 @@ describe("manual Start reuses confirmed phone audio", () => {
     expect(await (await customerVoice(url, callSid)).text()).toContain("<Conference");
     const [reservation] = await sql`select id from public.workspace_voice_reservation where provider_sid = ${callSid}`;
     const payload = { AccountSid: accountSid, CallSid: callSid, ConferenceSid: f.row.conference_sid ?? "", FriendlyName: f.row.conference_id,
-      StatusCallbackEvent: event, ParticipantLabel: `customer:${reservation.id}`, Muted: "false", ReasonParticipantLeft: "participant_hung_up" };
+      StatusCallbackEvent: event, ParticipantLabel: await customerPhaseLabel(reservation.id), Muted: "false", ReasonParticipantLeft: "participant_hung_up" };
     expect((await signedAudio(f.row.conference_callback, payload)).status).toBe(204);
     expect((await signedAudio(f.row.conference_callback, payload)).status).toBe(204);
     expect(rooms.update).not.toHaveBeenCalled(); expect((await journal.findVoiceAudioConnection(f.row.id))?.state).toBe("active");

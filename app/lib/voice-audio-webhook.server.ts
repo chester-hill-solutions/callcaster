@@ -21,12 +21,14 @@ function conferenceMatches(owner: VoiceAudioConnection, params: Record<string, s
 }
 
 async function handleConference(owner: VoiceAudioConnection, params: Record<string, string>, requestUrl: string) {
-  if (!conferenceMatches(owner, params, requestUrl)) return twilioWebhookForbiddenHangup();
   const event = parseTwilioVoiceCallback(params);
-  if (event.kind !== "participant") return new Response(null, { status: 204 });
+  if (event.kind !== "participant") return conferenceMatches(owner, params, requestUrl)
+    ? new Response(null, { status: 204 }) : twilioWebhookForbiddenHangup();
+  // Retain known phase conflicts before returning 403, including wrong rooms/labels.
+  const customer = await handleBoundVoiceAudioCustomerParticipant(owner, requestUrl, event);
+  if (!conferenceMatches(owner, params, requestUrl)) return twilioWebhookForbiddenHangup();
   if (event.event === "participant-join" || event.event === "participant-leave") {
-    if (!await handleBoundVoiceAudioParticipant(owner.workspace, requestUrl, event) &&
-      !await handleBoundVoiceAudioCustomerParticipant(owner, requestUrl, event))
+    if (!customer && !await handleBoundVoiceAudioParticipant(owner.workspace, requestUrl, event))
       await handleBoundVoiceAudioBridgeParticipant(owner, requestUrl, event);
   }
   await recordBoundVoiceRecordingRoomEvent(owner, { requestUrl, accountSid: event.accountSid ?? "",

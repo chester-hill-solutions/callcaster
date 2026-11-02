@@ -7,6 +7,8 @@ import { withVoiceAudioConnection, type VoiceAudioConnection } from "./voice-aud
 import type { VoiceAudioCustomerSourceProof } from "./voice-audio-customer-source.server";
 import type { VoiceReservation } from "./voice-credit-reservation.server";
 import { claimPredictiveHumanInTransaction, publishHumanAdmissionEvents, type HumanAdmissionEvents } from "./predictive-human-admission.server";
+import { recordVoiceCustomerPhaseEvent, saveVoiceCustomerPhase, type VoiceCustomerPhaseEvent } from "./voice-customer-phase.server";
+import type { VoiceCustomerPhaseInstruction } from "@/lib/voice-customer-phase";
 
 /** Provider-only nonce lookup; the original-account signature still must match. */
 export async function findVoicePhoneCustomerOwner(reservationId: string) {
@@ -16,20 +18,25 @@ export async function findVoicePhoneCustomerOwner(reservationId: string) {
 }
 
 /** Recheck source ownership under the same fence before issuing this customer join. */
-export async function claimVoicePhoneCustomerInstruction(owner: VoiceReservation, proof: VoiceAudioCustomerSourceProof) {
+export async function claimVoicePhoneCustomerInstruction(owner: VoiceReservation, proof: VoiceAudioCustomerSourceProof, phase: VoiceCustomerPhaseInstruction) {
   const { provider_sid: customerSid, customer_recording_id: recordingId, customer_recording_callback: recordingCallback } = owner;
   if (!owner.audio_connection_id || !owner.audio_mode || !["manual", "predictive"].includes(owner.audio_mode) || !customerSid || !recordingId || !recordingCallback)
     throw new VoiceAudioBindingError("Customer conference instruction has no saved owner");
   const publish: HumanAdmissionEvents = [];
   const result = await db.transaction(async tx => {
     const source = await voiceAudioCustomerSendGuard(tx, owner, proof);
-    const [issued] = await tx.update(reservations).set({ recipient_instruction_issued_at: sql`clock_timestamp()`, updated_at: new Date() })
-      .where(and(eq(reservations.id, owner.id), eq(reservations.workspace, owner.workspace), source,
+    const condition = and(eq(reservations.id, owner.id), eq(reservations.workspace, owner.workspace), source,
         eq(reservations.provider_sid, customerSid), eq(reservations.customer_recording_id, recordingId),
         eq(reservations.customer_recording_callback, recordingCallback),
         inArray(reservations.state, ["creating", "active"]), isNull(reservations.recipient_instruction_issued_at),
-        isNull(reservations.recipient_refused_at), isNull(reservations.terminal_status))).returning();
-    if (!issued || issued.audio_mode === "predictive" && !await claimPredictiveHumanInTransaction(tx, issued, publish)) return null;
+        isNull(reservations.recipient_refused_at), isNull(reservations.terminal_status));
+    const [current] = await tx.select().from(reservations).where(condition).for("update");
+    if (!current) return null;
+    const admitted = current.audio_mode !== "predictive" || await claimPredictiveHumanInTransaction(tx, current, publish);
+    const [issued] = await tx.update(reservations).set({ recipient_instruction_issued_at: sql`clock_timestamp()`,
+      ...(admitted ? { customer_phase_id: phase.id } : {}), updated_at: new Date() }).where(eq(reservations.id, current.id)).returning();
+    if (!issued || !admitted) return null;
+    await saveVoiceCustomerPhase(tx, issued, phase);
     return issued;
   });
   await publishHumanAdmissionEvents(publish);
@@ -37,22 +44,24 @@ export async function claimVoicePhoneCustomerInstruction(owner: VoiceReservation
 }
 
 /** Customer events retain the first phone's callback; they do not end its room. */
-export async function bindVoicePhoneCustomerParticipant(owner: VoiceAudioConnection, input: {
-  requestUrl: string; accountSid: string; conferenceId: string; conferenceSid: string; callSid: string; participantLabel: string;
-}) {
-  return withVoiceAudioConnection(owner, async (tx, current) => {
-    if (current.account_sid !== input.accountSid || current.conference_callback !== input.requestUrl ||
-      current.conference_id !== input.conferenceId || current.conference_sid !== input.conferenceSid)
-      throw new VoiceAudioBindingError("Customer event does not match its callback owner");
+export async function bindVoicePhoneCustomerParticipant(owner: VoiceAudioConnection, input: VoiceCustomerPhaseEvent) {
+  const result = await withVoiceAudioConnection(owner, async (tx, current) => {
+    const phase = await recordVoiceCustomerPhaseEvent(tx, current, input);
+    if (phase) return phase;
     const [row] = await tx.select().from(reservations).where(and(eq(reservations.workspace, current.workspace),
       eq(reservations.account_sid, current.account_sid), eq(reservations.provider_sid, input.callSid),
       eq(reservations.conference_id, current.conference_id), eq(reservations.conference_sid, input.conferenceSid),
       eq(reservations.audio_conference_callback, input.requestUrl))).limit(1);
-    if (!row) return null;
+    if (!row) return { reservation: null, conflict: false };
+    if (current.account_sid !== input.accountSid || current.conference_callback !== input.requestUrl ||
+      current.conference_id !== input.conferenceId || current.conference_sid !== input.conferenceSid)
+      throw new VoiceAudioBindingError("Customer event does not match its callback owner");
     if (!row.audio_connection_id || !row.send_started_at || !row.recipient_instruction_issued_at || !row.customer_recording_id ||
-      row.user_id !== current.user_id || row.state === "released" ||
+      row.customer_phase_id || row.user_id !== current.user_id || row.state === "released" ||
       input.participantLabel !== voiceAudioCustomerLabel(row.id))
       throw new VoiceAudioBindingError("Customer participant does not match its funded root");
-    return row;
+    return { reservation: row, conflict: false };
   });
+  if (result.conflict) throw new VoiceAudioBindingError("Customer phase has conflicting callback facts");
+  return result.reservation;
 }

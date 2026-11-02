@@ -10,7 +10,9 @@ type ParticipantEvent = Extract<TwilioVoiceCallback, { kind: "participant" }>;
 
 export async function handleBoundVoiceAudioCustomerParticipant(owner: VoiceAudioConnection, requestUrl: string, event: ParticipantEvent) {
   const row = await bindVoicePhoneCustomerParticipant(owner, { requestUrl, accountSid: event.accountSid ?? "", callSid: event.callSid ?? "",
-    conferenceId: event.conferenceName ?? "", conferenceSid: event.conferenceSid ?? "", participantLabel: event.raw.ParticipantLabel ?? "" });
+    conferenceId: event.conferenceName ?? "", conferenceSid: event.conferenceSid ?? "", participantLabel: event.raw.ParticipantLabel ?? "",
+    event: event.event, timestamp: event.timestamp, sequenceNumber: event.raw.SequenceNumber, muted: event.raw.Muted,
+    hold: event.raw.Hold, reason: event.raw.ReasonParticipantLeft ?? event.raw.Reason });
   if (row?.audio_mode === "predictive" && (isParticipantJoin(event) || isParticipantLeave(event))) {
     const call = await findCallBySid(event.callSid ?? "");
     if (!call || call.workspace !== row.workspace) throw new Error("Predictive phone customer Call is missing");

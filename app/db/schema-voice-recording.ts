@@ -1,4 +1,5 @@
 import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+export { workspace_voice_customer_phase, workspace_voice_customer_phase_event } from "./schema-voice-customer-phase";
 
 /** Each physical recording retains the original customer call's logical owner. */
 export const workspace_voice_recording_operation = pgTable("workspace_voice_recording_operation", {

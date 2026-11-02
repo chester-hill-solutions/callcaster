@@ -23,7 +23,7 @@ function sameCapture(expected: VoiceCallRecordingManifest, current: VoiceCallRec
   return expected.state === "single-part" && current.state === "single-part" &&
     expected.operationId === current.operationId && expected.recordingSid === current.recordingSid &&
     expected.audioUrl === current.audioUrl && expected.customer.customerSid === current.customer.customerSid &&
-    expected.customer.durationSeconds === current.customer.durationSeconds;
+    expected.customer.durationSeconds === current.customer.durationSeconds && expected.phaseProof === current.phaseProof;
 }
 
 function skipped(reason: "no_audio_url" | "already_transcribed" | "recording_parts_pending") {

@@ -16,6 +16,7 @@ import { reconcileVoiceBridge, recoverVoiceBridgeCandidate } from "@/lib/voice-b
 import { settleRecoveredVoiceCall } from "@/lib/recovered-voice-status.server";
 import { hasVoiceSetup } from "@/lib/voice-bridge-identity";
 import { recordVoiceCustomerCallTiming } from "@/server/voice-customer-media-boundary.server";
+import { withVoiceProviderReadBudget } from "@/lib/voice-provider-read-budget";
 
 function matchesReservation(reservation: VoiceReservation, candidate: CallInstance) {
   return candidate.accountSid === reservation.account_sid &&
@@ -79,10 +80,26 @@ async function settleSavedVoiceReservation(reservation: VoiceReservation) {
   return true;
 }
 
+function needsSettledPhaseTiming(row: VoiceReservation): row is VoiceReservation & { provider_sid: string } {
+  return row.state === "settled" && Boolean(row.customer_phase_id) && row.provider_sid !== null &&
+    row.terminal_status === "completed" && row.media_call_started_at === null;
+}
+
+/** Billing is already complete; this reads only the original customer clock. */
+async function recoverSettledPhaseTiming(reservation: VoiceReservation & { provider_sid: string }) {
+  const client = await createOriginalVoiceAccountClient(reservation);
+  const remote = await withVoiceProviderReadBudget(() => client.calls(reservation.provider_sid).fetch(),
+    5000, "Customer phase timing verification timed out");
+  if (remote.sid !== reservation.provider_sid || !matchesReservation(reservation, remote))
+    throw new Error("Customer phase timing has a different original Call");
+  return await recordVoiceCustomerCallTiming(reservation, remote) ? "settled" : "pending";
+}
+
 export async function reconcileVoiceReservation(reservation: VoiceReservation) {
   if (!reservation.send_started_at && reservation.state === "reserved") {
     return await releaseUnsentVoiceReservation(reservation, "not_sent") ? "released" : "pending";
   }
+  if (needsSettledPhaseTiming(reservation)) return recoverSettledPhaseTiming(reservation);
   if (await settleSavedVoiceReservation(reservation)) return "settled";
   const twilio = await createOriginalVoiceAccountClient(reservation);
   if (hasVoiceSetup(reservation)) return reconcileVoiceBridge(reservation, twilio);

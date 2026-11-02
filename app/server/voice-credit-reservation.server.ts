@@ -256,7 +256,10 @@ export async function deferVoiceReservation(reservation: VoiceReservation, messa
 export async function claimVoiceReservationRecovery(limit = 25) {
   return db.transaction(async (tx) => {
     const rows = await tx.select().from(reservations).where(and(
-      inArray(reservations.state, [...ACTIVE_VOICE_RESERVATION_STATES]), lt(reservations.lease_expires_at, new Date()),
+      or(inArray(reservations.state, [...ACTIVE_VOICE_RESERVATION_STATES]),
+        and(eq(reservations.state, "settled"), isNotNull(reservations.customer_phase_id),
+          eq(reservations.terminal_status, "completed"), isNull(reservations.media_call_started_at))),
+      lt(reservations.lease_expires_at, new Date()),
     )).orderBy(reservations.lease_expires_at).limit(limit).for("update", { skipLocked: true });
     if (!rows.length) return [];
     return tx.update(reservations).set({ lease_token: randomUUID(), lease_expires_at: new Date(Date.now() + LEASE_MS) })

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { voiceCustomerPhaseFingerprint } from "./voice-customer-phase.server";
 import { and, desc, eq, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { call, job, workspace_voice_recording_operation as recordings } from "@/db/schema";
 import { callRecordingPartStoragePath, twilioRecordingMp3Url } from "@/lib/call-recording-storage.server";
@@ -24,7 +25,9 @@ export async function retainVoiceRecordingBoundaryWork(tx: CreditTransaction, ow
   for (const row of rows) await tx.insert(job).values({ type: RECORDING_SIDE_EFFECTS_JOB_TYPE,
     workspace_id: owner.workspace, user_id: owner.user_id,
     params: recordingSideEffectsParams.parse({ recordingOperationId: row.id, leaseToken: row.lease_token }),
-    idempotency_key: `voice_recording_boundary:${row.id}`, status: "queued",
+    idempotency_key: owner.customer_phase_id ? `voice_recording_phase_boundary:${row.id}:${voiceCustomerPhaseFingerprint([
+      owner.customer_phase_id, owner.media_call_started_at, owner.media_call_ended_at, owner.media_call_duration_seconds,
+    ])}` : `voice_recording_boundary:${row.id}`, status: "queued",
   }).onConflictDoNothing();
 }
 

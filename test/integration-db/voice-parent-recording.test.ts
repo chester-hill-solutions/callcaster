@@ -119,14 +119,14 @@ describe("owned parent bridge capture (#2879)", () => {
       if (audio) { const { pool, directPool } = await import("@/server/db"); await Promise.all([pool.end(), directPool.end()]); }
     }
   });
-  async function fixture(sdk = false) {
+  async function fixture(sdk = false, issued = true) {
     const reservationId = randomUUID(), root = ca(), child = ca(), id = randomUUID(), replacement = ca(), cf = `CF${randomUUID().replaceAll("-", "")}`;
     const rootTo = sdk ? "" : phone, rootFrom = sdk ? `client:${actor}` : callerId, direction = sdk ? "inbound" : "outbound-api";
     await sql`insert into public.workspace_voice_reservation
       (id, workspace, kind, credits, account_sid, recipient, caller_id, user_id, setup_to, setup_client_identity,
        setup_sid, provider_sid, state, lease_token, lease_expires_at, send_started_at, recipient_instruction_issued_at, setup_continuation_url)
       values (${reservationId}::uuid, ${workspaceId}::uuid, 'staffed', 4, ${accountSid}, ${customer}, ${callerId}, ${actor},
-       ${rootTo}, ${sdk ? actor : null}, ${root}, ${child}, 'active', ${randomUUID()}::uuid, now() + interval '5 minutes', now(), now(),
+       ${rootTo}, ${sdk ? actor : null}, ${root}, ${child}, 'active', ${randomUUID()}::uuid, now() + interval '5 minutes', now(), ${issued ? new Date() : null},
        ${`${baseUrl}/api/voice-continuation?credit_reservation=${reservationId}`})`;
     await sql`insert into public.call (sid, workspace, user_id, account_sid, "to", "from", direction, status, parent_call_sid)
       values (${root}, ${workspaceId}::uuid, ${actor}, ${accountSid}, ${rootTo}, ${rootFrom}, ${direction}, 'in-progress', null),
@@ -273,12 +273,17 @@ describe("owned parent bridge capture (#2879)", () => {
     { name: "changed customer", patch: { provider_sid: ca() } },
     { name: "changed caller", patch: { caller_id: customer } },
     { name: "missing continuation", patch: { setup_continuation_url: null } },
-    { name: "unissued customer", patch: { recipient_instruction_issued_at: null } },
     { name: "ended parent", patch: { setup_terminal_at: new Date() } },
     { name: "ended customer", patch: { terminal_status: "completed" } },
   ])("funded $name is not the current bridge", async ({ patch }) => {
     const f = await fixture();
     await sql`update public.workspace_voice_reservation set ${sql(patch)} where id = ${f.reservationId}::uuid`;
+    await expect(dispatch.ensureVoiceParentRecording(f.connection)).rejects.toThrow("funded call is no longer current");
+    expect(io.requests).toHaveLength(0); expect(await stored()).toHaveLength(0);
+  });
+
+  test("an unissued customer is not the current bridge", async () => {
+    const f = await fixture(false, false);
     await expect(dispatch.ensureVoiceParentRecording(f.connection)).rejects.toThrow("funded call is no longer current");
     expect(io.requests).toHaveLength(0); expect(await stored()).toHaveLength(0);
   });

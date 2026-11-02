@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Changed: New phone customer calls save their Conference instruction phase with the single joining grant. Batch publication waits for matching signed visits and actual customer Call timing. Late facts retain recovery work after settlement without a second charge. Recording assembly and live handoff remain in development ([PR #3081](https://github.com/chester-hill-solutions/callcaster/pull/3081), [#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
+
 - Fixed: Batch transcript publication now saves the transcript, Call link and one charge in one transaction after checking the recording again. Failed writes can retry, changed media stays pending, and duplicate jobs keep one result. Recording assembly and live handoff remain in development ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
 
 - Fixed: A completed agent recording cannot start batch transcription while the original customer call is still live. Customer terminal times retain their provider source; unknown or conflicting times keep transcription pending. Recording assembly and live handoff remain in development ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).

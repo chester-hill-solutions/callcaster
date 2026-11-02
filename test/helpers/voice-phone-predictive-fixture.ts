@@ -1,5 +1,5 @@
 import { accountSid, actor, baseUrl, callerId, customer, otherActor, phone, signedAudio, sql, useOwnedAudioFixture, web, workspaceId } from "./voice-audio-fixture";
-import { confirmed } from "./voice-audio-customer-fixture";
+import { confirmed, customerPhaseLabel } from "./voice-audio-customer-fixture";
 import { randomUUID } from "node:crypto";
 import twilio from "twilio";
 import { beforeEach, expect, vi } from "vitest";
@@ -68,11 +68,14 @@ export async function busyPair() {
     campaign_id: f.campaignId, conference_id: f.row.conference_id }) };
 }
 
-export async function participant(f: Awaited<ReturnType<typeof scenario>>, root: Record<string, string>, event: string, sequence: string) {
+export async function participant(f: Awaited<ReturnType<typeof scenario>>, root: Record<string, string>, event: string, sequence: string,
+  options: { legacy?: boolean } = {}) {
   if (!root.id || !root.provider_sid) throw new Error("A customer participant fixture requires its saved reservation ID and provider SID");
   return signedAudio(f.row.conference_callback, { AccountSid: accountSid, CallSid: root.provider_sid,
-    ConferenceSid: f.row.conference_sid ?? '', FriendlyName: f.row.conference_id, ParticipantLabel: `customer:${root.id}`,
-    StatusCallbackEvent: event, SequenceNumber: sequence, Timestamp: new Date().toISOString(), ReasonParticipantLeft: 'participant_hung_up' });
+    ConferenceSid: f.row.conference_sid ?? '', FriendlyName: f.row.conference_id,
+    ParticipantLabel: options.legacy ? `customer:${root.id}` : await customerPhaseLabel(root.id),
+    StatusCallbackEvent: event, SequenceNumber: sequence,
+    Timestamp: new Date(Date.UTC(2026, 10, 1, 14, 0, Number(sequence))).toISOString(), ReasonParticipantLeft: 'participant_hung_up' });
 }
 
 export async function finalStatus(root: Record<string, string>, seconds = '42') {

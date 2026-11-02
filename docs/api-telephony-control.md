@@ -239,9 +239,22 @@ ended. Journaled single-part batch transcription requires a completed original
 customer and a proved terminal boundary. Its manifest reads the customer and
 capture set under the same ownership locks. Conference and multipart media still
 require complete-history proof and assembly.
+New phone customer instructions save a versioned Conference phase with the one-time
+joining grant. Its original account, customer, room, phone generation, required
+capture and XML digest remain fixed. Old issued calls cannot acquire this phase
+after the event. Signed receipts use the phase label and retain distinct facts;
+they do not assume globally unique or dense Conference sequence numbers. Identity
+conflicts commit before rejection. Valid customer events still use the live
+presence ordering rules, while ambiguous history blocks media publication.
+Phase-backed customer media also requires actual original-account Call timing
+and one unambiguous join and leave. This proves bounded membership, not sample
+precision for room media. Missing facts remain pending. The existing recovery
+lease can read missing actual timing after settlement without another debit.
 If timing arrives after the copy, its transaction retains an existing recording
 job. That job retries batch admission from the saved object without copying it
 again. Failed enqueue keeps the job retryable and preserves the logical-call key.
+Late phase receipts and stronger Call timing retain distinct durable wake keys,
+so an earlier completed wake cannot consume the later work.
 
 For eligible single-part media, final transcript publication rechecks the captured
 media and original customer under workspace, reservation and Call locks. The

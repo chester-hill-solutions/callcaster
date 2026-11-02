@@ -1120,6 +1120,10 @@ can leave the test green. Reuse a shared fixture's existing mocked export rather
 than registering another factory for that module. For lock proofs, pg_stat_activity
 query text can be truncated; use pg_blocking_pids with pg_locks relation and mode
 to identify the expected reservation wait instead of matching a query suffix.
+Follow the full blocker chain when several writers wait for one row. A later
+writer can wait behind the first waiter rather than directly behind the barrier.
+Prove both writers are queued before releasing it; counting only direct blockers
+does not establish that ordering.
 
 For a Drizzle rollback test with postgres.js, use `drizzle(client).transaction()`
 and pass its transaction executor to the app. Do not construct `drizzle(tx)`
@@ -1151,6 +1155,9 @@ saved candidate in `finally`, then verify its committed and live file hashes.
 Before running an adapted proof or publication helper, verify its issue number,
 branch, worktree, source identity and expected test counts. Derive these from one
 explicit task configuration. Reject stale identity before any publication.
+Resolve each explicit test path before a run. Vitest can ignore a nonexistent
+filter when other filters match, so require the expected file inventory and case
+counts before reporting the intended coverage.
 
 Pass the current tab handle into browser measurement helpers in a persistent
 REPL. A closure can retain a closed tab after the outer binding changes. Check

@@ -1,5 +1,5 @@
 import { bigint, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-export { workspace_voice_recording_operation, workspace_voice_recording_customer_event } from "./schema-voice-recording";
+export { workspace_voice_recording_operation, workspace_voice_recording_customer_event, workspace_voice_customer_phase, workspace_voice_customer_phase_event } from "./schema-voice-recording";
 export { workspace_voice_audio_intent } from "./schema-voice-audio-intent";
 export { workspace_voice_dialer_intent } from "./schema-voice-dialer-intent";
 
@@ -37,6 +37,7 @@ export const workspace_voice_reservation = pgTable("workspace_voice_reservation"
   setup_status_callback: text(),
   setup_continuation_url: text(),
   recipient_instruction_issued_at: timestamp({ withTimezone: true, mode: "date" }),
+  customer_phase_id: uuid(),
   recipient_refused_at: timestamp({ withTimezone: true, mode: "date" }),
   human_state: text().$type<"pending" | "joined" | "left" | "ended" | "refused">(),
   human_conference_sequence: bigint({ mode: "number" }),

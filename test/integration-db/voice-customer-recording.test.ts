@@ -1,5 +1,5 @@
-import { accountSid, callerId, clearFault, customer, fault, phone, sid, sql, state, useOwnedAudioFixture, web, workspaceId } from "../helpers/voice-audio-fixture";
-import { customerAttempt, customerUrls, fundCustomerAttempt, signedCustomerRecording } from "../helpers/voice-audio-customer-fixture";
+import { accountSid, callerId, clearFault, customer, fault, phone, sid, signedAudio, sql, state, useOwnedAudioFixture, web, workspaceId } from "../helpers/voice-audio-fixture";
+import { customerAttempt, customerPhaseLabel, customerUrls, fundCustomerAttempt, signedCustomerRecording, signedPhoneCustomerVoice } from "../helpers/voice-audio-customer-fixture";
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
@@ -9,6 +9,7 @@ import { findVoiceRecordingOperation } from "@/server/voice-recording-operation.
 import { enqueueFundedVoiceTerminalOutcome } from "@/server/voice-terminal-outcome.server";
 import { recordVoiceCustomerCallTiming } from "@/server/voice-customer-media-boundary.server";
 import { readVoiceCallRecordingManifest } from "@/server/voice-recording-batch.server";
+import { findVoicePhoneCustomerOwner } from "@/server/voice-phone-customer.server";
 import { runVoiceRecordingCopy } from "@/lib/voice-recording-copy.server";
 import type { CallListInstanceCreateOptions } from "twilio/lib/rest/api/v2010/account/call";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
@@ -20,8 +21,8 @@ vi.mock("@/lib/call-recording-storage.server", async importOriginal => ({
 }));
 
 async function armed() {
-  const f = await customerAttempt(), urls = customerUrls();
-  const reservation = await startVoiceReservation(await fundCustomerAttempt(f.args), urls, f.args.audioSource?.proof);
+  const f = await customerAttempt(), funded = await fundCustomerAttempt(f.args), urls = customerUrls(funded.id);
+  const reservation = await startVoiceReservation(funded, urls, f.args.audioSource?.proof);
   const customerSid = sid(), recordingSid = `RE${randomUUID().replaceAll("-", "")}`;
   const physical = { ...f.call, sid: customerSid, to: customer, from: callerId, voiceUrl: urls.voiceUrl, statusCallback: urls.statusCallback };
   web.records.set(customerSid, physical);
@@ -32,7 +33,26 @@ async function armed() {
 function params(f: { customerSid: string; recordingSid: string }, status = "in-progress"): Record<string, string> {
   return { AccountSid: accountSid, CallSid: f.customerSid, RecordingSid: f.recordingSid,
     RecordingSource: "OutboundAPI", RecordingStatus: status, RecordingChannels: "2",
-    RecordingStartTime: new Date().toUTCString(), ...(status === "completed" ? { RecordingDuration: "42" } : {}) };
+    RecordingStartTime: "Sun, 1 Nov 2026 14:00:00 +0000", ...(status === "completed" ? { RecordingDuration: "42" } : {}) };
+}
+
+async function grantVisit(f: Awaited<ReturnType<typeof armed>>) {
+  expect(await (await signedPhoneCustomerVoice(f.urls.voiceUrl, f.customerSid)).text()).toContain("<Conference");
+  const label = await customerPhaseLabel(f.reservation.id);
+  for (const [event, timestamp, sequence] of [["participant-join", "Sun, 1 Nov 2026 14:00:01 +0000", "0"],
+    ["participant-leave", "Sun, 1 Nov 2026 14:00:41 +0000", "9"]]) {
+    expect((await signedAudio(f.row.conference_callback, { AccountSid: accountSid, CallSid: f.customerSid,
+      ConferenceSid: f.row.conference_sid ?? "", FriendlyName: f.row.conference_id, ParticipantLabel: label,
+      StatusCallbackEvent: event, Timestamp: timestamp, SequenceNumber: sequence, Muted: "false", Hold: "false" })).status).toBe(204);
+  }
+}
+
+async function actualTiming(f: Awaited<ReturnType<typeof armed>>) {
+  const owner = await findVoicePhoneCustomerOwner(f.reservation.id);
+  if (!owner) throw new Error("Accepted customer owner required");
+  return recordVoiceCustomerCallTiming(owner, { sid: f.customerSid, accountSid, to: customer, from: callerId,
+    direction: "outbound-api", parentCallSid: null, status: "completed", duration: "42",
+    startTime: new Date("2026-11-01T14:00:00Z"), endTime: new Date("2026-11-01T14:00:42Z") });
 }
 
 function terminal(f: { customerSid: string }): Record<string, string> {
@@ -43,7 +63,7 @@ function terminal(f: { customerSid: string }): Record<string, string> {
 
 async function runBoundaryJob(partId: string) {
   const [row] = await sql`select id, type, params, max_attempts from public.job where workspace_id = ${workspaceId}::uuid
-    and idempotency_key = ${`voice_recording_boundary:${partId}`}`;
+    and idempotency_key like ${`voice_recording_phase_boundary:${partId}:%`} order by id desc limit 1`;
   if (!row) throw new Error("Durable recording boundary job required");
   const job: ClaimedJobRow = { id: Number(row.id), type: row.type, params: row.params, workspace_id: workspaceId,
     user_id: null, attempt_count: 1, max_attempts: row.max_attempts };
@@ -161,7 +181,8 @@ describe("recorded customer Start through an existing phone", () => {
     { enabled: false, completed: true }, { enabled: true, completed: true },
   ])("completed customer playback remains idempotent (batch=$enabled, customer ended=$completed)", async ({ enabled, completed }) => {
     const f = await armed(); await recordVoiceReservationProvider(f.reservation, f.customerSid);
-    if (completed) await enqueueFundedVoiceTerminalOutcome(workspaceId, f.customerSid, terminal(f));
+    await grantVisit(f);
+    if (completed) { await enqueueFundedVoiceTerminalOutcome(workspaceId, f.customerSid, terminal(f)); await actualTiming(f); }
     await sql`update public.workspace set feature_flags = ${sql.json({ batchTranscription: enabled })} where id = ${workspaceId}::uuid`;
     expect((await signedCustomerRecording(f.urls.customerRecording.callbackUrl, params(f, "completed"))).status).toBe(204);
     const part = await findVoiceRecordingOperation(f.urls.customerRecording.id); if (!part) throw new Error("Owned customer part required");
@@ -175,23 +196,29 @@ describe("recorded customer Start through an existing phone", () => {
     expect(storage.copy).toHaveBeenCalledTimes(1); expect(await state()).toMatchObject({ ledger: 0, reservations: 1 });
   });
 
-  test.each(["first callback", "late callback", "recovery"])("a copied recording retains batch work after %s timing", async source => {
+  test.each(["first callback", "late callback", "recovery"])("a copied recording retains batch work after %s and actual Call timing", async source => {
     const f = await armed(), owner = await recordVoiceReservationProvider(f.reservation, f.customerSid);
+    await grantVisit(f);
     await sql`update public.workspace set feature_flags = ${sql.json({ batchTranscription: true })} where id = ${workspaceId}::uuid`;
     if (source !== "first callback") await enqueueFundedVoiceTerminalOutcome(workspaceId, f.customerSid, { ...terminal(f), Timestamp: "" });
     expect((await signedCustomerRecording(f.urls.customerRecording.callbackUrl, params(f, "completed"))).status).toBe(204);
     const part = await findVoiceRecordingOperation(f.urls.customerRecording.id); if (!part) throw new Error("Owned customer part required");
     expect(await runVoiceRecordingCopy(workspaceId, part.id, part.lease_token)).toEqual({ copied: true });
     expect(await sql`select id from public.job where workspace_id = ${workspaceId}::uuid and type = 'elevenlabs_batch_transcribe'`).toHaveLength(0);
-    const retainBoundary = () => source === "recovery"
+    const retainBoundary = async () => {
+      const result = source === "recovery"
       ? recordVoiceCustomerCallTiming(owner, { sid: f.customerSid, accountSid, to: customer, from: callerId,
         direction: "outbound-api", parentCallSid: null, status: "completed", duration: "42",
         startTime: new Date("2026-11-01T14:00:00Z"), endTime: new Date("2026-11-01T14:00:42Z") })
       : enqueueFundedVoiceTerminalOutcome(workspaceId, f.customerSid, terminal(f));
+      await result;
+      if (source !== "recovery") await actualTiming(f);
+    };
     await retainBoundary(); await retainBoundary();
     const wakeups = await sql`select params from public.job where workspace_id = ${workspaceId}::uuid
-      and idempotency_key = ${`voice_recording_boundary:${part.id}`}`;
-    expect(wakeups).toEqual([{ params: { recordingOperationId: part.id, leaseToken: part.lease_token } }]);
+      and idempotency_key like ${`voice_recording_phase_boundary:${part.id}:%`}`;
+    expect(wakeups).toHaveLength(source === "recovery" ? 1 : 2);
+    for (const wakeup of wakeups) expect(wakeup).toEqual({ params: { recordingOperationId: part.id, leaseToken: part.lease_token } });
     expect(await runBoundaryJob(part.id)).toEqual({ copied: false });
     expect(await runBoundaryJob(part.id)).toEqual({ copied: false });
     expect(await sql`select params from public.job where workspace_id = ${workspaceId}::uuid and type = 'elevenlabs_batch_transcribe'`)
@@ -201,6 +228,7 @@ describe("recorded customer Start through an existing phone", () => {
 
   test.each(["recording_side_effects", "elevenlabs_batch_transcribe"])("retains copied media through a failed %s enqueue", async type => {
     const f = await armed(); await recordVoiceReservationProvider(f.reservation, f.customerSid);
+    await grantVisit(f);
     await sql`update public.workspace set feature_flags = ${sql.json({ batchTranscription: true })} where id = ${workspaceId}::uuid`;
     expect((await signedCustomerRecording(f.urls.customerRecording.callbackUrl, params(f, "completed"))).status).toBe(204);
     const part = await findVoiceRecordingOperation(f.urls.customerRecording.id); if (!part) throw new Error("Owned customer part required");
@@ -214,10 +242,12 @@ describe("recorded customer Start through an existing phone", () => {
       expect(saved).toEqual({ terminal_status: null, terminal_event_at: null });
     } else {
       await enqueueFundedVoiceTerminalOutcome(workspaceId, f.customerSid, terminal(f));
+      await actualTiming(f);
       await expect(runBoundaryJob(part.id)).rejects.toThrow();
     }
     await clearBoundaryFault();
     await enqueueFundedVoiceTerminalOutcome(workspaceId, f.customerSid, terminal(f));
+    await actualTiming(f);
     expect(await runBoundaryJob(part.id)).toEqual({ copied: false });
     expect(await runBoundaryJob(part.id)).toEqual({ copied: false });
     expect(await sql`select params from public.job where workspace_id = ${workspaceId}::uuid and type = 'elevenlabs_batch_transcribe'`)

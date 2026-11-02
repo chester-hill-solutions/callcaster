@@ -4,6 +4,7 @@ import { createTenantDb } from "./tenant-db";
 import { db } from "./db";
 import { voiceCustomerMediaBoundary } from "./voice-customer-media-boundary.server";
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
+import { readLockedVoiceCustomerPhase } from "./voice-customer-phase-proof.server";
 
 /** Snapshot the customer and capture set through the existing ownership fence. */
 export async function readVoiceCallRecordingManifest(workspaceId: string, callSid: string, audioUrl: string) {
@@ -27,7 +28,10 @@ export async function readLockedVoiceCallRecordingManifest(tx: CreditTransaction
   if (!rows.length) return owner.customer_recording_id
     ? { state: "pending" as const, reason: "recording_incomplete" } : { state: "legacy" as const };
   if (rows.length !== 1) return { state: "pending" as const, reason: "recording_assembly_required" };
-  return singlePartManifest(owner, rows[0], callSid, audioUrl);
+  const manifest = singlePartManifest(owner, rows[0], callSid, audioUrl);
+  if (manifest.state !== "single-part" || rows[0]?.kind !== "customer") return manifest;
+  const phase = await readLockedVoiceCustomerPhase(tx, owner, manifest.operationId);
+  return phase.state === "bounded" ? { ...manifest, phaseProof: phase.fingerprint } : phase;
 }
 
 function singlePartManifest(owner: typeof reservations.$inferSelect, row: typeof recordings.$inferSelect | undefined,
@@ -41,7 +45,7 @@ function singlePartManifest(owner: typeof reservations.$inferSelect, row: typeof
     return { state: "pending" as const, reason: "recording_incomplete" };
   const boundary = voiceCustomerMediaBoundary(owner);
   return boundary ? { state: "single-part" as const, operationId: row.id, recordingSid: row.provider_sid,
-    audioUrl: row.audio_url, customer: boundary } : { state: "pending" as const, reason: "customer_boundary_unproven" };
+    audioUrl: row.audio_url, customer: boundary, phaseProof: null } : { state: "pending" as const, reason: "customer_boundary_unproven" };
 }
 
 export type VoiceCallRecordingManifest = Awaited<ReturnType<typeof readLockedVoiceCallRecordingManifest>>;

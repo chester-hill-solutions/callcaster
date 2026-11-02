@@ -1,6 +1,7 @@
 import { accountSid, actor, baseUrl, callerId, clearFault, customer, fault, foreignId, otherActor, phone, rooms, signedAudio,
   sid, sql, state, web, workspaceId } from "../helpers/voice-audio-fixture";
 import { scenario, start, voice, busyPair, participant, finalStatus, windowState, useOwnedPredictiveFixture } from "../helpers/voice-phone-predictive-fixture";
+import { customerPhaseLabel } from "../helpers/voice-audio-customer-fixture";
 import { randomUUID } from "node:crypto";
 import twilio from "twilio";
 import { asRouteResponse, routeArgs } from "../helpers/route-result";
@@ -220,7 +221,7 @@ describe("predictive Start reuses confirmed phone audio", () => {
     const url = web.records.get(callSid)?.voiceUrl; if (!url) throw new Error('Owned voice URL required'); await voice(url, callSid);
     const [r] = await sql`select id, outreach_attempt_id from public.workspace_voice_reservation where provider_sid = ${callSid}`;
     const event = { AccountSid: accountSid, CallSid: callSid, ConferenceSid: f.row.conference_sid ?? '', FriendlyName: f.row.conference_id,
-      ParticipantLabel: `customer:${r.id}`, StatusCallbackEvent: 'participant-join', Timestamp: new Date().toISOString() };
+      ParticipantLabel: await customerPhaseLabel(r.id), StatusCallbackEvent: 'participant-join', Timestamp: new Date().toISOString() };
     expect((await signedAudio(f.row.conference_callback, event)).status).toBe(204);
     const [first] = await sql`select answered_at from public.outreach_attempt where id = ${r.outreach_attempt_id}`; expect(first.answered_at).not.toBeNull();
     const [queue] = await sql`select provider_status from public.campaign_queue where id =
@@ -238,7 +239,7 @@ describe("predictive Start reuses confirmed phone audio", () => {
     const [r] = await sql`select id, contact_id, outreach_attempt_id from public.workspace_voice_reservation where provider_sid = ${callSid}`;
     vi.mocked(emitPredictiveBroadcast).mockClear();
     const event = { AccountSid: accountSid, CallSid: callSid, ConferenceSid: f.row.conference_sid ?? '', FriendlyName: f.row.conference_id,
-      ParticipantLabel: `customer:${r.id}`, StatusCallbackEvent: 'participant-join', SequenceNumber: '7', Timestamp: new Date().toISOString() };
+      ParticipantLabel: await customerPhaseLabel(r.id), StatusCallbackEvent: 'participant-join', SequenceNumber: '7', Timestamp: new Date().toISOString() };
     expect((await signedAudio(f.row.conference_callback, event)).status).toBe(204);
     expect(emitPredictiveBroadcast).toHaveBeenCalledWith(workspaceId, expect.objectContaining({
       call_sid: callSid, user_id: actor, campaign_id: f.campaignId, contact_id: Number(r.contact_id),
@@ -264,7 +265,7 @@ describe("predictive Start reuses confirmed phone audio", () => {
     else await sql`update public.call set status = 'completed' where sid = ${callSid}`;
     vi.mocked(emitPredictiveBroadcast).mockClear();
     expect((await signedAudio(f.row.conference_callback, { AccountSid: accountSid, CallSid: callSid,
-      ConferenceSid: f.row.conference_sid ?? '', FriendlyName: f.row.conference_id, ParticipantLabel: `customer:${r.id}`,
+      ConferenceSid: f.row.conference_sid ?? '', FriendlyName: f.row.conference_id, ParticipantLabel: await customerPhaseLabel(r.id),
       StatusCallbackEvent: 'participant-join', SequenceNumber: '7', Timestamp: new Date().toISOString() })).status).toBe(204);
     expect(emitPredictiveBroadcast).not.toHaveBeenCalled();
     expect((await sql`select answered_at from public.outreach_attempt where id = ${r.outreach_attempt_id}`)[0].answered_at).toBeNull();
@@ -289,7 +290,7 @@ describe("predictive Start reuses confirmed phone audio", () => {
       assigned_to_user_id from public.campaign_queue where id = ${r.queue_id}`;
     expect(before.dispatch_generation).toBe(generation);
     expect((await signedAudio(f.row.conference_callback, { AccountSid: accountSid, CallSid: callSid,
-      ConferenceSid: f.row.conference_sid ?? '', FriendlyName: f.row.conference_id, ParticipantLabel: `customer:${r.id}`,
+      ConferenceSid: f.row.conference_sid ?? '', FriendlyName: f.row.conference_id, ParticipantLabel: await customerPhaseLabel(r.id),
       StatusCallbackEvent: 'participant-join', SequenceNumber: '7', Timestamp: new Date().toISOString() })).status).toBe(204);
     expect((await sql`select dispatch_generation, voice_reservation_id, queue_state, provider_status, dequeued_at,
       assigned_to_user_id from public.campaign_queue where id = ${r.queue_id}`)[0]).toEqual(before);
@@ -304,7 +305,7 @@ describe("predictive Start reuses confirmed phone audio", () => {
     const [r] = await sql`select id, outreach_attempt_id, queue_id from public.workspace_voice_reservation where provider_sid = ${callSid}`;
     await sql`update public.call set conference_id = null, start_time = null where sid = ${callSid}`;
     const event = { AccountSid: accountSid, CallSid: callSid, ConferenceSid: f.row.conference_sid ?? "", FriendlyName: f.row.conference_id,
-      ParticipantLabel: `customer:${r.id}`, StatusCallbackEvent: "participant-join", SequenceNumber: "7", Timestamp: new Date().toISOString() };
+      ParticipantLabel: await customerPhaseLabel(r.id), StatusCallbackEvent: "participant-join", SequenceNumber: "7", Timestamp: new Date().toISOString() };
     await sql.unsafe(`create function public.${fault}() returns trigger language plpgsql as $$ begin raise exception 'Owned predictive queue fault'; end $$`);
     await sql.unsafe(`create trigger ${fault} before update on public.campaign_queue for each row execute function public.${fault}()`);
     vi.mocked(emitPredictiveBroadcast).mockClear();
@@ -335,7 +336,7 @@ describe("predictive Start reuses confirmed phone audio", () => {
     await sql`update public.campaign_queue set provider_status = 'queued' where id = ${r.queue_id}`;
     const [before] = await sql`select answered_at from public.outreach_attempt where id = ${r.outreach_attempt_id}`;
     expect((await signedAudio(f.row.conference_callback, { AccountSid: accountSid, CallSid: callSid, ConferenceSid: f.row.conference_sid ?? "",
-      FriendlyName: f.row.conference_id, ParticipantLabel: `customer:${r.id}`, StatusCallbackEvent: "participant-join", SequenceNumber: "7",
+      FriendlyName: f.row.conference_id, ParticipantLabel: await customerPhaseLabel(r.id), StatusCallbackEvent: "participant-join", SequenceNumber: "7",
       Timestamp: new Date().toISOString() })).status).toBe(204);
     expect((await sql`select answered_at from public.outreach_attempt where id = ${r.outreach_attempt_id}`)[0]).toEqual(before);
     expect((await sql`select provider_status from public.campaign_queue where id = ${r.queue_id}`)[0].provider_status).toBe("in-progress");
@@ -464,7 +465,7 @@ describe("predictive Start reuses confirmed phone audio", () => {
     expect(await firstHuman.text()).toContain('<Conference');
     if (joined) expect((await signedAudio(f.row.conference_callback, { AccountSid: accountSid,
       CallSid: roots[0].provider_sid, ConferenceSid: f.row.conference_sid ?? '', FriendlyName: f.row.conference_id,
-      ParticipantLabel: `customer:${roots[0].id}`, StatusCallbackEvent: 'participant-join', SequenceNumber: '7',
+      ParticipantLabel: await customerPhaseLabel(roots[0].id), StatusCallbackEvent: 'participant-join', SequenceNumber: '7',
       Timestamp: new Date().toISOString() })).status).toBe(204);
     const secondHuman = await voice(roots[1].voice_url, roots[1].provider_sid);
     expect(secondHuman.status).toBe(200);
@@ -497,7 +498,7 @@ describe("predictive Start reuses confirmed phone audio", () => {
     expect(await (await voice(roots[0].voice_url, roots[0].provider_sid)).text()).toContain('<Conference');
     if (joined) expect((await signedAudio(f.row.conference_callback, { AccountSid: accountSid,
       CallSid: roots[0].provider_sid, ConferenceSid: f.row.conference_sid ?? '', FriendlyName: f.row.conference_id,
-      ParticipantLabel: `customer:${roots[0].id}`, StatusCallbackEvent: 'participant-join', SequenceNumber: '7',
+      ParticipantLabel: await customerPhaseLabel(roots[0].id), StatusCallbackEvent: 'participant-join', SequenceNumber: '7',
       Timestamp: new Date().toISOString() })).status).toBe(204);
     const [primary] = await sql`select queue_state, provider_status, dispatch_generation, voice_reservation_id, dequeued_at
       from public.campaign_queue where id = ${roots[0].queue_id}`;
@@ -534,7 +535,7 @@ describe("predictive Start reuses confirmed phone audio", () => {
     const [retry] = await sql`select * from public.campaign_queue where id = ${roots[1].queue_id}`;
     expect((await participant(f, roots[0], 'participant-leave', '8')).status).toBe(204);
     expect(await (await voice(roots[1].voice_url, roots[1].provider_sid)).text()).toContain('<Hangup');
-    expect((await participant(f, roots[1], 'participant-join', '9')).status).toBe(204);
+    expect((await participant(f, roots[1], 'participant-join', '9', { legacy: true })).status).toBe(204);
     expect((await sql`select * from public.campaign_queue where id = ${roots[1].queue_id}`)[0]).toEqual(retry);
     expect((await sql`select human_state from public.workspace_voice_reservation where id = ${roots[1].id}::uuid`)[0].human_state).toBe('refused');
   });
@@ -543,8 +544,8 @@ describe("predictive Start reuses confirmed phone audio", () => {
     const { f, roots, turn } = await busyPair();
     expect((await participant(f, roots[0], 'participant-join', '7')).status).toBe(204);
     vi.mocked(emitPredictiveBroadcast).mockClear();
-    expect((await participant(f, roots[1], 'participant-join', '8')).status).toBe(204);
-    expect((await participant(f, roots[1], 'participant-leave', '9')).status).toBe(204);
+    expect((await participant(f, roots[1], 'participant-join', '8', { legacy: true })).status).toBe(204);
+    expect((await participant(f, roots[1], 'participant-leave', '9', { legacy: true })).status).toBe(204);
     expect(emitPredictiveBroadcast).not.toHaveBeenCalled();
     expect(await turn()).toMatchObject({ message: 'Predictive admission deferred: queue_pending' });
     expect(web.create).toHaveBeenCalledTimes(2); expect(rooms.update).not.toHaveBeenCalled();

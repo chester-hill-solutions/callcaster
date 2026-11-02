@@ -551,25 +551,28 @@ describe("predictive and conference funding (#2879)", () => {
     provider.create.mockRejectedValueOnce(new Error("Owned recipient timeout"));
     expect((await signedRoute(agent.url, joinParams(agent))).status).toBe(500);
     const [reservation] = await sql`select * from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;
-    const sent = provider.create.mock.calls[1][0], at = new Date(Date.now() - 21 * 60_000), ended = new Date(Date.now() - 20 * 60_000);
+    const sent = provider.create.mock.calls[1][0], at = reservation.recipient_instruction_issued_at, ended = new Date(at.getTime() + 60_000);
     const root = { ...await provider.create.mock.results[0].value, status: "completed", duration: "90", dateCreated: at, dateUpdated: ended, endTime: ended };
     const child = { ...sent, sid: sid(), accountSid, parentCallSid: null, direction: "outbound-api", status: "completed", duration: "42",
       dateCreated: at, dateUpdated: ended, endTime: ended };
     provider.fetch.mockImplementation(async (id: string) => id === agent.setupSid ? root : child);
     provider.list.mockResolvedValue([child]);
-    await sql`update public.workspace_voice_reservation set send_started_at = ${at}, recipient_instruction_issued_at = ${at},
-      lease_expires_at = now() - interval '1 minute' where id = ${reservation.id}::uuid`;
-    const { runVoiceCreditRecovery } = await import("@/lib/voice-credit-recovery.server");
-    // Setup history cannot prove the independently created recipient.
-    provider.events.mockResolvedValue([{ request: { method: "POST", url: root.url, parameters: { call_sid: child.sid } } }]);
-    expect(await runVoiceCreditRecovery()).toMatchObject({ pending: 1, settled: 0 });
-    expect(await state()).toEqual({ credits: 100, holds: 1, ledger: 0 });
     await sql`update public.workspace_voice_reservation set lease_expires_at = now() - interval '1 minute' where id = ${reservation.id}::uuid`;
-    provider.events.mockResolvedValue([{ request: { method: "POST", url: sent.statusCallback, parameters: { call_sid: child.sid } } }]);
-    expect(await runVoiceCreditRecovery()).toMatchObject({ settled: 1, pending: 0 });
-    expect(await state()).toEqual({ credits: 96, holds: 0, ledger: 1 }); expect(provider.create).toHaveBeenCalledTimes(2);
-    const [saved] = await sql`select parent_call_sid, direction from public.call where sid = ${child.sid}`;
-    expect(saved).toEqual({ parent_call_sid: null, direction: "outbound-api" });
+    const { runVoiceCreditRecovery } = await import("@/lib/voice-credit-recovery.server");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(ended.getTime() + 20 * 60_000));
+    try {
+      // Setup history cannot prove the independently created recipient.
+      provider.events.mockResolvedValue([{ request: { method: "POST", url: root.url, parameters: { call_sid: child.sid } } }]);
+      expect(await runVoiceCreditRecovery()).toMatchObject({ pending: 1, settled: 0 });
+      expect(await state()).toEqual({ credits: 100, holds: 1, ledger: 0 });
+      await sql`update public.workspace_voice_reservation set lease_expires_at = now() - interval '1 minute' where id = ${reservation.id}::uuid`;
+      provider.events.mockResolvedValue([{ request: { method: "POST", url: sent.statusCallback, parameters: { call_sid: child.sid } } }]);
+      expect(await runVoiceCreditRecovery()).toMatchObject({ settled: 1, pending: 0 });
+      expect(await state()).toEqual({ credits: 96, holds: 0, ledger: 1 }); expect(provider.create).toHaveBeenCalledTimes(2);
+      const [saved] = await sql`select parent_call_sid, direction from public.call where sid = ${child.sid}`;
+      expect(saved).toEqual({ parent_call_sid: null, direction: "outbound-api" });
+    } finally { vi.useRealTimers(); }
   });
   test("an early funded terminal outcome cannot use the legacy path after a queue rebuild", async () => {
     await turn(); const first = provider.create.mock.calls[0][0];

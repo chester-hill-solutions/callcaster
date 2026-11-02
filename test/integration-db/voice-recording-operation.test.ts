@@ -143,7 +143,8 @@ describe("owned recording parts (#2879)", () => {
     const { persistReservedVoiceCall } = await import("@/server/voice-reservation-callback.server");
     return db.transaction(async (tx) => {
       const [issued] = await tx.update(reservations).set({ setup_sid: rootSid, state: "creating",
-        send_started_at: new Date(), recipient_instruction_issued_at: new Date() }).where(eq(reservations.id, reservation.id)).returning();
+        send_started_at: new Date(), recipient_instruction_issued_at: drizzleSql`coalesce(${reservations.recipient_instruction_issued_at}, clock_timestamp())` })
+        .where(eq(reservations.id, reservation.id)).returning();
       if (!issued) throw new Error("Owned fixture instruction required");
       await persistReservedVoiceCall(tx, issued, rootSid, "setup");
       return journal.armVoiceDialRecording(tx, issued, operation.id);
